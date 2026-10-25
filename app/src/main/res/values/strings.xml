@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Viewy</string>
+    <string name="preview_placeholder">Camera preview coming soon</string>
+    <string name="foundation_hint">Distance estimation, simply.</string>
+    <string name="controls_hint">Measurement controls coming soon</string>
+    <string name="measure">Measure (coming soon)</string>
+    <string name="settings">Settings (coming soon)</string>
+    <string name="pinned_object">Pinned object (coming soon)</string>
+</resources>
