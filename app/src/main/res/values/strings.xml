@@ -6,4 +6,15 @@
     <string name="measure">Measure (coming soon)</string>
     <string name="settings">Settings (coming soon)</string>
     <string name="pinned_object">Pinned object (coming soon)</string>
+    <string name="camera_starting">Starting rear camera…</string>
+    <string name="camera_timeout">Camera preview did not start. Retry the camera.</string>
+    <string name="camera_unavailable">Camera is unavailable. Close other camera apps, then retry.</string>
+    <string name="camera_display_changed">Display changed. Restarting preview…</string>
+    <string name="camera_start_failed">Unable to start the rear camera. Retry or check camera access in Settings.</string>
+    <string name="camera_initialization_failed">Unable to initialize the rear camera. Retry the camera.</string>
+    <string name="camera_no_rear">This device has no available rear camera.</string>
+    <string name="camera_no_consistent_lens">A consistent rear lens is unavailable on this device.</string>
+    <string name="camera_configuration_failed">Unable to configure a consistent rear preview. Retry the camera.</string>
+    <string name="camera_ready">Rear camera ready</string>
+    <string name="camera_waiting">Waiting for rear camera preview…</string>
 </resources>
