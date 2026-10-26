@@ -1,24 +1,29 @@
 # Viewy
 
-An offline Android app intended to estimate distance using the camera, phone
-orientation, and an estimated object height. Application ID: `com.malagel.viewy`.
+Viewy is an offline Android app for approximate physical measurements using phone
+cameras, orientation sensors and other supported hardware. The current method
+estimates horizontal distance to a vertical object from its assumed height and
+two aiming directions. Application ID: `com.malagel.viewy`.
 
-Phase C implements the first complete measurement: **Long Distance → Known Object
-Height → Two Endpoint Captures**. Allow camera access, enter height in meters or
-feet, aim at the top and capture, then aim at the bottom and capture within 15 s.
-Keep the camera position fixed and pause before each capture. The result estimates
-horizontal distance, with alignment guidance and explicit unquantified uncertainty.
-Everything runs offline; no photos, recordings, history or telemetry are stored.
+## Basic usage
 
-The preview-center direction is approximate: optional usable lens-pose metadata
-improves the device-axis estimate; absent/unsuitable metadata uses labeled device
-−Z. Preview timing and optical principal-point alignment are not calibrated.
+1. Allow camera access and enter the vertical distance between the object's
+   endpoints in meters or decimal feet.
+2. Keep the camera location fixed. Aim the centered reticle at the top, stop for
+   about one second, then capture while still.
+3. Aim at the bottom on the same vertical line, settle, and capture within 15 s
+   of the top capture. Remain still briefly after each capture.
+4. Read the approximate horizontal distance. Use recapture bottom or restart
+   to try again; saving a height starts a new measurement.
 
-- [Product requirements](docs/PRODUCT_SPEC.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Orientation conventions and Galaxy S22 validation](docs/ORIENTATION_ACQUISITION.md)
-- [Camera mapping, measurement behavior and device validation](docs/CAMERA_MEASUREMENT.md)
-- [Build and testing status](docs/BUILD_VERIFICATION.md)
+Follow alignment/stability guidance. Preview-center aiming and preview/sensor
+timing are approximate, and uncertainty is unquantified. No photos, recordings,
+measurement history or telemetry are stored; the app operates entirely offline.
+
+- [Product specification](docs/PRODUCT_SPEC.md): implemented behavior and future requirements.
+- [Architecture](docs/ARCHITECTURE.md): component boundaries and technical contracts.
+- [Validation](docs/VALIDATION.md): evidence, limitations and verification procedures.
+- [Development rules](AGENTS.md): repository engineering and resource restrictions.
 
 ## Development setup
 
@@ -35,23 +40,16 @@ compile and target API are 37. Keep local paths and signing keys out of Git.
 
 ## Build and test
 
-From the repository root:
+From the repository root, build the debug APK with bounded resource use:
 
 ```sh
-./gradlew :app:assembleDebug
-./gradlew :app:testDebugUnitTest
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_deploy.py'
+./gradlew --no-daemon --max-workers=1 --no-watch-fs :app:assembleDebug
 ```
 
-The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. JVM tests cover the
-known-height domain, orientation transforms, acquisition quality/time rules,
-camera-axis mapping, height conversion, and measurement workflow;
-instrumentation tests are not implemented.
-The Python tests mock ADB and Gradle to check the deployment script.
-Debug builds expose optional **Development diagnostics** below the measurement
-controls, sharing the production sensor session. Follow the Phase C Galaxy S22
-validation guide before relying on measurements.
-Device checks should also cover both themes, font scaling, rotation, and insets.
+The APK is `app/build/outputs/apk/debug/app-debug.apk`. Reproducible test/lint
+commands, recorded results and hardware procedures are in
+[Validation](docs/VALIDATION.md). Run only checks relevant to your change;
+[AGENTS.md](AGENTS.md) defines resource and device restrictions.
 
 ## Install and run
 
@@ -63,7 +61,8 @@ adb shell am start -n com.malagel.viewy/.MainActivity
 ```
 
 Alternatively, `./scripts/deploy.sh` builds, installs while preserving app data,
-and launches Viewy. VSCodium's **Viewy: Build & Deploy** task runs the same script.
+and launches Viewy. The script invokes a standard Gradle assembly without the
+resource flags above. VSCodium's **Viewy: Build & Deploy** task runs the same script.
 Optional machine settings belong in `scripts/deploy.local.conf` (ignored by Git).
 This is a trusted Bash file; for example:
 

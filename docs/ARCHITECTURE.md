@@ -1,152 +1,232 @@
 # Architecture
 
-## Current structure
+## Components and ownership
 
-Viewy retains one `app` module and one `ComponentActivity`. `MainActivity` owns
-edge-to-edge setup and resume/pause forwarding. `ViewyScreen` renders the camera,
-height editor, method explanation, capture control, guidance and result using
-Material 3 light/dark themes. Insets, bounded width and scrolling accommodate
-short windows and large fonts; device rendering remains to be validated.
+Viewy has one `app` module and one `ComponentActivity`. `MainActivity` owns
+edge-to-edge setup and resume/pause forwarding. `ViewyScreen` renders Material 3
+camera, height, guidance, capture and result controls; it collects state with
+lifecycle awareness. Insets, bounded width and scrolling support constrained
+layouts. Product behavior is defined in [Product specification](PRODUCT_SPEC.md).
 
-## State and responsibility boundaries
+Source paths below are relative to `app/src/main/java/com/malagel/viewy/`:
 
-- `camera/CameraPreview.kt` owns CameraX Preview only, camera selection/pinning,
-  optional metadata inspection, stream/error monitoring and unbinding. Compose
-  owns its view/lifecycle with `DisposableEffect`; CameraX owns camera start/stop.
-- `camera/CameraDirectionMapping.kt` is a pure, testable device-space axis policy.
-  Image/display rotation is not optical pose. Preview-center alignment remains an
-  explicit approximation; see [Camera measurement](CAMERA_MEASUREMENT.md).
-- `measurement/HeightInput.kt` validates positive decimal height and converts
-  meters/feet without presentation rounding.
-- `measurement/KnownHeightWorkflow.kt` owns method-specific immutable snapshots
-  and explicit top/bottom/correction/result transitions, freshness/frame checks,
-  alignment gates, retry and restart. It calls the unchanged Phase A calculator.
-- `ui/MeasurementViewModel.kt` owns ONE foreground orientation adapter, the workflow
-  and StateFlow. Camera streaming plus Activity resume enable acquisition; losing
-  either invalidates captures. UI collects state with lifecycle awareness.
-- `OrientationDiagnosticsState` / `OrientationDiagnosticsPanel` provide debug-only
-  A/B captures using the same acquisition. Source changes reset the measurement.
-  The former standalone diagnostics ViewModel was removed to avoid two pipelines.
+| Component | Responsibility |
+| --- | --- |
+| `domain/MeasurementCatalog.kt` | Stable mode/method identities, separate from method-specific workflows; no generic algorithm framework. |
+| `domain/KnownHeightDistance.kt` | Pure Kotlin geometry, typed failures, conditioning diagnostics and conditional input-bound propagation. |
+| `orientation/OrientationMath.kt` | Pure quaternion parsing/rotation, ray angles and circular differences. |
+| `orientation/OrientationSession.kt` | Pure bounded recent-ray statistics, frame/time validity, captures and pair compatibility. |
+| `orientation/AndroidOrientationAcquisition.kt` | Sensor discovery/registration, callback isolation, freshness publication and cleanup. |
+| `camera/CameraDirectionMapping.kt` | Pure policy mapping the selected optical axis into native device axes. |
+| `camera/CameraPreview.kt` | CameraX Preview selection/pinning, metadata, stream/errors and unbinding. |
+| `measurement/HeightInput.kt` | Decimal validation and meters/feet conversion without presentation rounding. |
+| `measurement/KnownHeightWorkflow.kt` | Immutable top/bottom/correction/result state, compatibility/alignment gates, retry and restart. |
+| `ui/MeasurementViewModel.kt` | One shared foreground sensor adapter, workflow and immutable StateFlow snapshots. |
+| `ui/OrientationDiagnosticsState.kt` and `ui/OrientationDiagnosticsPanel.kt` | Debug A/B captures, separate from measurement endpoints but sharing acquisition. |
 
-No camera/sensor work or distance math lives in large composables. Sensor events,
+Math and workflow logic are independent of Android/Compose. Sensor callbacks,
 workflow actions and periodic freshness updates are serialized on main. The
-adapter uses application context and is stopped on pause and ViewModel cleanup.
-The preview adapter closes observers, display listeners and its own use case on
-disposal; it never unbinds unrelated CameraX use cases.
+adapter uses application context; there is no background sensor service.
 
-## Phase A measurement domain
+## Measurement domain
 
-`domain/MeasurementCatalog.kt` defines stable `long_distance` mode and
-`known_object_height` method identifiers. The latter represents Known Object
-Height — Two Endpoint Captures. This is a minimal catalog, without a generic
-algorithm interface or framework.
+`KnownHeightDistance.estimate` accepts positive height H in meters and two finite,
+nonzero 3D rays in the same gravity-aligned frame: +Z up, X/Y horizontal. Ray
+magnitude is irrelevant; pitch alone is insufficient. With elevation
+`atan2(z, hypot(x,y))`, horizontal distance is:
 
-`domain/KnownHeightDistance.kt` is pure Kotlin, independent of Android and Compose.
-`KnownHeightDistance.estimate` takes height in meters and two 3D rays in one
-gravity-aligned frame, with positive Z up and X/Y horizontal. Camera/sensor frame
-transforms belong to the Phase B acquisition adapter. Device pitch alone is not an
-input to this algorithm.
+```
+distance = H / (topSlope - bottomSlope)
+slope = z / hypot(x,y)
+```
 
-For each ray, elevation is `atan2(z, hypot(x, y))`, and its tangent is computed
-directly as `z / hypot(x, y)`. Components are first scaled by their largest absolute
-value to avoid norm overflow/underflow. Horizontal distance is
-`H / (topSlope - bottomSlope)`. The model assumes a vertical object, endpoints
-at the same horizontal position, and an approximately stationary camera. It does
-not estimate slant range or detect camera movement.
+The object is assumed vertical, both endpoints share one horizontal position,
+and the camera stays approximately stationary. This estimates horizontal distance
+to that vertical line, not slant range or general 3D endpoint geometry. The domain
+diagnoses bearing mismatch without rejecting it; the workflow applies usability
+gates. Misaligned results remain conditional on the geometric assumptions.
 
-`KnownHeightResult` distinguishes estimates from typed failures, including invalid
-height/rays, undefined horizontal bearing, reversed endpoints, degenerate
-elevations, unusable distance and invalid uncertainty bounds. A zero horizontal
-vector has undefined bearing; a nonzero, near-vertical ray is accepted when its
-slopes and distance remain finite and usable. Slope overflow (including loss of
-the normalized horizontal component) returns `UNUSABLE_DISTANCE`. The absolute
-slope difference must exceed 32 times the unit Double ULP times
-`max(1, abs(topSlope), abs(bottomSlope))`. Differences within this guard are
-degenerate in either order; larger negative differences indicate reversed endpoints.
-This protects numerical resolution, not calibrated sensor or usability thresholds.
+Typed failures distinguish invalid height/rays/bounds, undefined horizontal
+bearing, reversed endpoints, degenerate elevations and unusable distance. Exactly
+vertical rays have undefined bearing; finite nonvertical rays near a pole may
+still yield usable nominal geometry. Scaling and cancellation-resistant arithmetic
+protect extreme inputs. A relative floating-point resolution guard distinguishes
+degeneracy from reversed order; it is not a calibrated angular threshold.
 
-Diagnostics expose both elevations, elevation separation, signed top-minus-bottom
-bearing difference wrapped to `[-PI, PI]`, its absolute alignment error, and the
-absolute first-order distance sensitivity to each elevation in meters per radian.
-Separation uses an `atan2` determinant/dot-product formula in the elevation plane
-to preserve small differences even when individual elevations round to `+/-PI/2`.
-Sensitivities factor the secant squared to avoid intermediate slope-square
-overflow; an overflowing derivative is null. Sensitivities indicate conditioning;
-they are not measurement error estimates. Bearing uses the original X/Y
-components independently of ray scaling. Its sign is ambiguous at an antipodal
-separation, and circular differences have a branch at `+/-PI`; future guidance
-must respect that wraparound. Misalignment does not reject an observation or
-imply a calibrated quality classification. When bearings differ, a scalar distance
-is conditional on the same-horizontal-position assumption; it is not a general
-solution for endpoints at different horizontal positions. Bearing reliability near
-vertical depends on input accuracy, which this domain does not infer.
+Diagnostics include elevations, separation, wrapped signed **top minus bottom**
+bearing and absolute first-order elevation sensitivities in meters/radian.
+Sensitivity describes conditioning, not error. An overflowing derivative is null.
+Bearing differences follow the short circular arc in `[-pi, pi]`; antipodal sign
+is ambiguous. Near-pole bearing reliability depends on input accuracy.
 
-Optional `InputBounds` are inclusive absolute bounds in meters or radians; all
-supplied bounds must be finite, ordered and contain the nominal value. Height
-bounds must be positive, and elevation bounds must lie strictly inside
-`(-PI/2, PI/2)` to exclude poles and undefined bearings. Invalid partial inputs
-are also rejected. Absent or incomplete bounds produce `Unavailable` uncertainty
-while preserving a valid nominal estimate. An extreme near-vertical ray may have
-an individual elevation rounded to `+/-PI/2`; no allowed Double angle bounds can
-enclose that value, even though the vector-based nominal result remains usable.
+Optional `InputBounds` are inclusive absolute height/elevation bounds. Each
+supplied bound must be finite, ordered and contain its nominal value; height
+bounds are positive and elevation bounds lie strictly inside `(-pi/2, pi/2)`.
+Invalid partial bounds are rejected; valid incomplete bounds preserve the estimate
+with `Unavailable` uncertainty. A usable extreme ray can have its nominal angle
+round to a pole, where no permitted angle bounds can enclose it.
 
-For complete bounds, monotonicity gives the smallest distance as
-`Hmin / (tan(topMax) - tan(bottomMin))` and the largest as
-`Hmax / (tan(topMin) - tan(bottomMax))`. For same-sign angles the denominator uses
-`sin(top - bottom) / (cos(top) * cos(bottom))`, avoiding cancellation between
-nearly equal tangents. Opposite-sign tangents are subtracted directly to avoid
-sine argument rounding near `+/-PI`. Angular endpoint ordering determines whether
-the minimum denominator can reach zero or become negative; in that case the
-positive-distance portion is `Unbounded`, with an explicit
-finite lower bound and no finite upper bound. Nonpositive-denominator combinations
-cannot describe the assumed positive-height geometry. Arithmetic overflow or
-underflow that prevents a usable interval is `NumericallyIndeterminate`, rather
-than a fabricated finite bound. Bounds are extrema evaluated in Double arithmetic,
-not a formally outward-rounded interval arithmetic implementation.
+Complete bounds propagate by monotonic extrema. Results are `Bounded`, `Unbounded`
+when allowed geometry approaches a zero positive denominator, or
+`NumericallyIndeterminate` when floating-point range prevents a usable interval.
+Nonpositive-denominator combinations cannot describe the assumed geometry. Bounds
+use Double arithmetic, not formally outward-rounded interval arithmetic. They
+are conditional on supplied bounds and assumptions, not confidence intervals;
+unspecified sensor bias, object tilt, translation and calibration errors are not
+included. Production supplies nominal inputs only and does not infer bounds from
+stationary variation. The result renderer supports the domain's conditional
+bounded, unbounded and indeterminate states, but there is no bounded-input editor.
 
-Intervals are conditional on all supplied bounds and geometric assumptions.
-They are not confidence intervals and do not include unspecified systematic
-errors, movement, object tilt, or sensor calibration errors. No default uncertainty
-or precision is invented. JVM tests in `app/src/test` cover geometry, invariance,
-invalid inputs, diagnostics and deterministic uncertainty propagation.
+## Coordinate systems and optical mapping
 
-## Phase B orientation acquisition
+All rotations use right-handed frames, column vectors and active Hamilton
+quaternions in x,y,z,w order. Quaternion sign reversal describes the same rotation.
 
-- `orientation/OrientationMath.kt`: pure quaternion parsing/rotation and ray
-  angles, independent of Android and UI. Camera mapping defaults to the explicit
-  uncalibrated device −Z assumption; the acquisition session also accepts the
-  selected camera axis and mapping identity. Display rotation does not remap it.
-- `orientation/OrientationSession.kt`: pure bounded recent-ray statistics,
-  timestamp validation, source/frame identity, typed capture gating and pair
-  comparisons. Captures use Phase A's existing `ViewingDirection`.
-- `orientation/AndroidOrientationAcquisition.kt`: platform sensor discovery,
-  checked registration, game-rotation preference/startup rotation-vector fallback,
-  per-registration callback isolation, pause cleanup, and periodic freshness state.
-- `ui/MeasurementViewModel.kt`: production and debug share one adapter/session.
-  The workflow clears endpoints when source, reference frame, camera configuration
-  or mapping changes. Release builds now acquire orientation for measurements.
+- **Device D:** Android native +X right, +Y toward device top, +Z out of the
+  screen. Display rotation does not change these axes, including on devices
+  whose natural orientation is landscape.
+- **Reference W:** `vW = R_WD * vD`. Rotation Vector uses East/North/Up;
+  Game Rotation Vector retains +Z up with an arbitrary, potentially drifting
+  horizontal reference. A game bearing is not compass heading.
+- **Camera C:** +Z points from the lens into the scene. The labeled uncalibrated
+  fallback is device `(0,0,-1)`, identified by
+  `rear-negative-device-z-assumption-v1` within the selected camera identity.
+- **Display/image:** image rotation changes image axes, not the physical center
+  aiming direction. `SENSOR_ORIENTATION` is image rotation, not optical pose.
 
-Quality limits remain provisional policy, not calibrated error bounds. Orientation
-cannot establish camera translation or distinguish heading drift from real motion.
-No uncertainty is fabricated from stability statistics.
-The full coordinate contracts, API research, limitations, and manual validation
-procedures are in [Orientation acquisition](ORIENTATION_ACQUISITION.md).
+Camera2 pose rotation maps device to camera. For suitable selected-camera metadata:
 
-## Build and dependencies
+```
+vD = inverse(R_CD) * (0,0,1)
+vW = R_WD * vD
+```
 
-Dependency versions are pinned in `gradle/libs.versions.toml`; the Gradle wrapper
-pins its distribution and SHA-256 checksum. Build Tools are pinned to 36.0.0.
+For a rotation matrix the inverse is its transpose; composition order matters.
+Only explicit PRIMARY_CAMERA or GYROSCOPE pose references on API 28+ are accepted,
+with four finite near-unit quaternion components and a rear-hemisphere axis.
+These references share sensor axes but differ in translation origin, irrelevant
+for a direction. Missing/pre-28, undefined, automotive, unknown, malformed or
+contradictory metadata uses the labeled fallback. Mapping identity incorporates
+selected logical/physical camera, pose reference and quaternion or fallback;
+a mapping change starts a new sensor session.
 
-AGP 9 supplies built-in Kotlin. The root buildscript upgrades its Kotlin Gradle
-plugin to 2.4.21, matching the Compose compiler plugin. Do not apply the separate
-Kotlin Android plugin alongside built-in Kotlin.
+With fallback mapping, identity orientation aims down (−WZ); +90° device-X
+rotation aims +WY, and a +90° WZ turn moves +WY toward −WX. Local device-Z roll
+preserves that assumed ray. Elevation is `atan2(z, hypot(x,y))`; bearing is
+`atan2(y,x)`, positive from +X toward +Y, not compass azimuth. Bearing is suppressed
+near vertical while elevation/ray remain available. No Euler averaging or
+pitch-only reconstruction is used.
 
-JUnit 4 is the only test dependency. Phase B explicitly declares the AndroidX
-Lifecycle ViewModel and runtime-compose libraries already present transitively
-in the UI stack for state ownership and lifecycle-aware collection. Phase C adds
-CameraX camera2/lifecycle/view 1.6.2 (stable), including
-its transitive dependencies. Only Preview is instantiated. Camera2 interop opt-in
-is isolated in the camera adapter for physical-lens pinning and stabilization
-requests. No analytics, advertising, navigation, dependency injection or storage
-features are introduced. Add dependencies only as features require them,
-while preserving offline operation.
+Reported lens pose is not independent calibration. Preview center need not equal
+the optical principal point. Intrinsics are diagnostic only: verified stream crop,
+distortion/rectification, focus dependence and metadata correspondence are absent.
+A valid future pixel-to-device transform must establish all of these together;
+applying a static pinhole correction alone would imply unsupported precision.
+Optical misalignment, stabilization, lens breathing and vendor processing can
+still affect the visible center ray.
+
+## Sensor sessions and observation compatibility
+
+Game Rotation Vector is preferred for short relative comparisons: it avoids
+magnetic corrections but permits heading drift. Rotation Vector is a startup
+fallback when game is absent or registration fails; it can respond to magnetic
+interference. There is no custom fusion or raw gyro integration. A running sensor
+never silently switches on stalls/unreliability. Explicit debug source selection
+or retry starts a new session and clears captures.
+
+The adapter checks registration and reports unavailable sources/failure. Sampling
+is a platform hint with no batching; short callbacks validate data, retained
+samples are rate-limited in a bounded time/count window, and periodic publication
+updates freshness even without events. Android three-/four-/five-element vectors
+are supported: optional w is reconstructed nonnegative for three elements; the
+fifth heading-accuracy field is not quaternion data or an inferred error bound.
+Malformed/nonfinite rotation components and gross norm errors are rejected; small
+platform roundoff is normalized.
+
+Each observation retains a unit ray, original sensor timestamp on the
+`elapsedRealtimeNanos` time base, source, reference UUID, mapping ID and quality.
+Pairs require identical source/frame/mapping, strictly increasing sensor times
+and a bounded elapsed interval. Wall-clock or UI receipt time never replaces
+sensor time. Invalid/non-increasing/future/old events invalidate the frame;
+long sample gaps, abrupt full-quaternion steps, platform discontinuity flags
+when available, and transitions into/out of unreliable status also reset it.
+Abrupt-motion detection cannot distinguish fast legitimate movement from reset.
+No observation may span registrations, even if a platform reference persists.
+Queued callbacks carry a registration token to prevent contamination of a new session.
+
+Quality includes age, time coverage, sample count, directional RMS/max variation,
+latest full-orientation step and raw platform accuracy. Unknown accuracy is not
+promised confidence. Sphere-based directional statistics measure aiming steadiness;
+near-cancelling rays cannot form a usable mean. Gradual roll about the aiming axis
+can remain steady, while abrupt full-device rotation resets the frame. Capture
+records the latest actual accepted ray, not the mean, and recomputes freshness
+at the button press. The first sample in a new frame has no previous-step diagnostic.
+
+`AcquisitionPolicy` and `MeasurementPolicy` in source define provisional operational
+gates for freshness, settling, motion, pair duration, alignment, near-vertical aim,
+separation and duplicate taps. These are not calibrated error or confidence bounds.
+Slow drift or magnetic corrections can pass steadiness checks. Orientation cannot
+detect translation or distinguish real rotation from reference drift.
+
+## Camera, workflow and lifecycle
+
+CameraX binds only Preview. The first default rear camera is selected; for a
+logical output, readable physical rear candidates are ordered deterministically
+and the one with largest reported sensor area is pinned through Camera2 interop.
+This is not a field-of-view/accuracy guarantee. If inspection/pinning/binding fails,
+report failure rather than silently allow lens switching. Nonlogical/older outputs
+retain the selected camera ID. There is no zoom command or lens-switch UI.
+
+A 4:3 stream is requested with supported-resolution fallback. PreviewView uses
+COMPATIBLE/TextureView for rounded clipping/overlays and FILL_CENTER for
+aspect-preserving centered crop. CameraX handles image rotation. Display changes,
+including 180° without recreation, rebind and invalidate captures. EIS/preview
+stabilization and OIS are requested off; autofocus/exposure remain at defaults.
+Requests do not prove hardware behavior. There is no image analysis, photo capture,
+recording, focus lock, automatic endpoint detection or camera extension.
+
+Capture requires OPEN plus STREAMING and resumed Activity. Permission is rechecked
+on resume; denial and camera errors expose recovery. Startup timeout runs only
+while STARTED so background initialization does not spuriously fail. Compose owns
+the preview through DisposableEffect; CameraX owns lifecycle start/stop. Disposal
+removes observers/display listeners and unbinds only this Preview.
+
+The ViewModel enables its single sensor adapter only while resumed and camera
+ready. Pause, camera loss/reconfiguration, recreation or source/frame/mapping
+changes invalidate endpoints/results. Pause removes the sensor listener/freshness
+timer; ViewModel cleanup releases acquisition. No session survives process death.
+Debug A/B captures share this pipeline without sharing measurement endpoints.
+
+The workflow owns top/bottom/correction/result transitions, finite height,
+compatibility checks and retry. Saving height restarts; bottom recapture reuses
+top only while frame/time validity permits. Alignment works independently of height
+or distance geometry: positive **current minus top** wrapped bearing means turn
+physically right (decrease bearing), negative means left. Screen orientation and
+roll do not change that gravity-relative meaning. Gates cannot establish fixed
+camera position.
+
+There is no preview-exposure/sensor synchronization: neither tap time nor latest
+sensor timestamp identifies the displayed frame's exposure. Rendering, processing,
+exposure and scheduling add unmeasured latency, potentially worse in low light.
+No constant latency correction or extrapolation is applied. Settling before and
+remaining still after capture is a mitigation, not a latency bound.
+
+## Build contracts
+
+Versions live in `gradle/libs.versions.toml` and Gradle build files; the wrapper
+pins its distribution and checksum. AGP supplies built-in Kotlin, upgraded by the
+root buildscript to match the Compose compiler; do not also apply Kotlin Android.
+JUnit 4 supports JVM tests. Camera2 interop opt-in stays in the camera adapter.
+The manifest requests CAMERA and removes the transitive network-state permission;
+there are no Internet, microphone, location or storage permissions. No navigation,
+dependency-injection or persistence framework is implemented.
+
+See [README](../README.md) for setup and [Validation](VALIDATION.md) for test
+coverage, recorded evidence and outstanding physical checks.
+
+Platform references for the frame and preview contracts:
+[Android rotation-vector sensors](https://developer.android.com/develop/sensors-and-location/sensors/sensors_motion),
+[sensor coordinates/lifecycle](https://developer.android.com/develop/sensors-and-location/sensors/sensors_overview),
+[Camera2 lens characteristics](https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics),
+and [CameraX PreviewView](https://developer.android.com/reference/androidx/camera/view/PreviewView).
+These API contracts do not validate any physical lens or measurement accuracy.
