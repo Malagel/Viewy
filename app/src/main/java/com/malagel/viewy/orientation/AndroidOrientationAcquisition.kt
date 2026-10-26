@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.Build
 import android.os.Looper
 import android.os.SystemClock
+import com.malagel.viewy.camera.CameraDirectionMapping
 
 /** Immutable snapshots. Sensor callbacks and publication are confined to the main looper. */
 data class AcquisitionState(
@@ -39,7 +40,7 @@ class AndroidOrientationAcquisition(context: Context, private val onState: (Acqu
     }
 
     /** Fallback is attempted only before a registration/session starts. Explicit restarts reset it. */
-    fun start(requestedSource: OrientationSource? = null) {
+    fun start(requestedSource: OrientationSource? = null, mapping: CameraDirectionMapping? = null) {
         check(Looper.myLooper() == Looper.getMainLooper())
         stop()
         val sensors = OrientationSource.entries.mapNotNull { source ->
@@ -50,7 +51,9 @@ class AndroidOrientationAcquisition(context: Context, private val onState: (Acqu
         val failed = mutableListOf<String>()
         for (source in candidates) {
             val sensor = sensors[source] ?: continue
-            val newSession = OrientationSession(source)
+            val newSession = if (mapping == null) OrientationSession(source) else OrientationSession(
+                source, deviceDirection = mapping.deviceDirection, cameraMappingId = mapping.id,
+            )
             val token = generation
             val newListener = object : SensorEventListener {
                 override fun onSensorChanged(event: SensorEvent) {

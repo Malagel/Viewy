@@ -91,7 +91,12 @@ fun compareObservations(
 }
 
 /** Pure Kotlin acquisition state. All calls are serialized by the Android adapter on main. */
-class OrientationSession(val source: OrientationSource, private val policy: AcquisitionPolicy = AcquisitionPolicy()) {
+class OrientationSession(
+    val source: OrientationSource,
+    private val policy: AcquisitionPolicy = AcquisitionPolicy(),
+    private val deviceDirection: ViewingDirection = RearCameraAxis.assumedDeviceDirection,
+    private val cameraMappingId: String = RearCameraAxis.mappingId,
+) {
     private data class Sample(val rotation: OrientationRotation, val direction: ViewingDirection, val time: Long)
     private val samples = ArrayDeque<Sample>()
     var referenceFrameId: String = UUID.randomUUID().toString()
@@ -146,7 +151,7 @@ class OrientationSession(val source: OrientationSource, private val policy: Acqu
         lastReceivedTimestamp = timestampNanos
         // An interruption’s first reading has no previous sample in its new frame.
         step = change.takeIf { referenceFrameId == previousFrameId }
-        samples.addLast(Sample(rotation, rotation.rotate(RearCameraAxis.assumedDeviceDirection), timestampNanos))
+        samples.addLast(Sample(rotation, rotation.rotate(deviceDirection), timestampNanos))
         while (samples.size > 64 || timestampNanos - samples.first().time > policy.windowNanos) samples.removeFirst()
     }
 
@@ -172,7 +177,7 @@ class OrientationSession(val source: OrientationSource, private val policy: Acqu
     }
 
     fun latest(nowNanos: Long): OrientationObservation? = samples.lastOrNull()?.let {
-        OrientationObservation(it.direction, it.time, referenceFrameId, source, quality(nowNanos))
+        OrientationObservation(it.direction, it.time, referenceFrameId, source, quality(nowNanos), cameraMappingId)
     }
 
     /** Capture the latest actual ray, not an averaged synthetic orientation or a button timestamp. */
