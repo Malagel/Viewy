@@ -138,12 +138,14 @@ class OrientationSession(val source: OrientationSource, private val policy: Acqu
         // validate every event, but retain/transform at most 100 samples per sensor second.
         if (previous != null && timestampNanos - previous.time < 10_000_000L) return
         val change = previous?.rotation?.separation(rotation)
+        val previousFrameId = referenceFrameId
         when {
             previous != null && timestampNanos - previous.time > policy.maximumGapNanos -> interrupt(Interruption.SAMPLE_GAP)
             change != null && change > policy.abruptRotationRadians -> interrupt(Interruption.ABRUPT_ROTATION)
         }
         lastReceivedTimestamp = timestampNanos
-        step = change
+        // An interruption’s first reading has no previous sample in its new frame.
+        step = change.takeIf { referenceFrameId == previousFrameId }
         samples.addLast(Sample(rotation, rotation.rotate(RearCameraAxis.assumedDeviceDirection), timestampNanos))
         while (samples.size > 64 || timestampNanos - samples.first().time > policy.windowNanos) samples.removeFirst()
     }

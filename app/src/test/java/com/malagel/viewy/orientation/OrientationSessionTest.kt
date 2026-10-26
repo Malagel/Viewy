@@ -77,6 +77,7 @@ class OrientationSessionTest {
         s.add(identity,next,next)
         assertNotEquals(first.referenceFrameId,s.referenceFrameId)
         assertEquals(CaptureStatus.SETTLING,s.quality(next).status)
+        assertNull(s.quality(next).latestStepRadians)
         val second = capture(s,fill(s,next+tick))
         assertEquals(ObservationComparison.Rejected(PairFailure.DIFFERENT_REFERENCE_FRAME),compareObservations(first,second))
     }
@@ -88,7 +89,9 @@ class OrientationSessionTest {
         assertNotEquals(frame,s.referenceFrameId)
         assertEquals(Interruption.ABRUPT_ROTATION,s.lastInterruption)
         assertEquals(CaptureStatus.SETTLING,s.quality(end+tick).status)
+        assertNull(s.quality(end+tick).latestStepRadians)
         assertEquals(CaptureStatus.READY,s.quality(fill(s,end+2*tick,rotationX(PI/2))).status)
+        assertEquals(0.0,s.quality(end+14*tick).latestStepRadians!!,1e-7)
     }
     @Test fun rayVariationUsesSphericalStatisticsAndSettlesWhenMotionLeavesWindow() {
         val s = session()
