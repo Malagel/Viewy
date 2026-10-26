@@ -34,7 +34,7 @@ fun OrientationDiagnosticsPanel(
     Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.large) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Phase B · Orientation diagnostics (debug)", style = MaterialTheme.typography.titleMedium)
-            Text("Scroll here for diagnostics. No camera preview; aim using the physical rear-camera axis.")
+            Text("Shared foreground acquisition. A/B diagnostics are separate from measurement endpoints.")
             Text("Available: ${acquisition.availableSources.joinToString().ifEmpty { "none" }}")
             Text("Active: ${acquisition.activeSource ?: "none"} · ${acquisition.sensorName ?: "—"}")
             Text("${acquisition.message} · ${quality?.status ?: "WAITING"}")
@@ -44,7 +44,7 @@ fun OrientationDiagnosticsPanel(
             Text("Samples: ${quality?.sampleCount ?: 0} · span ${quality?.spanNanos?.let { format(it / 1e6) } ?: "—"} ms")
             Text("Ray variation RMS / max: ${degrees(quality?.rmsVariationRadians)}° / ${degrees(quality?.maximumVariationRadians)}°")
             Text("Last full-orientation step: ${degrees(quality?.latestStepRadians)}°\nPlatform accuracy code: ${quality?.sensorAccuracy ?: "unknown"}")
-            Text("Rear axis = device −Z (uncalibrated). Game bearing is relative and may drift; rotation-vector bearing is magnetically referenced. Near vertical, bearing is unavailable. Stability limits are provisional.")
+            Text("Mapping: ${observation?.cameraMappingId ?: "—"}\nGame bearing is relative and may drift; rotation-vector bearing is magnetically referenced. Near vertical, bearing is unavailable. Stability limits are provisional.")
             Button(onClick = { onCapture(true) }, enabled = quality?.status == CaptureStatus.READY) { Text("Record A") }
             Button(onClick = { onCapture(false) }, enabled = quality?.status == CaptureStatus.READY && state.first != null) { Text("Record B / compare") }
             Text(state.captureMessage)

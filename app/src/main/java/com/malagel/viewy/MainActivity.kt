@@ -7,38 +7,31 @@ import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
-import com.malagel.viewy.ui.OrientationDiagnosticsPanel
-import com.malagel.viewy.ui.OrientationDiagnosticsViewModel
+import com.malagel.viewy.ui.MeasurementViewModel
 import com.malagel.viewy.ui.ViewyScreen
 import com.malagel.viewy.ui.theme.ViewyTheme
 
 class MainActivity : ComponentActivity() {
-    private val diagnostics by lazy { ViewModelProvider(this)[OrientationDiagnosticsViewModel::class.java] }
+    private val measurement by lazy { ViewModelProvider(this)[MeasurementViewModel::class.java] }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             ViewyTheme {
-                if (BuildConfig.DEBUG) {
-                    val state by diagnostics.state.collectAsStateWithLifecycle()
-                    ViewyScreen(diagnostics = {
-                        OrientationDiagnosticsPanel(state, diagnostics::capture, diagnostics::restart, diagnostics::clearCaptures)
-                    })
-                } else {
-                    ViewyScreen()
-                }
+                val state by measurement.state.collectAsStateWithLifecycle()
+                ViewyScreen(state, measurement)
             }
         }
     }
 
     override fun onResume() {
         super.onResume()
-        if (BuildConfig.DEBUG) diagnostics.start()
+        measurement.resume()
     }
 
     override fun onPause() {
-        if (BuildConfig.DEBUG) diagnostics.stop()
+        measurement.pause()
         super.onPause()
     }
 }
