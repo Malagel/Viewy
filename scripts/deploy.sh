@@ -18,15 +18,35 @@ EOF
 }
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-development_storage="$HOME/Storage/Apps/AppImages/vscodium.appimage.home"
-export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-17-openjdk}"
-export ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$development_storage/Android/Sdk}}"
+config_file="$repo_root/scripts/deploy.local.conf"
+# Save explicit settings before loading the optional, trusted Bash configuration.
+declare -A overrides=()
+config_keys=(JAVA_HOME ANDROID_HOME ANDROID_SDK_ROOT ANDROID_USER_HOME GRADLE_USER_HOME PHONE_SERIAL ANDROID_SERIAL)
+for key in "${config_keys[@]}"; do
+    [[ ! -v "$key" ]] || overrides[$key]="${!key}"
+done
+if [[ -f "$config_file" ]]; then
+    source "$config_file" || fail "Could not load $config_file. Check its Bash syntax."
+fi
+# An explicit SDK setting takes precedence over either local SDK alias.
+if [[ -v overrides[ANDROID_HOME] || -v overrides[ANDROID_SDK_ROOT] ]]; then
+    unset ANDROID_HOME ANDROID_SDK_ROOT
+fi
+for key in "${!overrides[@]}"; do
+    printf -v "$key" '%s' "${overrides[$key]}"
+done
+
+[[ -n ${JAVA_HOME:-} ]] || fail "Set JAVA_HOME to a JDK (17 or newer) in the environment or $config_file."
+export JAVA_HOME
+export ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+[[ -n "$ANDROID_HOME" ]] || fail "Set ANDROID_HOME (or ANDROID_SDK_ROOT) in the environment or $config_file."
 if [[ -n ${ANDROID_SDK_ROOT:-} ]]; then
     [[ "$ANDROID_HOME" -ef "$ANDROID_SDK_ROOT" ]] ||
         fail 'ANDROID_HOME and ANDROID_SDK_ROOT must refer to the same SDK.'
+    export ANDROID_SDK_ROOT
 fi
-export ANDROID_USER_HOME="${ANDROID_USER_HOME:-$development_storage/.android}"
-export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$development_storage/.gradle}"
+export ANDROID_USER_HOME="${ANDROID_USER_HOME:-$HOME/.android}"
+export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$HOME/.gradle}"
 export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$PATH"
 
 [[ -x "$JAVA_HOME/bin/java" && -x "$JAVA_HOME/bin/javac" ]] ||
@@ -38,9 +58,11 @@ adb="$(command -v adb)" || fail "adb not found. Check $ANDROID_HOME/platform-too
 command -v timeout >/dev/null || fail 'timeout (GNU coreutils) is required for bounded ADB discovery.'
 
 # Only this paired phone is selected automatically. ANDROID_SERIAL is an explicit override.
-phone_serial='R5CTA21K2WF'
+phone_serial="${PHONE_SERIAL:-}"
 service_prefix="adb-$phone_serial-"
 requested_target="${ANDROID_SERIAL:-}"
+[[ -n "$phone_serial" || -n "$requested_target" ]] ||
+    fail "Set PHONE_SERIAL to the phone's hardware serial in $config_file or the environment for automatic discovery, or set ANDROID_SERIAL to an authorized target from 'adb devices -l'."
 target=''
 deadline=$((SECONDS + 15))
 
@@ -82,7 +104,7 @@ select_target() {
     return 1
 }
 
-printf 'Looking for %s (up to 15 seconds)...\n' "${requested_target:-Galaxy S22}"
+printf 'Looking for %s (up to 15 seconds)...\n' "${requested_target:-$phone_serial}"
 devices=''
 while (( SECONDS < deadline )); do
     devices="$(bounded_adb devices -l 2>/dev/null)" || devices=''
@@ -90,10 +112,11 @@ while (( SECONDS < deadline )); do
         break
     fi
 
-    # Connect only endpoints advertised for the paired S22 debugging service.
+    # Connect only endpoints advertised for the configured phone's debugging service.
     # Pairing services and other phones are deliberately ignored.
     services="$(bounded_adb mdns services 2>/dev/null)" || services=''
     while read -r service type endpoint rest; do
+        [[ -n "$phone_serial" ]] || continue
         [[ "$service" == "$service_prefix"* ]] || continue
         [[ "$type" == _adb-tls-connect._tcp || "$type" == _adb-tls-connect._tcp. ]] || continue
         [[ -n "$endpoint" && "$endpoint" != -* ]] || continue
@@ -116,7 +139,7 @@ done
 if [[ -z "$target" ]]; then
     printf '%s\n' "$devices" >&2
     wireless_help
-    fail "Could not identify and reach ${requested_target:-Galaxy S22 ($phone_serial)} within 15 seconds. Check authorization/connection or set ANDROID_SERIAL to an authorized target."
+    fail "Could not identify and reach ${requested_target:-$phone_serial} within 15 seconds. Check authorization/connection or set ANDROID_SERIAL to an authorized target."
 fi
 
 cd -- "$repo_root"

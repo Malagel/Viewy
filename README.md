@@ -49,11 +49,24 @@ adb shell am start -n com.malagel.viewy/.MainActivity
 
 Alternatively, `./scripts/deploy.sh` builds, installs while preserving app data,
 and launches Viewy. VSCodium's **Viewy: Build & Deploy** task runs the same script.
-The script has machine-specific tool/cache defaults and automatically selects
-only a preconfigured phone. Set `JAVA_HOME`, `ANDROID_HOME`, `GRADLE_USER_HOME`,
-and `ANDROID_USER_HOME` for other environments. If `ANDROID_SDK_ROOT` is also
-set, it must refer to the same SDK as `ANDROID_HOME`. The script requires Bash
-and GNU `timeout`.
+Optional machine settings belong in `scripts/deploy.local.conf` (ignored by Git).
+This is a trusted Bash file; for example:
+
+```sh
+JAVA_HOME='/path/to/jdk-17'
+ANDROID_HOME="$HOME/Android/Sdk"
+PHONE_SERIAL='hardware-serial-from-your-phone'
+# Optional: ANDROID_USER_HOME and GRADLE_USER_HOME
+```
+
+Explicit environment variables override local settings. Set `JAVA_HOME` and
+`ANDROID_HOME` (or `ANDROID_SDK_ROOT`) through either source. If both SDK variables
+are explicitly set, they must refer to the same SDK. Android configuration and
+Gradle caches default to `$HOME/.android` and `$HOME/.gradle`; set
+`ANDROID_USER_HOME` and `GRADLE_USER_HOME` to preserve custom locations.
+`PHONE_SERIAL` enables automatic discovery of that phone; alternatively select
+an authorized target with `ANDROID_SERIAL`. The script requires Bash and GNU
+`timeout`.
 
 To choose another authorized target, use the identifier from `adb devices -l`:
 

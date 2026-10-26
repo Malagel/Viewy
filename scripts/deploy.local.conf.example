@@ -1,0 +1,24 @@
+# Optional local configuration for scripts/deploy.sh.
+#
+# Copy this file to scripts/deploy.local.conf and edit the values.
+# deploy.local.conf is ignored by Git.
+#
+# Uncomment only the settings you need.
+
+# Java Development Kit (JDK 17 or newer).
+# JAVA_HOME="/path/to/jdk"
+
+# Android SDK installation directory.
+# ANDROID_HOME="$HOME/Android/Sdk"
+
+# Android CLI configuration and cache directory.
+# ANDROID_USER_HOME="$HOME/.android"
+
+# Gradle dependency cache and daemon directory.
+# GRADLE_USER_HOME="$HOME/.gradle"
+
+# Preferred Android device hardware serial.
+# Find connected devices using: adb devices -l
+# For wireless ADB, this identifies the paired phone,
+# not its temporary IP address or connection port.
+# PHONE_SERIAL="YOUR_DEVICE_SERIAL"

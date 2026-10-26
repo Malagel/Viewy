@@ -4,6 +4,7 @@ Run with: python -m unittest discover -s tests -p 'test_deploy.py'
 """
 import os
 from pathlib import Path
+import shlex
 import subprocess
 import tempfile
 import time
@@ -11,7 +12,9 @@ import unittest
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'scripts/deploy.sh'
-SERVICE = 'adb-R5CTA21K2WF-test._adb-tls-connect._tcp'
+CONFIG_KEYS = ('JAVA_HOME', 'ANDROID_HOME', 'ANDROID_SDK_ROOT', 'ANDROID_SERIAL',
+               'ANDROID_USER_HOME', 'GRADLE_USER_HOME', 'PHONE_SERIAL')
+SERVICE = 'adb-FICTIONAL123-test._adb-tls-connect._tcp'
 
 
 class DeployTest(unittest.TestCase):
@@ -32,12 +35,15 @@ class DeployTest(unittest.TestCase):
         for name in ('java', 'javac'):
             (jdk / 'bin' / name).symlink_to('/usr/bin/true')
         self.log = self.root / 'calls'
-        self.env = dict(os.environ, JAVA_HOME=str(jdk), ANDROID_HOME=str(sdk),
+        base_env = {k: v for k, v in os.environ.items() if k not in CONFIG_KEYS}
+        self.env = dict(base_env, JAVA_HOME=str(jdk), ANDROID_HOME=str(sdk),
                         ANDROID_SDK_ROOT=str(sdk), ANDROID_SERIAL='',
                         ANDROID_USER_HOME=str(self.root / 'android'),
                         GRADLE_USER_HOME=str(self.root / 'gradle'),
                         TEST_LOG=str(self.log), TEST_ROOT=str(self.root),
                         SERVICE=SERVICE, SCENARIO='service')
+        self.config = self.repo / 'scripts/deploy.local.conf'
+        self.config.write_text("PHONE_SERIAL='FICTIONAL123'\n")
         self.write_executable(sdk / 'platform-tools/adb', '''#!/usr/bin/env bash
 printf '%s\\n' "$*" >> "$TEST_LOG"
 case "$1" in
@@ -60,8 +66,8 @@ case "$1" in
         case "$SCENARIO" in
             reconnect)
                 printf 'List of discovered mdns services\\n'
-                printf 'adb-R5CTA21K2WF-test _adb-tls-connect._tcp. 192.0.2.1:34567\\n'
-                printf 'adb-R5CTA21K2WF-test _adb-tls-pairing._tcp 192.0.2.1:45678\\n'
+                printf 'adb-FICTIONAL123-test _adb-tls-connect._tcp. 192.0.2.1:34567\\n'
+                printf 'adb-FICTIONAL123-test _adb-tls-pairing._tcp 192.0.2.1:45678\\n'
                 printf 'adb-OTHER-test _adb-tls-connect._tcp 192.0.2.2:34567\\n' ;;
             delayed)
                 if [[ -f "$TEST_ROOT/polled" ]]; then
@@ -77,7 +83,7 @@ case "$1" in
             shell)
                 if [[ "$4" == -n && "$5" == getprop ]]; then
                     if [[ "$2" == 192.0.2.1:34567 ]]; then
-                        printf 'R5CTA21K2WF\\r\\n'
+                        printf 'FICTIONAL123\\r\\n'
                     else
                         printf 'OTHER\\n'
                     fi
@@ -91,6 +97,7 @@ case "$1" in
 esac
 ''')
         self.write_executable(self.repo / 'gradlew', '''#!/usr/bin/env bash
+printf '%s\\n' "JAVA_HOME=$JAVA_HOME" "ANDROID_HOME=$ANDROID_HOME" "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-}" "ANDROID_USER_HOME=$ANDROID_USER_HOME" "GRADLE_USER_HOME=$GRADLE_USER_HOME" > "$TEST_ROOT/build-env"
 printf 'gradle %s\\n' "$*" >> "$TEST_LOG"
 [[ "$SCENARIO" != build-fail ]] || exit 1
 if [[ "$SCENARIO" != missing-apk ]]; then
@@ -111,7 +118,8 @@ fi
                                 text=True, timeout=8)
         self.assertEqual(result.returncode == 0, success,
                          result.stdout + result.stderr)
-        calls = self.log.read_text().splitlines()
+        self.result = result
+        calls = self.log.read_text().splitlines() if self.log.exists() else []
         if success:
             target = serial or ('192.0.2.1:34567' if scenario in ('ip', 'offline-alias') else SERVICE)
             install = f'-s {target} install -r {self.repo}/app/build/outputs/apk/debug/app-debug.apk'
@@ -125,6 +133,75 @@ fi
     def assert_no_build(self, scenario, serial=''):
         calls = self.run_script(scenario, serial, success=False)
         self.assertFalse(any(c.startswith('gradle') or ' install ' in c for c in calls))
+
+    def test_local_configuration(self):
+        # Tool paths and phone identity come from the isolated configuration.
+        settings = {key: self.env.pop(key) for key in CONFIG_KEYS if key in self.env}
+        settings['PHONE_SERIAL'] = 'FICTIONAL123'
+        self.config.write_text(''.join(f'{key}={shlex.quote(value)}\n'
+                                       for key, value in settings.items()))
+        self.run_script('service')
+        build_env = (self.root / 'build-env').read_text().splitlines()
+        for key, value in settings.items():
+            if key not in ('PHONE_SERIAL', 'ANDROID_SERIAL'):
+                self.assertIn(f'{key}={value}', build_env)
+
+    def test_environment_overrides_local_configuration(self):
+        self.config.write_text("""JAVA_HOME=/missing/jdk
+ANDROID_HOME=/missing/sdk
+ANDROID_SDK_ROOT=/missing/other-sdk
+ANDROID_USER_HOME=/missing/android
+GRADLE_USER_HOME=/missing/gradle
+PHONE_SERIAL=WRONG
+ANDROID_SERIAL=missing
+""")
+        self.env['PHONE_SERIAL'] = 'FICTIONAL123'
+        self.run_script('service')
+        build_env = (self.root / 'build-env').read_text().splitlines()
+        for key in ('JAVA_HOME', 'ANDROID_HOME', 'ANDROID_USER_HOME', 'GRADLE_USER_HOME'):
+            self.assertIn(f'{key}={self.env[key]}', build_env)
+
+    def test_explicit_sdk_root_overrides_local_sdk_home(self):
+        self.config.write_text('PHONE_SERIAL=FICTIONAL123\nANDROID_HOME=/missing/sdk\n')
+        del self.env['ANDROID_HOME']
+        self.run_script('service')
+
+    def test_explicit_sdk_home_overrides_local_sdk_root(self):
+        self.config.write_text('PHONE_SERIAL=FICTIONAL123\nANDROID_SDK_ROOT=/missing/sdk\n')
+        del self.env['ANDROID_SDK_ROOT']
+        self.run_script('service')
+
+    def test_conflicting_explicit_sdk_aliases_are_rejected(self):
+        self.env['ANDROID_SDK_ROOT'] = '/missing/sdk'
+        self.assert_no_build('service')
+        self.assertIn('must refer to the same SDK', self.result.stderr)
+
+    def test_no_local_configuration_with_explicit_target(self):
+        self.config.unlink()
+        self.run_script('duplicates', serial='other')
+
+    def test_missing_configuration_has_actionable_errors(self):
+        self.config.unlink()
+        for key, message in (('PHONE_SERIAL', 'Set PHONE_SERIAL'),
+                             ('ANDROID_HOME', 'Set ANDROID_HOME'),
+                             ('JAVA_HOME', 'Set JAVA_HOME')):
+            if key == 'ANDROID_HOME':
+                del self.env['ANDROID_HOME']
+                del self.env['ANDROID_SDK_ROOT']
+            elif key == 'JAVA_HOME':
+                del self.env['JAVA_HOME']
+            self.assert_no_build('service')
+            self.assertIn(message, self.result.stderr)
+            self.assertIn('deploy.local.conf', self.result.stderr)
+
+    def test_portable_cache_defaults(self):
+        del self.env['ANDROID_USER_HOME']
+        del self.env['GRADLE_USER_HOME']
+        self.env['HOME'] = str(self.root / 'isolated home')
+        self.run_script('service')
+        build_env = (self.root / 'build-env').read_text().splitlines()
+        self.assertIn(f"ANDROID_USER_HOME={self.env['HOME']}/.android", build_env)
+        self.assertIn(f"GRADLE_USER_HOME={self.env['HOME']}/.gradle", build_env)
 
     def test_service(self):
         self.run_script('service')
