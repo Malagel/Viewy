@@ -4,7 +4,8 @@ An offline Android app intended to estimate distance using the camera, phone
 orientation, and an estimated object height. Application ID: `com.malagel.viewy`.
 
 The current app is a Compose placeholder screen with disabled controls. Camera
-access, sensors, measurements, presets, persistence, and navigation are planned.
+access, sensors, measurement UI, presets, persistence, and navigation are planned.
+Phase A provides pure Kotlin known-height distance calculations with JVM tests.
 
 - [Product requirements](docs/PRODUCT_SPEC.md)
 - [Architecture](docs/ARCHITECTURE.md)
@@ -33,9 +34,9 @@ From the repository root:
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_deploy.py'
 ```
 
-The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. There are no Android
-application tests yet; a unit-test task reporting `NO-SOURCE` is not a passing
-test suite. The Python tests mock ADB and Gradle to check the deployment script.
+The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. JVM tests cover the
+known-height mathematical domain; instrumentation tests are not implemented.
+The Python tests mock ADB and Gradle to check the deployment script.
 Device checks should cover both themes, font scaling, rotation, and system insets.
 
 ## Install and run
