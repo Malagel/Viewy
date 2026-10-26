@@ -2,28 +2,37 @@
 
 ## Current structure
 
-Viewy uses one `app` module and one `ComponentActivity`. `MainActivity` owns
-Android lifecycle entry and edge-to-edge setup. `ui/ViewyScreen.kt` contains
-the stateless placeholder screen and small private composables; `ui/theme`
-contains Material 3 light/dark palettes. Strings and vector assets are Android
-resources.
-
-The layout applies system insets, caps its width on large displays, and scrolls
-on short windows or at large font scales. Compose previews cover both palettes;
-device behavior remains unverified.
+Viewy retains one `app` module and one `ComponentActivity`. `MainActivity` owns
+edge-to-edge setup and resume/pause forwarding. `ViewyScreen` renders the camera,
+height editor, method explanation, capture control, guidance and result using
+Material 3 light/dark themes. Insets, bounded width and scrolling accommodate
+short windows and large fonts; device rendering remains to be validated.
 
 ## State and responsibility boundaries
 
-The production placeholder remains stateless. The debug orientation panel uses
-`OrientationDiagnosticsViewModel`, immutable StateFlow snapshots, and
-`collectAsStateWithLifecycle`. Sensor events and a foreground freshness timer are
-serialized on the main handler; no background coroutine or service is needed.
-Activity resume/pause owns registration, and ViewModel cleanup also releases it.
+- `camera/CameraPreview.kt` owns CameraX Preview only, camera selection/pinning,
+  optional metadata inspection, stream/error monitoring and unbinding. Compose
+  owns its view/lifecycle with `DisposableEffect`; CameraX owns camera start/stop.
+- `camera/CameraDirectionMapping.kt` is a pure, testable device-space axis policy.
+  Image/display rotation is not optical pose. Preview-center alignment remains an
+  explicit approximation; see [Camera measurement](CAMERA_MEASUREMENT.md).
+- `measurement/HeightInput.kt` validates positive decimal height and converts
+  meters/feet without presentation rounding.
+- `measurement/KnownHeightWorkflow.kt` owns method-specific immutable snapshots
+  and explicit top/bottom/correction/result transitions, freshness/frame checks,
+  alignment gates, retry and restart. It calls the unchanged Phase A calculator.
+- `ui/MeasurementViewModel.kt` owns ONE foreground orientation adapter, the workflow
+  and StateFlow. Camera streaming plus Activity resume enable acquisition; losing
+  either invalidates captures. UI collects state with lifecycle awareness.
+- `OrientationDiagnosticsState` / `OrientationDiagnosticsPanel` provide debug-only
+  A/B captures using the same acquisition. Source changes reset the measurement.
+  The former standalone diagnostics ViewModel was removed to avoid two pipelines.
 
-Keep distance mathematics in pure Kotlin under `domain`, independent of Compose
-and Android sensor types, with meaningful JVM tests. Keep camera acquisition,
-sensor acquisition, presentation state, and local settings separate. Add adapters,
-repositories, or interfaces only when a concrete boundary requires them.
+No camera/sensor work or distance math lives in large composables. Sensor events,
+workflow actions and periodic freshness updates are serialized on main. The
+adapter uses application context and is stopped on pause and ViewModel cleanup.
+The preview adapter closes observers, display listeners and its own use case on
+disposal; it never unbinds unrelated CameraX use cases.
 
 ## Phase A measurement domain
 
@@ -104,22 +113,22 @@ invalid inputs, diagnostics and deterministic uncertainty propagation.
 ## Phase B orientation acquisition
 
 - `orientation/OrientationMath.kt`: pure quaternion parsing/rotation and ray
-  angles, independent of Android and UI. Rear axis mapping is an explicit
-  uncalibrated device −Z assumption, unchanged by display rotation.
+  angles, independent of Android and UI. Camera mapping defaults to the explicit
+  uncalibrated device −Z assumption; the acquisition session also accepts the
+  selected camera axis and mapping identity. Display rotation does not remap it.
 - `orientation/OrientationSession.kt`: pure bounded recent-ray statistics,
   timestamp validation, source/frame identity, typed capture gating and pair
   comparisons. Captures use Phase A's existing `ViewingDirection`.
 - `orientation/AndroidOrientationAcquisition.kt`: platform sensor discovery,
   checked registration, game-rotation preference/startup rotation-vector fallback,
   per-registration callback isolation, pause cleanup, and periodic freshness state.
-- `ui/OrientationDiagnosticsViewModel.kt` and `OrientationDiagnosticsPanel.kt`:
-  debug A/B inspection and explicit session/source restart controls. A reference
-  change clears captures. Release startup does not instantiate sensor acquisition.
+- `ui/MeasurementViewModel.kt`: production and debug share one adapter/session.
+  The workflow clears endpoints when source, reference frame, camera configuration
+  or mapping changes. Release builds now acquire orientation for measurements.
 
-No camera API is opened. No automatic switching occurs within a session.
-Quality limits are provisional policy, not calibrated error bounds. Orientation
-cannot establish camera translation or independently distinguish heading drift
-from real rotation. No uncertainty is fabricated from stability statistics.
+Quality limits remain provisional policy, not calibrated error bounds. Orientation
+cannot establish camera translation or distinguish heading drift from real motion.
+No uncertainty is fabricated from stability statistics.
 The full coordinate contracts, API research, limitations, and manual validation
 procedures are in [Orientation acquisition](ORIENTATION_ACQUISITION.md).
 
@@ -134,7 +143,10 @@ Kotlin Android plugin alongside built-in Kotlin.
 
 JUnit 4 is the only test dependency. Phase B explicitly declares the AndroidX
 Lifecycle ViewModel and runtime-compose libraries already present transitively
-in the UI stack for state ownership and lifecycle-aware collection. The foundation
-has no camera, analytics, advertising, navigation, dependency injection, or
-storage libraries. Add dependencies only as features require them,
+in the UI stack for state ownership and lifecycle-aware collection. Phase C adds
+CameraX camera2/lifecycle/view 1.6.2 (stable), including
+its transitive dependencies. Only Preview is instantiated. Camera2 interop opt-in
+is isolated in the camera adapter for physical-lens pinning and stabilization
+requests. No analytics, advertising, navigation, dependency injection or storage
+features are introduced. Add dependencies only as features require them,
 while preserving offline operation.

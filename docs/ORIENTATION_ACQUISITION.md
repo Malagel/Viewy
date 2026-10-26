@@ -1,10 +1,15 @@
 # Phase B: orientation acquisition
 
-Phase B is implemented as a reusable foreground sensor adapter plus a debug-only
-panel appended below the existing placeholder controls. No camera preview,
-permission request, height selection, distance workflow, storage, or networking
-is introduced. Release builds retain the foundation screen and do not start the
-orientation listener. Phase A domain code is unchanged.
+Phase B provides the reusable foreground sensor adapter described here. Phase C
+now shares it between production measurement and the optional debug panel; release
+builds also acquire orientation while the camera is streaming and Activity resumed.
+See [Camera measurement](CAMERA_MEASUREMENT.md) for the current workflow and mapping.
+Phase A geometry and Phase B default mapping/quality/time contracts are preserved.
+
+The developer reported preliminary fixed-aim Galaxy S22 repeatability: Game
+Rotation Vector ≈0.029° separation over 14.1 s, Rotation Vector ≈0.028° over 14.8 s.
+These observations are not absolute accuracy, optical calibration, validated
+uncertainty bounds, or Phase C camera-based distance validation.
 
 ## Sources and Android API decisions
 
@@ -94,20 +99,17 @@ the translation origin while sharing device sensor axes; translation does not
 change a direction. An automotive frame or unknown pose convention must not be
 assumed to be a handset calibration.
 
-Phase B deliberately declares no camera permission and opens no camera, so no
-lens pose was obtained from a Galaxy S22. It uses the explicit fallback above
-on every device. There is no automatic metadata-based correction to validate yet.
-Phase C must select the actual camera/physical lens, inspect its metadata after
-permission, verify the convention and calibration on hardware, and either retain
-the labeled assumption or install a validated axis mapping under a different
-mapping identity/new session. Missing, malformed, undefined, or unsuitable pose
-metadata must retain a labeled fallback rather than claim exact calibration.
+The original Phase B did not open a camera and used the fallback on every device.
+Phase C now selects/pins the rear output and optionally uses suitable reported
+pose metadata under a distinct mapping identity/new session. Missing, malformed,
+undefined or unsuitable pose metadata retains a labeled fallback. Physical
+validation of the actual S22 camera metadata is still pending.
 
-The preview's center may differ from the calibrated optical principal point.
-Phase C must account for crop, intrinsics/distortion if needed, stabilization,
-zoom/lens switching, and reticle-to-ray alignment. Captured timestamps are
-orientation sample times, not synchronized camera exposure times. These issues
-are not solved by applying image rotation or by adding CameraX to Phase B.
+Preview center may differ from optical principal point. Phase C uses centered
+cropping and requests stabilization off, but has no calibrated stream/intrinsics/
+distortion model. Captures retain orientation sample times, not synchronized
+preview exposures. The [camera measurement guide](CAMERA_MEASUREMENT.md) records
+the implemented strategy, remaining uncertainty and validation steps.
 
 ## Acquisition boundary, lifecycle, and time
 
@@ -135,8 +137,9 @@ Accuracy code 0 (`SENSOR_STATUS_UNRELIABLE`) blocks capture. Other platform code
 are displayed as raw diagnostics; unknown accuracy is not a promised confidence
 level. Transition into or out of unreliable state clears the window/frame.
 
-The debug ViewModel holds immutable StateFlow snapshots. Compose collects them
-with lifecycle awareness. Activity resume registers; pause unregisters, removes
+The measurement ViewModel shares immutable StateFlow snapshots with debug tools.
+Compose collects them with lifecycle awareness. Resumed Activity plus streaming
+camera enables registration; pause unregisters, removes
 the freshness timer, invalidates captures, and stops acquisition. Configuration
 recreation also starts a new session, even if it was caused by display rotation.
 Queued events carry a registration token and cannot populate a later session.
@@ -147,7 +150,8 @@ context only; there is no activity retention or background sensor service.
 
 Quality exposes sample count/time coverage, latest age, directional RMS/max
 angular variation, latest full-orientation step, platform accuracy code, and
-capture status. Directional statistics normalize the vector sum on the unit
+capture status. The first sample after a frame reset has no within-frame rotation
+step, so its latest-step diagnostic is null. Directional statistics normalize the vector sum on the unit
 sphere and measure geodesic angles to that mean. Near-cancelling sums have no
 usable mean and cannot pass stability. Statistics evaluate **aiming direction**:
 a gradual pure roll does not create aiming instability, while abrupt full-device
@@ -183,11 +187,11 @@ smooth. Orientation alone cannot distinguish these from real rotation and cannot
 detect translation or guarantee the camera stayed stationary. No accelerometer
 position tracking, stationary-camera claim, or default uncertainty is introduced.
 
-## Galaxy S22 manual verification (not yet executed)
+## Phase B Galaxy S22 procedures (full matrix still pending)
 
 Build/install with the existing `./scripts/deploy.sh` workflow on an authorized
-Galaxy S22. Scroll below the disabled production controls to the **Phase B**
-panel. There is no live preview: use a rigid fixture with an external sight line
+Galaxy S22. Open **Development diagnostics** below the measurement controls.
+For sensor-only checks use a rigid fixture with an external sight line
 parallel to the rear camera axis; do not infer optical calibration from this
 panel. Record device model, Android version, active sensor name/source, mounting
 method, frame, times, RMS/max, and A/B differences externally. Avoid changing
@@ -202,7 +206,7 @@ without moving the phone. Allow about one second to settle before each capture.
 | Left/right turns | At a level fixed position, yaw slowly. Check continuous circular bearing and signed A/B change. Bearing uses atan2(Y,X); relate signs to the displayed axes, not a compass. |
 | Return / possible drift | Fix aim, record A, move away and return within 15 s, then B. Repeat without moving at all for 5/10/15 s intervals. Log discrepancies separately for each source. A discrepancy cannot establish its cause. |
 | Wraparound | Slowly cross +180°/−180° bearing. Capture on either side while stationary. The comparison should be a small signed angle rather than approximately 360°. |
-| Endpoints | Use two points on a plumb line at one horizontal position. Fix the camera location, record lower A and upper B. Elevation change should be positive; wrapped bearing change should be small. No distance is computed by this UI. |
+| Endpoints | Use two points on a plumb line at one horizontal position. Fix the camera location, record lower A and upper B. Elevation change should be positive; wrapped bearing change should be small. Debug A/B captures are separate from production top/bottom distance captures. |
 | Rapid motion / settling | Quickly move the phone. Expect MOVING/SETTLING or a new frame with ABRUPT_ROTATION; prior A/B must clear on a frame change. Stop and verify readiness recovers only after sufficient new samples. |
 | Temporary interruption | In a disposable emulator/sensor test environment, stop delivery for >250 ms, then resume. Check age grows to STALE, capture is blocked, and resumed events start a new frame. If the S22 already has a Sensors Off tile configured, it can serve the same check; configuring it is not required. |
 | Background / resume | Record A; Home/lock the device, then resume/unlock. Check captures clear, new frame ID, fresh sample times, settling before READY. Repeat several times; inspect logs for listener/lifecycle errors. |

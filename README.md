@@ -3,15 +3,21 @@
 An offline Android app intended to estimate distance using the camera, phone
 orientation, and an estimated object height. Application ID: `com.malagel.viewy`.
 
-The app retains its Compose placeholder screen and disabled production controls.
-Phase A provides pure Kotlin known-height distance calculations. Phase B adds
-foreground orientation acquisition and a debug-only sensor/capture diagnostic
-panel below the controls. Camera preview, measurement UI, presets, persistence,
-and navigation remain planned. The sensor foundation and domain have JVM tests.
+Phase C implements the first complete measurement: **Long Distance → Known Object
+Height → Two Endpoint Captures**. Allow camera access, enter height in meters or
+feet, aim at the top and capture, then aim at the bottom and capture within 15 s.
+Keep the camera position fixed and pause before each capture. The result estimates
+horizontal distance, with alignment guidance and explicit unquantified uncertainty.
+Everything runs offline; no photos, recordings, history or telemetry are stored.
+
+The preview-center direction is approximate: optional usable lens-pose metadata
+improves the device-axis estimate; absent/unsuitable metadata uses labeled device
+−Z. Preview timing and optical principal-point alignment are not calibrated.
 
 - [Product requirements](docs/PRODUCT_SPEC.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Orientation conventions and Galaxy S22 validation](docs/ORIENTATION_ACQUISITION.md)
+- [Camera mapping, measurement behavior and device validation](docs/CAMERA_MEASUREMENT.md)
 - [Build and testing status](docs/BUILD_VERIFICATION.md)
 
 ## Development setup
@@ -38,11 +44,13 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_deploy.
 ```
 
 The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. JVM tests cover the
-known-height domain, orientation transforms, and acquisition quality/time rules;
+known-height domain, orientation transforms, acquisition quality/time rules,
+camera-axis mapping, height conversion, and measurement workflow;
 instrumentation tests are not implemented.
 The Python tests mock ADB and Gradle to check the deployment script.
-Debug builds expose orientation diagnostics by scrolling below the production
-controls. Follow the Galaxy S22 validation guide before relying on sensor results.
+Debug builds expose optional **Development diagnostics** below the measurement
+controls, sharing the production sensor session. Follow the Phase C Galaxy S22
+validation guide before relying on measurements.
 Device checks should also cover both themes, font scaling, rotation, and insets.
 
 ## Install and run
