@@ -27,6 +27,7 @@ android {
 }
 
 dependencies {
+    testImplementation(libs.junit)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.ui)
