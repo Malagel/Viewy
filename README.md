@@ -1,63 +1,70 @@
 # Viewy
 
-An offline Android app intended to estimate distance using a camera, phone
+An offline Android app intended to estimate distance using the camera, phone
 orientation, and an estimated object height. Application ID: `com.malagel.viewy`.
 
-Task 1 creates the Android foundation and a placeholder screen. Camera access,
-sensors, distance calculations, presets, persistence, and navigation are planned;
-none is implemented. See [product specification](docs/PRODUCT_SPEC.md),
-[architecture](docs/ARCHITECTURE.md), and [verification status](docs/BUILD_VERIFICATION.md).
+The current app is a Compose placeholder screen with disabled controls. Camera
+access, sensors, measurements, presets, persistence, and navigation are planned.
 
-## Technology
+- [Product requirements](docs/PRODUCT_SPEC.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Build and testing status](docs/BUILD_VERIFICATION.md)
 
-- Kotlin 2.4.21 with AGP built-in Kotlin and the matching Compose compiler plugin.
-- Jetpack Compose BOM 2026.09.00 (UI/foundation 1.12.1, Material 3 1.4.0).
-- Activity Compose 1.13.0; Gradle Kotlin DSL and a version catalog.
-- Android Gradle Plugin 9.4.0; Gradle wrapper 9.6.0.
-- Minimum Android 6.0 (API 23); compile/target Android 17 (API 37).
-- SDK Build Tools 36.0.0; Java/Kotlin JVM target 17.
+## Development setup
 
-API 23 provides a broad baseline compatible with this stack. API 37 is the
-current stable major Android SDK. The static screen needs no additional
-coroutine library; asynchronous work can use structured coroutines in later tasks.
+Use JDK 17 or newer and an Android SDK with Platform 37, Build Tools 36.0.0,
+and Platform Tools. Accept SDK licenses through Android Studio or `sdkmanager`.
+Set `JAVA_HOME` and `ANDROID_HOME` for your installation, or configure the SDK
+with `sdk.dir` in an untracked `local.properties`.
 
-## Development tools and setup
+Use the included Gradle wrapper; no system Gradle is required. The first build
+needs network access for dependencies; the app itself operates offline. Toolchain
+and library versions are defined in `gradle/libs.versions.toml`, the Gradle build
+files, and `gradle/wrapper/gradle-wrapper.properties`. Minimum Android API is 23;
+compile and target API are 37. Keep local paths and signing keys out of Git.
 
-Use JDK 17 or newer (JDK 17 is the baseline) and an Android Studio version
-supporting AGP 9.4, such as Quail 4 or Rabbit 1. Command-line builds need no IDE
-or system Gradle installation. Install Android SDK Command-line Tools, Platform
-37, Build Tools 36.0.0, and Platform Tools via Android Studio's SDK Manager.
-Alternatively, with `sdkmanager` on your PATH:
-
-```sh
-export JAVA_HOME=/absolute/path/to/jdk-17
-export PATH="$JAVA_HOME/bin:$PATH"
-export ANDROID_HOME="$HOME/Android/Sdk"
-sdkmanager --sdk_root="$ANDROID_HOME" "platforms;android-37" "build-tools;36.0.0" "platform-tools"
-sdkmanager --sdk_root="$ANDROID_HOME" --licenses
-```
-
-Set `ANDROID_HOME` to your actual SDK directory, or create an untracked
-`local.properties` containing `sdk.dir=/absolute/path/to/Android/Sdk`.
-The first build requires network access to download Gradle and Maven dependencies;
-the application itself operates offline. Do not commit SDK paths or signing keys.
-
-## Build, test, and install
+## Build and test
 
 From the repository root:
 
 ```sh
-./gradlew testDebugUnitTest
-./gradlew assembleDebug
+./gradlew :app:assembleDebug
+./gradlew :app:testDebugUnitTest
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_deploy.py'
+```
+
+The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. There are no Android
+application tests yet; a unit-test task reporting `NO-SOURCE` is not a passing
+test suite. The Python tests mock ADB and Gradle to check the deployment script.
+Device checks should cover both themes, font scaling, rotation, and system insets.
+
+## Install and run
+
+With an authorized API 23+ device or emulator connected:
+
+```sh
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb shell am start -n com.malagel.viewy/.MainActivity
 ```
 
-Enable USB debugging on an API 23+ device, or start an emulator before installing.
-The debug APK is automatically signed with a local debug key. Android Studio can
-also run the `app` configuration. There is no domain logic or JVM test suite yet;
-a successful unit-test task may report `NO-SOURCE` and is not evidence of UI
-validation. Check both themes, font scaling, rotation, and system insets on a device.
+Alternatively, `./scripts/deploy.sh` builds, installs while preserving app data,
+and launches Viewy. VSCodium's **Viewy: Build & Deploy** task runs the same script.
+The script has machine-specific tool/cache defaults and automatically selects
+only a preconfigured phone. Set `JAVA_HOME`, `ANDROID_HOME`, `GRADLE_USER_HOME`,
+and `ANDROID_USER_HOME` for other environments. If `ANDROID_SDK_ROOT` is also
+set, it must refer to the same SDK as `ANDROID_HOME`. The script requires Bash
+and GNU `timeout`.
 
-Read [AGENTS.md](AGENTS.md) before future milestones. Keep changes within the
-current task and run relevant verification before reporting results.
+To choose another authorized target, use the identifier from `adb devices -l`:
+
+```sh
+ANDROID_SERIAL='serial-from-adb-devices' ./scripts/deploy.sh
+```
+
+For wireless debugging, enable it in the device's Developer options. Use
+`adb pair PHONE_IP:PAIRING_PORT` if pairing is needed, then
+`adb connect PHONE_IP:DEBUGGING_PORT` with the current address shown on the
+phone. Pairing and debugging ports differ. The script retries discovery for
+up to 15 seconds and stops before building if no eligible device is reachable.
+
+Follow [AGENTS.md](AGENTS.md) for development rules.
