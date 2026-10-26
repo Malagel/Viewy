@@ -31,8 +31,14 @@ typed geometry failures, alignment and sensitivity diagnostics, and conditional
 distance bounds when complete input bounds are explicitly supplied. Stable mode
 and method identifiers exist; these calculations are not connected to the UI.
 
+Phase B implements foreground orientation acquisition, gravity-aligned rear-axis
+transforms, timestamp/reference-frame validation, recent aiming stability, and
+typed captures/comparisons. Debug builds append a development diagnostic panel
+below the foundation controls. The rear optical axis is an explicitly uncalibrated
+negative-device-Z assumption; physical sensor validation remains pending. See
+[Orientation acquisition](ORIENTATION_ACQUISITION.md).
+
 The existing pinned-object placeholder remains until a later UI phase replaces
-it with the mode selector. Camera preview, sensor acquisition and coordinate
-transforms, measurement UI integration, presets, settings persistence, and
-navigation remain unimplemented. Runtime verification is tracked
-in [Build verification](BUILD_VERIFICATION.md).
+it with the mode selector. Camera preview, production measurement UI integration,
+presets, settings persistence, and navigation remain unimplemented. Runtime
+verification is tracked in [Build verification](BUILD_VERIFICATION.md).

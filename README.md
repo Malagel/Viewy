@@ -3,12 +3,15 @@
 An offline Android app intended to estimate distance using the camera, phone
 orientation, and an estimated object height. Application ID: `com.malagel.viewy`.
 
-The current app is a Compose placeholder screen with disabled controls. Camera
-access, sensors, measurement UI, presets, persistence, and navigation are planned.
-Phase A provides pure Kotlin known-height distance calculations with JVM tests.
+The app retains its Compose placeholder screen and disabled production controls.
+Phase A provides pure Kotlin known-height distance calculations. Phase B adds
+foreground orientation acquisition and a debug-only sensor/capture diagnostic
+panel below the controls. Camera preview, measurement UI, presets, persistence,
+and navigation remain planned. The sensor foundation and domain have JVM tests.
 
 - [Product requirements](docs/PRODUCT_SPEC.md)
 - [Architecture](docs/ARCHITECTURE.md)
+- [Orientation conventions and Galaxy S22 validation](docs/ORIENTATION_ACQUISITION.md)
 - [Build and testing status](docs/BUILD_VERIFICATION.md)
 
 ## Development setup
@@ -35,9 +38,12 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_deploy.
 ```
 
 The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. JVM tests cover the
-known-height mathematical domain; instrumentation tests are not implemented.
+known-height domain, orientation transforms, and acquisition quality/time rules;
+instrumentation tests are not implemented.
 The Python tests mock ADB and Gradle to check the deployment script.
-Device checks should cover both themes, font scaling, rotation, and system insets.
+Debug builds expose orientation diagnostics by scrolling below the production
+controls. Follow the Galaxy S22 validation guide before relying on sensor results.
+Device checks should also cover both themes, font scaling, rotation, and insets.
 
 ## Install and run
 

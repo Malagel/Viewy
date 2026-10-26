@@ -43,7 +43,7 @@ import com.malagel.viewy.R
 import com.malagel.viewy.ui.theme.ViewyTheme
 
 @Composable
-fun ViewyScreen(modifier: Modifier = Modifier) {
+fun ViewyScreen(modifier: Modifier = Modifier, diagnostics: (@Composable () -> Unit)? = null) {
     Scaffold(modifier = modifier) { insets ->
         BoxWithConstraints(
             modifier = Modifier.fillMaxSize().padding(insets),
@@ -118,6 +118,7 @@ fun ViewyScreen(modifier: Modifier = Modifier) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                 )
+                diagnostics?.invoke()
             }
         }
     }

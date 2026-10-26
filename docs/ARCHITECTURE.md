@@ -14,9 +14,11 @@ device behavior remains unverified.
 
 ## State and responsibility boundaries
 
-The static screen does not need a ViewModel or an additional coroutine library.
-When state or asynchronous work is introduced, expose immutable UI state from a
-ViewModel, collect it with lifecycle awareness, and use structured coroutines.
+The production placeholder remains stateless. The debug orientation panel uses
+`OrientationDiagnosticsViewModel`, immutable StateFlow snapshots, and
+`collectAsStateWithLifecycle`. Sensor events and a foreground freshness timer are
+serialized on the main handler; no background coroutine or service is needed.
+Activity resume/pause owns registration, and ViewModel cleanup also releases it.
 
 Keep distance mathematics in pure Kotlin under `domain`, independent of Compose
 and Android sensor types, with meaningful JVM tests. Keep camera acquisition,
@@ -33,7 +35,7 @@ algorithm interface or framework.
 `domain/KnownHeightDistance.kt` is pure Kotlin, independent of Android and Compose.
 `KnownHeightDistance.estimate` takes height in meters and two 3D rays in one
 gravity-aligned frame, with positive Z up and X/Y horizontal. Camera/sensor frame
-transforms belong to a later acquisition adapter. Device pitch alone is not an
+transforms belong to the Phase B acquisition adapter. Device pitch alone is not an
 input to this algorithm.
 
 For each ray, elevation is `atan2(z, hypot(x, y))`, and its tangent is computed
@@ -99,6 +101,28 @@ errors, movement, object tilt, or sensor calibration errors. No default uncertai
 or precision is invented. JVM tests in `app/src/test` cover geometry, invariance,
 invalid inputs, diagnostics and deterministic uncertainty propagation.
 
+## Phase B orientation acquisition
+
+- `orientation/OrientationMath.kt`: pure quaternion parsing/rotation and ray
+  angles, independent of Android and UI. Rear axis mapping is an explicit
+  uncalibrated device −Z assumption, unchanged by display rotation.
+- `orientation/OrientationSession.kt`: pure bounded recent-ray statistics,
+  timestamp validation, source/frame identity, typed capture gating and pair
+  comparisons. Captures use Phase A's existing `ViewingDirection`.
+- `orientation/AndroidOrientationAcquisition.kt`: platform sensor discovery,
+  checked registration, game-rotation preference/startup rotation-vector fallback,
+  per-registration callback isolation, pause cleanup, and periodic freshness state.
+- `ui/OrientationDiagnosticsViewModel.kt` and `OrientationDiagnosticsPanel.kt`:
+  debug A/B inspection and explicit session/source restart controls. A reference
+  change clears captures. Release startup does not instantiate sensor acquisition.
+
+No camera API is opened. No automatic switching occurs within a session.
+Quality limits are provisional policy, not calibrated error bounds. Orientation
+cannot establish camera translation or independently distinguish heading drift
+from real rotation. No uncertainty is fabricated from stability statistics.
+The full coordinate contracts, API research, limitations, and manual validation
+procedures are in [Orientation acquisition](ORIENTATION_ACQUISITION.md).
+
 ## Build and dependencies
 
 Dependency versions are pinned in `gradle/libs.versions.toml`; the Gradle wrapper
@@ -108,6 +132,9 @@ AGP 9 supplies built-in Kotlin. The root buildscript upgrades its Kotlin Gradle
 plugin to 2.4.21, matching the Compose compiler plugin. Do not apply the separate
 Kotlin Android plugin alongside built-in Kotlin.
 
-JUnit 4 is the only added test dependency. The foundation has no camera, analytics, advertising, navigation, dependency
-injection, or storage libraries. Add dependencies only as features require them,
+JUnit 4 is the only test dependency. Phase B explicitly declares the AndroidX
+Lifecycle ViewModel and runtime-compose libraries already present transitively
+in the UI stack for state ownership and lifecycle-aware collection. The foundation
+has no camera, analytics, advertising, navigation, dependency injection, or
+storage libraries. Add dependencies only as features require them,
 while preserving offline operation.
