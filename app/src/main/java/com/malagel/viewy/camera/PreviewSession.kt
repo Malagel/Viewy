@@ -9,6 +9,12 @@ internal class PreviewSession {
     var state = CameraPreviewState()
         private set
 
+    /** Revoke ownership before a different method can bind, including queued callbacks. */
+    fun invalidate() {
+        active = null
+        state = CameraPreviewState()
+    }
+
     fun start(): Long {
         state = CameraPreviewState()
         return (++generation).also { active = it }

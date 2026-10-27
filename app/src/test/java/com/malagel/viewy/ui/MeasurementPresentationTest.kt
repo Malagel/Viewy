@@ -1,6 +1,7 @@
 package com.malagel.viewy.ui
 
 import com.malagel.viewy.R
+import com.malagel.viewy.domain.MeasurementMethod
 import com.malagel.viewy.domain.ViewingDirection
 import com.malagel.viewy.measurement.*
 import com.malagel.viewy.orientation.*
@@ -10,18 +11,49 @@ import org.junit.Test
 class MeasurementPresentationTest {
     private val quality = OrientationQuality(13, 480_000_000L, 0, 0.0, 0.0, 0.0, 3, CaptureStatus.READY)
     private val observation = OrientationObservation(ViewingDirection(1.0, 0.0, 0.0), 2_000_000_000L, "frame", OrientationSource.GAME_ROTATION_VECTOR, quality, "camera")
+    private val selected = MeasurementSelection().browse(MeasurementMethod.KNOWN_OBJECT_HEIGHT.mode).activate(MeasurementMethod.KNOWN_OBJECT_HEIGHT)
     private val ready = MeasurementUiState(
+        selection = selected,
         measurement = MeasurementState(heightMeters = 2.0, cameraReady = true, latest = observation),
+        camera = com.malagel.viewy.camera.CameraPreviewState(ready = true),
         acquisition = AcquisitionState(running = true),
     )
 
     @Test fun heightIsRequiredBeforeCameraUseAndRestartRetainsIt() {
         val workflow = KnownHeightWorkflow()
-        assertFalse(MeasurementUiState(measurement = workflow.state).needsCamera)
+        assertFalse(MeasurementUiState(selection = selected, measurement = workflow.state).needsCamera)
         workflow.setHeight(2.0, HeightUnit.FEET)
-        assertTrue(MeasurementUiState(measurement = workflow.state).needsCamera)
+        assertTrue(MeasurementUiState(selection = selected, measurement = workflow.state).needsCamera)
         workflow.restart()
-        assertTrue(MeasurementUiState(measurement = workflow.state).needsCamera)
+        assertTrue(MeasurementUiState(selection = selected, measurement = workflow.state).needsCamera)
+    }
+
+    @Test fun inactiveSelectionCannotUseCameraOrSensorsEvenWithResidualWorkflowAndCameraState() {
+        for (selection in listOf(MeasurementSelection(), MeasurementSelection().dismiss())) {
+            val inactive = ready.copy(selection = selection)
+            assertFalse(inactive.needsCamera)
+            assertFalse(inactive.needsOrientation(resumed = true))
+        }
+    }
+
+    @Test fun browsingAndReselectionDoNotChangeWorkflowOrResourceEligibility() {
+        val method = MeasurementMethod.KNOWN_OBJECT_HEIGHT
+        val browsing = selected.openModes().browse(method.mode)
+        for (navigation in listOf(selected.openModes(), browsing, browsing.back(), browsing.dismiss(), browsing.activate(method))) {
+            val state = ready.copy(selection = navigation)
+            assertSame(ready.measurement, state.measurement)
+            assertSame(ready.camera, state.camera)
+            assertSame(ready.acquisition, state.acquisition)
+            assertTrue(state.needsCamera)
+            assertTrue(state.needsOrientation(resumed = true))
+        }
+    }
+
+    @Test fun orientationRequiresHeightResumedActivityAndReadyCamera() {
+        assertTrue(ready.needsOrientation(resumed = true))
+        assertFalse(ready.needsOrientation(resumed = false))
+        assertFalse(ready.copy(camera = ready.camera.copy(ready = false)).needsOrientation(resumed = true))
+        assertFalse(ready.copy(measurement = ready.measurement.copy(heightMeters = null)).needsOrientation(resumed = true))
     }
 
     @Test fun normalReadinessHasNoWarningAndResolvedLiveNoticesDisappear() {

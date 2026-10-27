@@ -27,7 +27,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -43,15 +42,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -66,8 +61,6 @@ import com.malagel.viewy.camera.CameraPreview
 import com.malagel.viewy.measurement.*
 import kotlinx.coroutines.delay
 
-private val ViewyWordmarkFont = FontFamily(Font(R.font.nunito_bold, weight = FontWeight.Bold))
-
 @Composable
 fun ViewyScreen(state: MeasurementUiState, model: MeasurementViewModel) {
     val context = LocalContext.current
@@ -79,6 +72,13 @@ fun ViewyScreen(state: MeasurementUiState, model: MeasurementViewModel) {
     var showDebug by rememberSaveable { mutableStateOf(false) }
     var showWorkspace by rememberSaveable { mutableStateOf(false) }
     var showStatus by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(state.selection.activeMethod) {
+        if (state.selection.activeMethod == null) {
+            editHeight = false
+            showWorkspace = false
+            showStatus = false
+        }
+    }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { permission = it }
     DisposableEffect(owner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -105,157 +105,136 @@ fun ViewyScreen(state: MeasurementUiState, model: MeasurementViewModel) {
         delay(if (candidate == null) 500 else 250)
         hint = candidate
     }
-    // Blur the existing content in place: browsing must not dispose the preview or its session.
-    // Compose uses platform blur on Android 12+; the dialog's dim scrim remains on older devices.
-    val methodBackdrop = if (state.selection.browsingMode != null) Modifier.blur(12.dp) else Modifier
-    Scaffold(modifier = methodBackdrop) { insets ->
-        BoxWithConstraints(Modifier.fillMaxSize().padding(insets), contentAlignment = Alignment.TopCenter) {
-            val compact = maxHeight < 500.dp || LocalDensity.current.fontScale > 1.5f || maxWidth < 320.dp
-            val workspace: @Composable (Boolean) -> Unit = { overflow ->
-                Column(
-                    Modifier.widthIn(max = 600.dp).fillMaxSize().padding(start = if (compact) 12.dp else 20.dp, end = if (compact) 12.dp else 20.dp, top = 8.dp, bottom = if (compact) 16.dp else 32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
+    MeasurementSelector(state.selection, model::dismissSelection, model::backSelection, model::browseMode, model::selectMethod) { methodBackdrop ->
+        Scaffold(modifier = methodBackdrop) { insets ->
+            BoxWithConstraints(Modifier.fillMaxSize().padding(insets), contentAlignment = Alignment.TopCenter) {
+                val compact = maxHeight < 500.dp || LocalDensity.current.fontScale > 1.5f || maxWidth < 320.dp
+                val workspace: @Composable (Boolean) -> Unit = { overflow ->
                     Column(
-                        Modifier.weight(1f).then(if (overflow) Modifier.verticalScroll(rememberScrollState()) else Modifier),
+                        Modifier.widthIn(max = 600.dp).fillMaxSize().padding(start = if (compact) 12.dp else 20.dp, end = if (compact) 12.dp else 20.dp, top = 8.dp, bottom = if (compact) 16.dp else 32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Row(
-                            Modifier.fillMaxWidth().padding(top = if (compact) 4.dp else 12.dp, bottom = if (compact) 12.dp else 28.dp),
-                            verticalAlignment = Alignment.CenterVertically,
+                        Column(
+                            Modifier.weight(1f).then(if (overflow) Modifier.verticalScroll(rememberScrollState()) else Modifier),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineLarge.copy(
-                                    fontFamily = ViewyWordmarkFont, fontWeight = FontWeight.Bold,
-                                    fontSize = if (compact) 30.sp else 38.sp,
-                                    lineHeight = if (compact) 38.sp else 46.sp,
-                                ))
-                                if (!compact) Text(stringResource(R.string.measurement_method_subtitle), style = MaterialTheme.typography.bodySmall)
-                            }
-                            if (BuildConfig.DEBUG) LabeledIconButton(R.string.show_diagnostics, "⋯", { showDebug = true })
-                            if (overflow) LabeledIconButton(R.string.close, "×", { showWorkspace = false })
-                            val configurationsLabel = stringResource(R.string.configurations_placeholder)
-                            FilledTonalIconButton(
-                                onClick = {}, enabled = false, shape = CircleShape,
-                                modifier = Modifier.size(52.dp).semantics { contentDescription = configurationsLabel },
-                            ) {
-                                Icon(painterResource(R.drawable.ic_settings), contentDescription = null, modifier = Modifier.size(28.dp))
-                            }
-                        }
-                        key(state.selection.activeMethod) {
-                            BoxWithConstraints(
-                                Modifier.fillMaxWidth().then(if (overflow) Modifier.height(320.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)) else Modifier.weight(1f)).clip(RoundedCornerShape(28.dp))
-                                    .background(if (state.needsCamera) Color.Black else MaterialTheme.colorScheme.secondaryContainer),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                val hintText = hint?.let { stringResource(it) }
-                                val hintStyle = MaterialTheme.typography.bodyMedium
-                                val hintHeight = remember(hintText, hintStyle, maxWidth, density) {
-                                    hintText?.let {
-                                        textMeasurer.measure(it, hintStyle, constraints = Constraints(maxWidth = with(density) { (maxWidth - 52.dp).roundToPx().coerceAtLeast(1) })).size.height
-                                    } ?: 0
-                                }
-                                val recoveryNeeded = !permission || !state.camera.ready || !state.acquisition.running
-                                val useStatusDialog = !overflow && ((compact && recoveryNeeded) || hintHeight > with(density) { (maxHeight / 2 - 54.dp).toPx() })
-                                if (state.needsCamera && permission) {
-                                    key(cameraAttempt) { LivePreview(model) }
-                                    if (state.camera.ready && state.acquisition.running) Reticle(Modifier.size(40.dp))
-                                }
-                                if (!state.needsCamera) {
-                                    Button(
-                                        onClick = { editHeight = true },
-                                        modifier = Modifier.padding(20.dp).widthIn(min = 240.dp, max = 320.dp).heightIn(min = 64.dp),
-                                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
-                                    ) { Text(stringResource(R.string.enter_height), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center) }
-                                } else {
-                                    // Long recovery text has a scrollable dialog in constrained windows.
-                                    if (useStatusDialog) {
-                                        FilledTonalIconButton(onClick = { showStatus = true }, modifier = Modifier.align(Alignment.BottomStart).padding(4.dp)
-                                            .semantics { contentDescription = previewStatusLabel }) {
-                                            Text(if (!permission || !state.camera.ready || !state.acquisition.running || hint != null) "!" else "i")
-                                        }
-                                    } else if (recoveryNeeded) {
-                                        Surface(Modifier.fillMaxWidth().align(Alignment.BottomCenter), color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.95f)) {
-                                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                RecoveryControls(state, permission, requested, requestPermission, openSettings, { cameraAttempt++ }, { model.restartSource(null) })
-                                            }
-                                        }
-                                    } else {
-                                        AnimatedContent(
-                                            targetState = hint,
-                                            modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
-                                            transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "Preview guidance",
-                                        ) { message ->
-                                            if (message != null) Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.9f), shape = RoundedCornerShape(16.dp)) {
-                                                Text(stringResource(message), Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
-                                                    .semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.bodyMedium)
-                                            }
-                                        }
+                            ViewyHeader(compact, overflow, true, { showDebug = true }, { showWorkspace = false })
+                            key(state.selection.activeMethod) {
+                                BoxWithConstraints(
+                                    Modifier.fillMaxWidth().then(if (overflow) Modifier.height(320.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)) else Modifier.weight(1f)).clip(RoundedCornerShape(28.dp))
+                                        .background(if (state.needsCamera) Color.Black else MaterialTheme.colorScheme.secondaryContainer),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    val hintText = hint?.let { stringResource(it) }
+                                    val hintStyle = MaterialTheme.typography.bodyMedium
+                                    val hintHeight = remember(hintText, hintStyle, maxWidth, density) {
+                                        hintText?.let {
+                                            textMeasurer.measure(it, hintStyle, constraints = Constraints(maxWidth = with(density) { (maxWidth - 52.dp).roundToPx().coerceAtLeast(1) })).size.height
+                                        } ?: 0
                                     }
-                                    val heightLabel = stringResource(R.string.height_edit, heightLabelText(measurement.unit.fromMeters(measurement.heightMeters!!), LocalLocale.current.platformLocale), measurement.unit.label)
-                                    if (compact) {
-                                        LabeledIconButton(R.string.object_height, "↕", { editHeight = true }, Modifier.align(Alignment.TopEnd), heightLabel)
+                                    val recoveryNeeded = !permission || !state.camera.ready || !state.acquisition.running
+                                    val useStatusDialog = !overflow && ((compact && recoveryNeeded) || hintHeight > with(density) { (maxHeight / 2 - 54.dp).toPx() })
+                                    if (state.needsCamera && permission) {
+                                        key(cameraAttempt) { LivePreview(model) }
+                                        if (state.camera.ready && state.acquisition.running) Reticle(Modifier.size(40.dp))
+                                    }
+                                    if (!state.needsCamera) {
+                                        Button(
+                                            onClick = { editHeight = true },
+                                            modifier = Modifier.padding(20.dp).widthIn(min = 240.dp, max = 320.dp).heightIn(min = 64.dp),
+                                            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+                                        ) { Text(stringResource(R.string.enter_height), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center) }
                                     } else {
-                                        FilledTonalButton(
-                                            onClick = { editHeight = true }, shape = CircleShape,
-                                            modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
-                                            colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f)),
-                                        ) { Text(heightLabel) }
+                                        // Long recovery text has a scrollable dialog in constrained windows.
+                                        if (useStatusDialog) {
+                                            FilledTonalIconButton(onClick = { showStatus = true }, modifier = Modifier.align(Alignment.BottomStart).padding(4.dp)
+                                                .semantics { contentDescription = previewStatusLabel }) {
+                                                Text(if (!permission || !state.camera.ready || !state.acquisition.running || hint != null) "!" else "i")
+                                            }
+                                        } else if (recoveryNeeded) {
+                                            Surface(Modifier.fillMaxWidth().align(Alignment.BottomCenter), color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.95f)) {
+                                                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                    RecoveryControls(state, permission, requested, requestPermission, openSettings, { cameraAttempt++ }, { model.restartSource(null) })
+                                                }
+                                            }
+                                        } else {
+                                            AnimatedContent(
+                                                targetState = hint,
+                                                modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
+                                                transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "Preview guidance",
+                                            ) { message ->
+                                                if (message != null) Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.9f), shape = RoundedCornerShape(16.dp)) {
+                                                    Text(stringResource(message), Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                                                        .semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.bodyMedium)
+                                                }
+                                            }
+                                        }
+                                        val heightLabel = stringResource(R.string.height_edit, heightLabelText(measurement.unit.fromMeters(measurement.heightMeters!!), LocalLocale.current.platformLocale), measurement.unit.label)
+                                        if (compact) {
+                                            LabeledIconButton(R.string.object_height, "↕", { editHeight = true }, Modifier.align(Alignment.TopEnd), heightLabel)
+                                        } else {
+                                            FilledTonalButton(
+                                                onClick = { editHeight = true }, shape = CircleShape,
+                                                modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
+                                                colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f)),
+                                            ) { Text(heightLabel) }
+                                        }
                                     }
                                 }
                             }
+                            MeasurementStageArea(
+                                measurement, resultDescription, textMeasurer,
+                                if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                            )
                         }
-                        MeasurementStageArea(
-                            measurement, resultDescription, textMeasurer,
-                            if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                        MeasurementControls(
+                            captureTop = measurement.top == null, canCapture = measurement.canCapture,
+                            compact = compact, onRestart = model::restart, onCapture = model::capture,
+                            modeControl = { ModeControl(model::openModes) },
                         )
                     }
-                    MeasurementControls(
-                        captureTop = measurement.top == null, canCapture = measurement.canCapture,
-                        compact = compact, onRestart = model::restart, onCapture = model::capture,
-                        modeControl = { ModeControl(state.selection, model::toggleModes, model::dismissSelection, model::browseMode) },
-                    )
                 }
+                // An exceptional window gets a readable, scrollable workspace dialog. Its
+                // capture/navigation row stays fixed; the regular portrait screen never scrolls.
+                val exceptional = maxHeight < 360.dp || maxWidth < 280.dp || LocalDensity.current.fontScale > 2f
+                if (state.selection.activeMethod == null) {
+                    InactiveMeasurementScreen(compact, { showDebug = true }) { ModeControl(model::openModes) }
+                } else if (exceptional) {
+                    Column(Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        TextButton(onClick = { showWorkspace = true }, modifier = Modifier.weight(1f)) {
+                            Text(stringResource(R.string.open_viewfinder))
+                        }
+                        MeasurementControls(measurement.top == null, measurement.canCapture, true, model::restart, model::capture) {
+                            ModeControl(model::openModes)
+                        }
+                    }
+                    if (showWorkspace) Dialog(onDismissRequest = { showWorkspace = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+                        Surface(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout)).then(methodBackdrop)) { workspace(true) }
+                    }
+                } else workspace(false)
             }
-            // An exceptional window gets a readable, scrollable workspace dialog. Its
-            // capture/navigation row stays fixed; the regular portrait screen never scrolls.
-            val exceptional = maxHeight < 360.dp || maxWidth < 280.dp || LocalDensity.current.fontScale > 2f
-            if (exceptional) {
-                Column(Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    TextButton(onClick = { showWorkspace = true }, modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.open_viewfinder))
-                    }
-                    MeasurementControls(measurement.top == null, measurement.canCapture, true, model::restart, model::capture) {
-                        ModeControl(state.selection, model::toggleModes, model::dismissSelection, model::browseMode)
-                    }
-                }
-                if (showWorkspace) Dialog(onDismissRequest = { showWorkspace = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-                    Surface(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout)).then(methodBackdrop)) { workspace(true) }
-                }
-            } else workspace(false)
         }
-    }
-    if (editHeight) HeightDialog(measurement, onDismiss = { editHeight = false }) { meters, unit ->
-        model.setHeight(meters, unit)
-        editHeight = false
-    }
-    if (showStatus) AlertDialog(
-        onDismissRequest = { showStatus = false }, title = { Text(stringResource(R.string.preview_status)) },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(stringResource(R.string.measurement_method_subtitle))
-                Text(stageText(measurement))
-                if (!state.needsCamera) TextButton(onClick = { showStatus = false; editHeight = true }) { Text(stringResource(R.string.enter_height)) }
-                else {
-                    RecoveryControls(state, permission, requested, requestPermission, openSettings, { cameraAttempt++ }, { model.restartSource(null) })
-                    candidate?.let { Text(stringResource(it)) }
+        if (editHeight && state.selection.activeMethod != null) HeightDialog(measurement, onDismiss = { editHeight = false }) { meters, unit ->
+            model.setHeight(meters, unit)
+            editHeight = false
+        }
+        if (showStatus && state.selection.activeMethod != null) AlertDialog(
+            onDismissRequest = { showStatus = false }, title = { Text(stringResource(R.string.preview_status)) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(stringResource(R.string.measurement_method_subtitle))
+                    Text(stageText(measurement))
+                    if (!state.needsCamera) TextButton(onClick = { showStatus = false; editHeight = true }) { Text(stringResource(R.string.enter_height)) }
+                    else {
+                        RecoveryControls(state, permission, requested, requestPermission, openSettings, { cameraAttempt++ }, { model.restartSource(null) })
+                        candidate?.let { Text(stringResource(it)) }
+                    }
                 }
-            }
-        }, confirmButton = { TextButton(onClick = { showStatus = false }) { Text(stringResource(R.string.close)) } },
-    )
-    if (BuildConfig.DEBUG && showDebug) DiagnosticsDialog(state, model) { showDebug = false }
-    state.selection.browsingMode?.let { mode -> MethodSelectionCarousel(mode, model::selectMethod, model::dismissSelection) }
+            }, confirmButton = { TextButton(onClick = { showStatus = false }) { Text(stringResource(R.string.close)) } },
+        )
+        if (BuildConfig.DEBUG && showDebug) DiagnosticsDialog(state, model) { showDebug = false }
+    }
 }
 
 @Composable
@@ -336,7 +315,7 @@ private fun stageText(state: MeasurementState): String = state.result?.let {
 })
 
 @Composable
-private fun LabeledIconButton(@StringRes label: Int, symbol: String, onClick: () -> Unit, modifier: Modifier = Modifier, description: String = stringResource(label)) {
+internal fun LabeledIconButton(@StringRes label: Int, symbol: String, onClick: () -> Unit, modifier: Modifier = Modifier, description: String = stringResource(label)) {
     FilledTonalIconButton(onClick = onClick, modifier = modifier.semantics { contentDescription = description }) {
         Text(symbol, fontSize = with(LocalDensity.current) { 24.dp.toSp() }, modifier = Modifier.clearAndSetSemantics {})
     }

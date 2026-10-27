@@ -18,6 +18,22 @@ class PreviewSessionTest {
         assertFalse(session.state.ready)
     }
 
+    @Test fun methodChangeRevokesPendingAndReadyPreviewOwnership() {
+        for (alreadyReady in listOf(false, true)) {
+            val session = PreviewSession()
+            val old = session.start()
+            if (alreadyReady) session.update(old, ready)
+            session.invalidate()
+            assertFalse(session.state.ready)
+            assertNull(session.state.mapping)
+            assertFalse(session.update(old, ready))
+            val next = session.start()
+            assertTrue(session.update(next, ready))
+            assertFalse(session.stop(old))
+            assertTrue(session.state.ready)
+        }
+    }
+
     @Test fun retryRejectsOldCallbacksAndOldDisposal() {
         val session = PreviewSession()
         val previous = session.start()

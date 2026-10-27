@@ -1,9 +1,7 @@
 package com.malagel.viewy.ui
 
 import android.app.Application
-import android.content.Context
 import android.os.SystemClock
-import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import com.malagel.viewy.camera.CameraPreviewState
 import com.malagel.viewy.camera.PreviewSession
@@ -25,19 +23,15 @@ data class MeasurementUiState(
     val acquisition: AcquisitionState = AcquisitionState(),
     val diagnostics: OrientationDiagnosticsState = OrientationDiagnosticsState(),
 ) {
-    val needsCamera: Boolean get() = selection.activeMethod.requiresCamera && measurement.heightMeters != null
+    val needsCamera: Boolean get() = selection.activeMethod?.requiresCamera == true && measurement.heightMeters != null
+    fun needsOrientation(resumed: Boolean): Boolean = resumed && needsCamera && camera.ready &&
+        selection.activeMethod?.requiresOrientation == true
 }
 
 /** Shares ONE foreground acquisition with measurement and debug tools. Everything runs on main. */
 class MeasurementViewModel(application: Application) : AndroidViewModel(application) {
     private val workflow = KnownHeightWorkflow()
-    private val selectionPreferences = application.getSharedPreferences("measurement_selection", Context.MODE_PRIVATE)
-    private val savedMethodId = try {
-        selectionPreferences.getString("active_method_id", null)
-    } catch (_: ClassCastException) {
-        null // Treat a malformed preference like an unavailable identifier.
-    }
-    private val mutableState = MutableStateFlow(MeasurementUiState(selection = MeasurementSelection.restore(savedMethodId)))
+    private val mutableState = MutableStateFlow(MeasurementUiState())
     val state = mutableState.asStateFlow()
     private val previewSession = PreviewSession()
     private var resumed = false
@@ -78,8 +72,7 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
     private fun reconcile() {
         val camera = mutableState.value.camera
         val mapping = camera.mapping
-        val method = mutableState.value.selection.activeMethod
-        val desired = if (resumed && mutableState.value.needsCamera && method.requiresOrientation && camera.ready) mapping else null
+        val desired = if (mutableState.value.needsOrientation(resumed)) mapping else null
         workflow.cameraReady(desired != null)
         if (desired?.id != activeMapping) {
             activeMapping = desired?.id
@@ -88,7 +81,8 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
         publish()
     }
 
-    fun toggleModes() { mutableState.value = mutableState.value.copy(selection = mutableState.value.selection.toggleModes()) }
+    fun openModes() { mutableState.value = mutableState.value.copy(selection = mutableState.value.selection.openModes()) }
+    fun backSelection() { mutableState.value = mutableState.value.copy(selection = mutableState.value.selection.back()) }
     fun dismissSelection() { mutableState.value = mutableState.value.copy(selection = mutableState.value.selection.dismiss()) }
     fun browseMode(mode: MeasurementMode) { mutableState.value = mutableState.value.copy(selection = mutableState.value.selection.browse(mode)) }
 
@@ -100,13 +94,11 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
             workflow.restart()
             activeMapping = null
             acquisition.stop()
-            mutableState.value = mutableState.value.copy(camera = CameraPreviewState())
+            previewSession.invalidate()
+            mutableState.value = mutableState.value.copy(camera = previewSession.state)
         }
         mutableState.value = mutableState.value.copy(selection = next)
-        if (previous.browsingMode == method.mode) {
-            selectionPreferences.edit { putString("active_method_id", next.activeMethod.id) }
-        }
-        reconcile()
+        if (next.activeMethod != previous.activeMethod) reconcile()
     }
 
     fun setHeight(meters: Double, unit: HeightUnit) { workflow.setHeight(meters, unit); publish(); reconcile() }
