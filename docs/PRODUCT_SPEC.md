@@ -11,12 +11,24 @@ without analytics or ads.
 
 Modes describe **what** the user measures; methods describe **how**. The current
 mode is **Long Distance** and its method is **Known Object Height — Two Endpoint
-Captures**. Additional modes and methods are planned, but their scope and
-implementations are not defined in repository requirements.
+Captures**. Short Distance and Height appear as unavailable mode placeholders;
+two empty method cards are reserved for future validated methods. They cannot start a
+measurement.
 
 ## Implemented behavior
 
-- Rear-camera preview in a rounded rectangle with a centered aiming reticle.
+- Mode opens separate elevated, rounded options. Long Distance opens a centered
+  floating method-card carousel with tall cards, horizontal swiping and a page
+  indicator. Tap a
+  method card to activate it; outside taps or system Back dismiss selection.
+  Browsing, dismissing or reselecting the active method preserves its workflow,
+  subject to existing session interruption and capture-expiry rules.
+- Startup restores the last selected method from its locally stored stable ID,
+  defaulting to Known Object Height on fresh installs or unavailable saved IDs.
+  Captures, results and sensor sessions are never restored.
+- A disabled configurations placeholder sits at top right; Restart remains on
+  the left of capture. No settings screen is implemented.
+- Rear-camera preview in a rounded rectangle with a thin, centered plus-shaped aiming reticle.
 - Positive finite object-height entry in meters or decimal feet. Decimal point
   and comma are accepted; grouping separators are not supported.
 - Top capture followed by bottom capture within 15 s, with guidance for fresh,
@@ -33,10 +45,10 @@ implementations are not defined in repository requirements.
 - Camera permission explanation, retry/settings access, and visible camera or
   orientation unavailability with captures blocked.
 - Minimal Material 3 light/dark interface, circular capture button, bounded width
-  and scrolling for constrained layouts. The Mode control explains the single
-  available method. Optional diagnostics are restricted to debug builds.
+  and scrolling for constrained layouts. Optional diagnostics are restricted to
+  debug builds.
 
-No photos, recording, measurement history, persistent settings, network access,
+No photos, recording, measurement history, configurable settings, network access,
 analytics or ads are implemented. Hardware correctness and usability still need
 validation; see [Validation](VALIDATION.md).
 
@@ -47,7 +59,6 @@ validation; see [Validation](VALIDATION.md).
 - Broader metric/imperial support beyond the current meters/decimal-feet entry
   and result display.
 - Locally stored settings and a settings control at bottom left.
-- A mode selector and navigation supporting additional modes and methods.
 
 Preserve the minimalist interface, offline operation and honest accuracy claims
 as these capabilities are added.

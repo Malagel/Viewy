@@ -12,7 +12,7 @@ Source paths below are relative to `app/src/main/java/com/malagel/viewy/`:
 
 | Component | Responsibility |
 | --- | --- |
-| `domain/MeasurementCatalog.kt` | Stable mode/method identities, separate from method-specific workflows; no generic algorithm framework. |
+| `domain/MeasurementCatalog.kt` | Stable mode/method identities and implemented-method capability requirements; unavailable modes have no methods. |
 | `domain/KnownHeightDistance.kt` | Pure Kotlin geometry, typed failures, conditioning diagnostics and conditional input-bound propagation. |
 | `orientation/OrientationMath.kt` | Pure quaternion parsing/rotation, ray angles and circular differences. |
 | `orientation/OrientationSession.kt` | Pure bounded recent-ray statistics, frame/time validity, captures and pair compatibility. |
@@ -20,8 +20,10 @@ Source paths below are relative to `app/src/main/java/com/malagel/viewy/`:
 | `camera/CameraDirectionMapping.kt` | Pure policy mapping the selected optical axis into native device axes. |
 | `camera/CameraPreview.kt` | CameraX Preview selection/pinning, metadata, stream/errors and unbinding. |
 | `measurement/HeightInput.kt` | Decimal validation and meters/feet conversion without presentation rounding. |
+| `measurement/MeasurementSelection.kt` | Pure selection transitions, active method and independent mode/method browsing state. |
+| `ui/MeasurementSelection.kt` | Floating mode pills and centered method-card carousel, including disabled placeholders and swipe navigation. |
 | `measurement/KnownHeightWorkflow.kt` | Immutable top/bottom/correction/result state, compatibility/alignment gates, retry and restart. |
-| `ui/MeasurementViewModel.kt` | One shared foreground sensor adapter, workflow and immutable StateFlow snapshots. |
+| `ui/MeasurementViewModel.kt` | Selection state, one shared foreground sensor adapter, workflow and immutable StateFlow snapshots. |
 | `ui/OrientationDiagnosticsState.kt` and `ui/OrientationDiagnosticsPanel.kt` | Debug A/B captures, separate from measurement endpoints but sharing acquisition. |
 
 Math and workflow logic are independent of Android/Compose. Sensor callbacks,
@@ -191,9 +193,22 @@ while STARTED so background initialization does not spuriously fail. Compose own
 the preview through DisposableEffect; CameraX owns lifecycle start/stop. Disposal
 removes observers/display listeners and unbinds only this Preview.
 
-The ViewModel enables its single sensor adapter only while resumed and camera
-ready. Pause, camera loss/reconfiguration, recreation or source/frame/mapping
-changes invalidate endpoints/results. Pause removes the sensor listener/freshness
+Selection is held in the ViewModel separately from the measurement workflow.
+The ViewModel reads only the active method's stable ID from private Android
+SharedPreferences before publishing initial state and writes it on valid method
+selection. Missing, malformed or unavailable IDs fall back to Known Object Height;
+selection menus start closed. Preview composition is keyed by active method;
+disposal releases its camera. Browsing overlays keep the active preview composed
+and do not reset captures. Activating the same method only closes selection;
+a different method invalidates captures and stops acquisition before reconciliation.
+Unavailable modes and empty method cards cannot activate a workflow. Only the
+method ID is persisted across process death; navigation, captures, results and
+hardware sessions are temporary.
+
+The ViewModel enables its single sensor adapter only with an active method that
+requires orientation, while resumed and camera ready. Only methods requiring a
+camera compose a preview. Pause, camera loss/reconfiguration, recreation or
+source/frame/mapping changes invalidate endpoints/results. Pause removes the sensor listener/freshness
 timer; ViewModel cleanup releases acquisition. No session survives process death.
 Debug A/B captures share this pipeline without sharing measurement endpoints.
 
@@ -219,7 +234,8 @@ root buildscript to match the Compose compiler; do not also apply Kotlin Android
 JUnit 4 supports JVM tests. Camera2 interop opt-in stays in the camera adapter.
 The manifest requests CAMERA and removes the transitive network-state permission;
 there are no Internet, microphone, location or storage permissions. No navigation,
-dependency-injection or persistence framework is implemented.
+dependency-injection or persistence framework is implemented; method selection
+uses platform SharedPreferences.
 
 See [README](../README.md) for setup and [Validation](VALIDATION.md) for test
 coverage, recorded evidence and outstanding physical checks.

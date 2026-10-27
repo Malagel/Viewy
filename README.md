@@ -7,7 +7,8 @@ two aiming directions. Application ID: `com.malagel.viewy`.
 
 ## Basic usage
 
-1. Allow camera access and enter the vertical distance between the object's
+1. Viewy opens the last used method (Known Object Height by default). Use **Mode**
+   to browse methods. Allow camera access and enter the vertical distance between the object's
    endpoints in meters or decimal feet.
 2. Keep the camera location fixed. Aim the centered reticle at the top, stop for
    about one second, then capture while still.

@@ -25,7 +25,7 @@ JVM coverage in `app/src/test` exercises geometry/invariance, typed failures,
 conditioning and conditional bounds; quaternion signs/order/formats and poles;
 spherical steadiness statistics, timestamps, discontinuities, reliability and
 source/frame/mapping isolation; inverse camera-pose mapping and fallbacks; height
-conversion; and acquisition observations through workflow/calculator transitions,
+conversion; selection availability, stable-ID restoration/fallback, activation, dismissal and reselection; and acquisition observations through workflow/calculator transitions,
 alignment/wraparound, interruption, correction and retry. Source and tests define
 the individual cases. Mocked deployment tests verify script decisions using
 fictional devices/configuration, not real wireless reliability.
@@ -90,6 +90,7 @@ Keep records externally; the app has no history/export feature.
 | Repeatability and return | Fixture fixed aim and compare debug A/B over 5/10/15 s, then move away and return within the pair limit. Repeat separately for each available sensor using new-session controls; no pair may span sources. Initial rotation-vector runs should avoid magnetic objects; record controlled magnetic disturbance separately. Differences combine return, fixture and sensor effects, not independently measured drift. |
 | Reference distances and repetition | Independently measure horizontal lens-to-target-line distance with tape/range instrument at several safe distances/heights and positive/negative endpoint elevations. Collect multiple full measurements with independent re-aims (for example ten per setup), recording every result/rejection, signed/absolute relative error and spread. Compare short/long capture durations and fixture/handheld results. Viewy output must not define its own reference. |
 | Lighting and focus | Repeat bright/dim/backlit scenes. Observe autofocus, lens breathing, center movement and preview delay. Wait for a clear stationary image; no claim ties the captured orientation to an earlier displayed frame. |
+| Mode and method selection | Verify fresh launch opens Known Object Height with menus closed. Open/close Mode and check separately spaced disabled pills. Choose Long Distance, swipe all three tall floating cards and check the page indicator. Tap the available card anywhere to activate; outside taps and system Back return directly to measurement. Capture a top endpoint or result, browse/dismiss/reselect promptly, and confirm preservation within existing session/expiry rules. Reopen after process death: only the selected method should restore. Configurations and unavailable modes/cards must not activate anything. Check portrait/landscape, large text, light/dark and TalkBack; card text must scroll and horizontal swiping remain usable. Check the thin plus reticle against bright and dark scenes. |
 | Layout and accessibility | Check light/dark themes, large font/display sizes, TalkBack capture labels, small screens/landscape, height-dialog keyboard and system insets. Controls/results must remain reachable by scrolling. |
 
 ## Outstanding reliability limits
