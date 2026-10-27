@@ -1,3 +1,5 @@
 <resources>
-    <color name="window_background">#111412</color>
+    <!-- Material 3 baseline dark: Neutral6 and Primary80; matches the Compose theme. -->
+    <color name="window_background">#141218</color>
+    <color name="accent">#D0BCFF</color>
 </resources>

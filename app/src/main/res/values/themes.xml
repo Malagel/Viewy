@@ -1,7 +1,8 @@
 <resources>
-    <style name="Theme.Viewy" parent="android:style/Theme.Material.Light.NoActionBar">
+    <style name="Theme.Viewy" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:fontFamily">sans</item>
-        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:colorAccent">@color/accent</item>
         <item name="android:windowActionModeOverlay">true</item>
         <item name="android:windowBackground">@color/window_background</item>
     </style>
