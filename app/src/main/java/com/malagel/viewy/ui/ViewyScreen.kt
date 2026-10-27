@@ -33,6 +33,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
@@ -82,9 +83,22 @@ fun ViewyScreen(state: MeasurementUiState, model: MeasurementViewModel) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Column(Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineLarge)
-                    Text(stringResource(R.string.measurement_method_subtitle), style = MaterialTheme.typography.bodyMedium)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineLarge)
+                        Text(stringResource(R.string.measurement_method_subtitle), style = MaterialTheme.typography.bodyMedium)
+                    }
+                    val configurationsLabel = stringResource(R.string.configurations_placeholder)
+                    FilledTonalIconButton(
+                        onClick = {}, enabled = false,
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
+                        modifier = Modifier.semantics { contentDescription = configurationsLabel },
+                    ) {
+                        Text(stringResource(R.string.configurations_symbol), fontSize = 24.sp)
+                    }
                 }
                 key(state.selection.activeMethod) {
                     if (state.selection.activeMethod.requiresCamera) {

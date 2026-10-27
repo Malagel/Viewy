@@ -76,6 +76,8 @@
     <string name="short_distance">Short Distance</string>
     <string name="height_mode">Height</string>
     <string name="not_available">Not available yet</string>
+    <string name="configurations_symbol" translatable="false">⚙</string>
+    <string name="configurations_placeholder">Configurations (unavailable)</string>
     <string name="known_height_method">Known Object Height</string>
     <string name="method_estimates">Estimate distance using an object\'s known height.</string>
     <string name="method_requires">Camera, orientation sensor, and object height.</string>
