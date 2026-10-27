@@ -9,6 +9,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -31,9 +34,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -59,6 +64,11 @@ import com.malagel.viewy.R
 import com.malagel.viewy.camera.CameraPreview
 import com.malagel.viewy.measurement.*
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.withTimeoutOrNull
 
 @Composable
 fun ViewyScreen(
@@ -375,24 +385,70 @@ private fun MeasurementControls(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class, FlowPreview::class)
 @Composable
 private fun HeightDialog(state: MeasurementState, unit: HeightUnit, onDismiss: () -> Unit, onSave: (Double) -> Unit) {
     val locale = LocalLocale.current.platformLocale
     val originalText = rememberSaveable { state.heightMeters?.let { heightInputText(unit.fromMeters(it), locale) } ?: "" }
     var text by rememberSaveable { mutableStateOf(originalText) }
     val meters = heightInMeters(text, unit)
-    // Only this dialog responds to the IME. Top anchoring prevents the card from
-    // recentering when the keyboard opens; constrained content scrolls above it.
+    val opacity = remember { Animatable(0f) }
+    var pendingClose by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val closing = pendingClose != null
+    val close: (() -> Unit) -> Unit = { action ->
+        if (pendingClose == null) pendingClose = action
+    }
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { close(onDismiss) },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
         val focusRequester = remember { FocusRequester() }
         val keyboard = LocalSoftwareKeyboardController.current
+        val focusManager = LocalFocusManager.current
+        val imeVisible by rememberUpdatedState(WindowInsets.isImeVisible)
         val windowInfo = LocalWindowInfo.current
         var requestedInitialFocus by remember { mutableStateOf(false) }
-        LaunchedEffect(windowInfo.isWindowFocused) {
-            if (windowInfo.isWindowFocused && !requestedInitialFocus) {
+        var cardVisible by remember { mutableStateOf(false) }
+        var placement by remember { mutableStateOf(HeightDialogPlacement()) }
+        val keyboardTarget = WindowInsets.imeAnimationTarget
+        val keyboardCurrent = WindowInsets.ime
+        val density = LocalDensity.current
+        // One dialog-owned animation job: dismissal cancels entry and continues
+        // from its current opacity. Remove the window only after exit completes.
+        LaunchedEffect(cardVisible, closing) {
+            if (closing) {
+                // Hide while the focused decimal editor is still attached. Removing
+                // it first can restart input with default editor options mid-hide.
+                keyboard?.hide()
+                if (opacity.value > 0f) opacity.animateTo(0f, tween(170, easing = LinearEasing))
+                // Visibility can change before the hide animation finishes; require
+                // the animated bottom inset to reach zero too. Bound faulty IMEs.
+                withTimeoutOrNull(750L) {
+                    snapshotFlow { !imeVisible && keyboardCurrent.getBottom(density) == 0 }.first { it }
+                }
+                focusManager.clearFocus(force = true)
+                withFrameNanos { }
+                pendingClose?.invoke()
+            } else if (cardVisible) {
+                opacity.animateTo(1f, tween(175))
+            }
+        }
+        LaunchedEffect(requestedInitialFocus, closing) {
+            if (!requestedInitialFocus || closing) return@LaunchedEffect
+            // Wait out transient initial inset reports and retain their maximum.
+            // The timeout also leaves hardware/floating-keyboard entry reachable.
+            withTimeoutOrNull(1_000L) {
+                snapshotFlow { maxOf(keyboardCurrent.getBottom(density), keyboardTarget.getBottom(density)) }
+                    .onEach { placement = placement.observe(it) }
+                    .debounce(120L)
+                    .first { it > 0 }
+            }
+            placement = placement.freeze()
+            withFrameNanos { }
+            cardVisible = true
+        }
+        LaunchedEffect(windowInfo.isWindowFocused, closing) {
+            if (windowInfo.isWindowFocused && !requestedInitialFocus && !closing) {
                 // Wait for the dialog's field to attach; never steal focus again on recomposition
                 // or reopen a keyboard the user has deliberately dismissed.
                 withFrameNanos { }
@@ -403,12 +459,15 @@ private fun HeightDialog(state: MeasurementState, unit: HeightUnit, onDismiss: (
         }
         Box(
             Modifier.fillMaxSize()
-                .windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout))
-                .imePadding().padding(24.dp),
-            contentAlignment = Alignment.TopCenter,
+                .windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout)
+                    .union(WindowInsets(bottom = placement.frozenKeyboardBottomPx ?: 0)))
+                .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 20.dp),
+            contentAlignment = Alignment.BottomCenter,
         ) {
             Surface(
-                modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth(),
+                modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth()
+                    .graphicsLayer { alpha = opacity.value }
+                    .then(if (cardVisible && !closing) Modifier else Modifier.clearAndSetSemantics {}),
                 shape = MaterialTheme.shapes.extraLarge,
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
             ) {
@@ -428,8 +487,13 @@ private fun HeightDialog(state: MeasurementState, unit: HeightUnit, onDismiss: (
                         )
                     }
                     FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
-                        TextButton(onClick = { meters?.let { onSave(if (text == originalText) state.heightMeters ?: it else it) } }, enabled = meters != null) { Text(stringResource(R.string.save_height)) }
+                        TextButton(onClick = { close(onDismiss) }, enabled = cardVisible && !closing) { Text(stringResource(R.string.cancel)) }
+                        TextButton(onClick = {
+                            meters?.let { parsed ->
+                                val saved = if (text == originalText) state.heightMeters ?: parsed else parsed
+                                close { onSave(saved) }
+                            }
+                        }, enabled = cardVisible && !closing && meters != null) { Text(stringResource(R.string.save_height)) }
                     }
                 }
             }
