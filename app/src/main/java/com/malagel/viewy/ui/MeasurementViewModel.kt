@@ -4,6 +4,9 @@ import android.app.Application
 import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import com.malagel.viewy.camera.CameraPreviewState
+import com.malagel.viewy.domain.MeasurementMethod
+import com.malagel.viewy.domain.MeasurementMode
+import com.malagel.viewy.measurement.MeasurementSelection
 import com.malagel.viewy.measurement.HeightUnit
 import com.malagel.viewy.measurement.KnownHeightWorkflow
 import com.malagel.viewy.measurement.MeasurementState
@@ -13,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 data class MeasurementUiState(
+    val selection: MeasurementSelection = MeasurementSelection(),
     val measurement: MeasurementState = MeasurementState(),
     val camera: CameraPreviewState = CameraPreviewState(),
     val acquisition: AcquisitionState = AcquisitionState(),
@@ -41,20 +45,38 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
 
     fun previewChanged(camera: CameraPreviewState) {
         mutableState.value = mutableState.value.copy(camera = camera)
-        workflow.cameraReady(camera.ready && resumed)
         reconcile()
     }
 
     private fun reconcile() {
         val camera = mutableState.value.camera
         val mapping = camera.mapping
-        val desired = if (resumed && camera.ready) mapping else null
+        val method = mutableState.value.selection.activeMethod
+        val desired = if (resumed && method.requiresOrientation && camera.ready) mapping else null
         workflow.cameraReady(desired != null)
         if (desired?.id != activeMapping) {
             activeMapping = desired?.id
             if (desired == null) acquisition.stop() else acquisition.start(requestedSource, desired)
         }
         publish()
+    }
+
+    fun toggleModes() { mutableState.value = mutableState.value.copy(selection = mutableState.value.selection.toggleModes()) }
+    fun dismissSelection() { mutableState.value = mutableState.value.copy(selection = mutableState.value.selection.dismiss()) }
+    fun browseMode(mode: MeasurementMode) { mutableState.value = mutableState.value.copy(selection = mutableState.value.selection.browse(mode)) }
+
+    fun selectMethod(method: MeasurementMethod) {
+        val previous = mutableState.value.selection
+        val next = previous.activate(method)
+        if (next.activeMethod != previous.activeMethod) {
+            // A different workflow must never inherit captures or a hardware session.
+            workflow.restart()
+            activeMapping = null
+            acquisition.stop()
+            mutableState.value = mutableState.value.copy(camera = CameraPreviewState())
+        }
+        mutableState.value = mutableState.value.copy(selection = next)
+        reconcile()
     }
 
     fun setHeight(meters: Double, unit: HeightUnit) { workflow.setHeight(meters, unit); publish() }

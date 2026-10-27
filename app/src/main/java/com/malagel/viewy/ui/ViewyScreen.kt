@@ -62,7 +62,6 @@ fun ViewyScreen(state: MeasurementUiState, model: MeasurementViewModel) {
     var requested by rememberSaveable { mutableStateOf(false) }
     var cameraAttempt by remember { mutableIntStateOf(0) }
     var editHeight by rememberSaveable { mutableStateOf(false) }
-    var showMethod by rememberSaveable { mutableStateOf(false) }
     var showDebug by rememberSaveable { mutableStateOf(false) }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> permission = granted }
     // Settings can change permission while the Activity is stopped.
@@ -78,7 +77,8 @@ fun ViewyScreen(state: MeasurementUiState, model: MeasurementViewModel) {
         BoxWithConstraints(Modifier.fillMaxSize().padding(insets), contentAlignment = Alignment.TopCenter) {
             val previewHeight = (maxHeight - 340.dp).coerceIn(240.dp, 580.dp)
             Column(
-                Modifier.widthIn(max = 600.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(20.dp),
+                Modifier.widthIn(max = 600.dp).fillMaxWidth()
+                    .verticalScroll(rememberScrollState()).heightIn(min = maxHeight).padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -86,80 +86,85 @@ fun ViewyScreen(state: MeasurementUiState, model: MeasurementViewModel) {
                     Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineLarge)
                     Text(stringResource(R.string.measurement_method_subtitle), style = MaterialTheme.typography.bodyMedium)
                 }
-                Box(
-                    Modifier.fillMaxWidth().height(previewHeight).clip(RoundedCornerShape(32.dp))
-                        .background(Color.Black), contentAlignment = Alignment.Center,
-                ) {
-                    if (permission) {
-                        key(cameraAttempt) { LivePreview(model::previewChanged) }
-                        Reticle(Modifier.size(44.dp))
-                    } else {
-                        Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(stringResource(R.string.camera_permission_explanation), color = Color.White)
-                            Button(onClick = { requested = true; launcher.launch(Manifest.permission.CAMERA) }) {
-                                Text(if (requested) stringResource(R.string.camera_permission_retry) else stringResource(R.string.camera_permission_allow))
+                key(state.selection.activeMethod) {
+                    if (state.selection.activeMethod.requiresCamera) {
+                        Box(
+                            Modifier.fillMaxWidth().height(previewHeight).clip(RoundedCornerShape(32.dp))
+                                .background(Color.Black), contentAlignment = Alignment.Center,
+                        ) {
+                            if (permission) {
+                                key(cameraAttempt) { LivePreview(model::previewChanged) }
+                                Reticle(Modifier.size(44.dp))
+                            } else {
+                                Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(stringResource(R.string.camera_permission_explanation), color = Color.White)
+                                    Button(onClick = { requested = true; launcher.launch(Manifest.permission.CAMERA) }) {
+                                        Text(if (requested) stringResource(R.string.camera_permission_retry) else stringResource(R.string.camera_permission_allow))
+                                    }
+                                    if (requested) TextButton(onClick = {
+                                        context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:${context.packageName}".toUri()))
+                                    }) { Text(stringResource(R.string.open_app_settings), color = Color.White) }
+                                }
                             }
-                            if (requested) TextButton(onClick = {
-                                context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:${context.packageName}".toUri()))
-                            }) { Text(stringResource(R.string.open_app_settings), color = Color.White) }
-                        }
-                    }
-                    if (permission && !state.camera.ready) {
-                        Column(Modifier.align(Alignment.BottomCenter).background(Color.Black.copy(alpha = 0.8f)).padding(16.dp)) {
-                            Text(stringResource(state.camera.messageRes), color = Color.White)
-                            TextButton(onClick = { cameraAttempt++ }) { Text(stringResource(R.string.camera_retry), color = Color.White) }
-                        }
-                    }
-                }
-                Text(
-                    when (measurement.stage) {
-                        MeasurementStage.TOP -> stringResource(R.string.measurement_stage_top)
-                        MeasurementStage.BOTTOM, MeasurementStage.CORRECTION -> stringResource(R.string.measurement_stage_bottom)
-                        MeasurementStage.RESULT -> stringResource(R.string.measurement_stage_result)
-                    }, style = MaterialTheme.typography.titleLarge,
-                )
-                OutlinedButton(onClick = { editHeight = true }) {
-                    Text(measurement.heightMeters?.let {
-                        stringResource(R.string.height_edit, String.format(Locale.getDefault(), "%.6g", measurement.unit.fromMeters(it)), measurement.unit.label)
-                    } ?: stringResource(R.string.enter_height))
-                }
-                measurement.result?.let { MeasurementResult(it, measurement.unit) }
-                if (measurement.result == null) {
-                    Text(stringResource(guidance(state)), style = MaterialTheme.typography.bodyLarge)
-                    measurement.notice?.let { Text(stringResource(noticeResource(it)), color = MaterialTheme.colorScheme.primary) }
-                    if (measurement.cameraReady && !state.acquisition.running) {
-                        TextButton(onClick = { model.restartSource(null) }) { Text(stringResource(R.string.orientation_retry)) }
-                    }
-                }
-                MeasurementControls(
-                    captureTop = measurement.top == null, canCapture = measurement.canCapture,
-                    onRestart = model::restart, onCapture = model::capture, onMode = { showMethod = true },
-                )
-                if (measurement.result != null) {
-                    Button(onClick = model::restart) { Text(stringResource(R.string.new_measurement)) }
-                    OutlinedButton(onClick = model::recaptureBottom) { Text(stringResource(R.string.recapture_bottom)) }
-                } else Text(if (measurement.top == null) stringResource(R.string.capture_top) else stringResource(R.string.capture_bottom), style = MaterialTheme.typography.labelLarge)
-                Text(stringResource(R.string.capture_instructions), style = MaterialTheme.typography.bodySmall)
-                Text(stringResource(R.string.aiming_limitation), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (BuildConfig.DEBUG) {
-                    TextButton(onClick = { showDebug = !showDebug }) { Text(if (showDebug) stringResource(R.string.hide_diagnostics) else stringResource(R.string.show_diagnostics)) }
-                    if (showDebug) {
-                        Text(state.camera.diagnostic)
-                        measurement.result?.let { result ->
-                            Text("Height ${measurement.heightMeters} m · distance ${result.horizontalDistanceMeters} m\n" +
-                                "Top/bottom elevation ${Math.toDegrees(result.diagnostics.topElevationRadians)}° / ${Math.toDegrees(result.diagnostics.bottomElevationRadians)}°\n" +
-                                "Elevation separation ${Math.toDegrees(result.diagnostics.elevationSeparationRadians)}°\n" +
-                                "Bearing error ${Math.toDegrees(result.diagnostics.alignmentErrorRadians)}°\n" +
-                                "Duration ${measurement.bottom?.timestampNanos?.minus(measurement.top!!.timestampNanos)?.div(1e9)} s\n" +
-                                "Sensitivity top/bottom ${result.diagnostics.topSensitivityMetersPerRadian} / ${result.diagnostics.bottomSensitivityMetersPerRadian} m/rad")
-                            listOf("Top" to measurement.top, "Bottom" to measurement.bottom).forEach { (label, observation) ->
-                                observation?.let {
-                                    Text("$label sensor t ${it.timestampNanos} ns · capture age ${it.quality.ageNanos?.div(1e6)} ms\n" +
-                                        "Captured RMS/max ${it.quality.rmsVariationRadians?.let(Math::toDegrees)}° / ${it.quality.maximumVariationRadians?.let(Math::toDegrees)}°")
+                            if (permission && !state.camera.ready) {
+                                Column(Modifier.align(Alignment.BottomCenter).background(Color.Black.copy(alpha = 0.8f)).padding(16.dp)) {
+                                    Text(stringResource(state.camera.messageRes), color = Color.White)
+                                    TextButton(onClick = { cameraAttempt++ }) { Text(stringResource(R.string.camera_retry), color = Color.White) }
                                 }
                             }
                         }
-                        OrientationDiagnosticsPanel(state.diagnostics, model::captureDiagnostic, model::restartSource, model::clearDiagnostics)
+                    }
+                    Text(
+                        when (measurement.stage) {
+                            MeasurementStage.TOP -> stringResource(R.string.measurement_stage_top)
+                            MeasurementStage.BOTTOM, MeasurementStage.CORRECTION -> stringResource(R.string.measurement_stage_bottom)
+                            MeasurementStage.RESULT -> stringResource(R.string.measurement_stage_result)
+                        }, style = MaterialTheme.typography.titleLarge,
+                    )
+                    OutlinedButton(onClick = { editHeight = true }) {
+                        Text(measurement.heightMeters?.let {
+                            stringResource(R.string.height_edit, String.format(Locale.getDefault(), "%.6g", measurement.unit.fromMeters(it)), measurement.unit.label)
+                        } ?: stringResource(R.string.enter_height))
+                    }
+                    measurement.result?.let { MeasurementResult(it, measurement.unit) }
+                    if (measurement.result == null) {
+                        Text(stringResource(guidance(state)), style = MaterialTheme.typography.bodyLarge)
+                        measurement.notice?.let { Text(stringResource(noticeResource(it)), color = MaterialTheme.colorScheme.primary) }
+                        if (measurement.cameraReady && !state.acquisition.running) {
+                            TextButton(onClick = { model.restartSource(null) }) { Text(stringResource(R.string.orientation_retry)) }
+                        }
+                    }
+                    MeasurementControls(
+                        captureTop = measurement.top == null, canCapture = measurement.canCapture,
+                        onRestart = model::restart, onCapture = model::capture,
+                        modeControl = { ModeControl(state.selection, model::toggleModes, model::dismissSelection, model::browseMode) },
+                    )
+                    if (measurement.result != null) {
+                        Button(onClick = model::restart) { Text(stringResource(R.string.new_measurement)) }
+                        OutlinedButton(onClick = model::recaptureBottom) { Text(stringResource(R.string.recapture_bottom)) }
+                    } else Text(if (measurement.top == null) stringResource(R.string.capture_top) else stringResource(R.string.capture_bottom), style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(R.string.capture_instructions), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.aiming_limitation), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (BuildConfig.DEBUG) {
+                        TextButton(onClick = { showDebug = !showDebug }) { Text(if (showDebug) stringResource(R.string.hide_diagnostics) else stringResource(R.string.show_diagnostics)) }
+                        if (showDebug) {
+                            Text(state.camera.diagnostic)
+                            measurement.result?.let { result ->
+                                Text("Height ${measurement.heightMeters} m · distance ${result.horizontalDistanceMeters} m\n" +
+                                    "Top/bottom elevation ${Math.toDegrees(result.diagnostics.topElevationRadians)}° / ${Math.toDegrees(result.diagnostics.bottomElevationRadians)}°\n" +
+                                    "Elevation separation ${Math.toDegrees(result.diagnostics.elevationSeparationRadians)}°\n" +
+                                    "Bearing error ${Math.toDegrees(result.diagnostics.alignmentErrorRadians)}°\n" +
+                                    "Duration ${measurement.bottom?.timestampNanos?.minus(measurement.top!!.timestampNanos)?.div(1e9)} s\n" +
+                                    "Sensitivity top/bottom ${result.diagnostics.topSensitivityMetersPerRadian} / ${result.diagnostics.bottomSensitivityMetersPerRadian} m/rad")
+                                listOf("Top" to measurement.top, "Bottom" to measurement.bottom).forEach { (label, observation) ->
+                                    observation?.let {
+                                        Text("$label sensor t ${it.timestampNanos} ns · capture age ${it.quality.ageNanos?.div(1e6)} ms\n" +
+                                            "Captured RMS/max ${it.quality.rmsVariationRadians?.let(Math::toDegrees)}° / ${it.quality.maximumVariationRadians?.let(Math::toDegrees)}°")
+                                    }
+                                }
+                            }
+                            OrientationDiagnosticsPanel(state.diagnostics, model::captureDiagnostic, model::restartSource, model::clearDiagnostics)
+                        }
                     }
                 }
             }
@@ -169,11 +174,9 @@ fun ViewyScreen(state: MeasurementUiState, model: MeasurementViewModel) {
         model.setHeight(meters, unit)
         editHeight = false
     }
-    if (showMethod) AlertDialog(
-        onDismissRequest = { showMethod = false }, title = { Text(stringResource(R.string.long_distance)) },
-        text = { Text(stringResource(R.string.method_explanation)) },
-        confirmButton = { TextButton(onClick = { showMethod = false }) { Text(stringResource(R.string.use_method)) } },
-    )
+    state.selection.browsingMode?.let { mode ->
+        MethodSelectionCarousel(mode, model::selectMethod, model::dismissSelection)
+    }
 }
 
 @Composable
@@ -292,7 +295,7 @@ private fun MeasurementControls(
     canCapture: Boolean,
     onRestart: () -> Unit,
     onCapture: () -> Unit,
-    onMode: () -> Unit,
+    modeControl: @Composable () -> Unit,
 ) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         TextButton(onClick = onRestart, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.restart_measurement)) }
@@ -308,7 +311,7 @@ private fun MeasurementControls(
                 drawCircle(color, radius = 12.dp.toPx())
             }
         }
-        TextButton(onClick = onMode, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.mode)) }
+        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { modeControl() }
     }
 }
 
@@ -323,7 +326,7 @@ private fun MeasurementPreview() {
         Surface {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 MeasurementResult(result, HeightUnit.METERS)
-                MeasurementControls(captureTop = false, canCapture = true, onRestart = {}, onCapture = {}, onMode = {})
+                MeasurementControls(captureTop = false, canCapture = true, onRestart = {}, onCapture = {}, modeControl = { TextButton(onClick = {}) { Text(stringResource(R.string.mode)) } })
             }
         }
     }

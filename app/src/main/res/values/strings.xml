@@ -22,8 +22,6 @@
     <string name="hide_diagnostics">Hide development diagnostics</string>
     <string name="show_diagnostics">Development diagnostics</string>
     <string name="long_distance">Long Distance</string>
-    <string name="method_explanation">Known Object Height · Two Endpoint Captures\n\nEnter the object\'s vertical height, record its top, then its bottom. This is the first available method.</string>
-    <string name="use_method">Use this method</string>
     <string name="object_height">Object height</string>
     <string name="height_instructions">Enter the vertical distance between the two endpoints. Saving starts a new measurement.</string>
     <string name="height_invalid">Enter a positive decimal height.</string>
@@ -75,4 +73,14 @@
     <string name="camera_ready">Rear camera ready</string>
     <string name="camera_waiting">Waiting for rear camera preview…</string>
     <string name="camera_stopped">Camera stopped</string>
+    <string name="short_distance">Short Distance</string>
+    <string name="height_mode">Height</string>
+    <string name="not_available">Not available yet</string>
+    <string name="known_height_method">Known Object Height</string>
+    <string name="method_estimates">Estimate distance using an object\'s known height.</string>
+    <string name="method_requires">Camera, orientation sensor, and object height.</string>
+    <string name="method_procedure">Aim at the top, then the bottom, keeping the phone stationary.</string>
+    <string name="method_limitations">Approximate and uncalibrated; uncertainty is not quantified.</string>
+    <string name="method_placeholder">Method placeholder</string>
+    <string name="method_page">%1$d of %2$d</string>
 </resources>
