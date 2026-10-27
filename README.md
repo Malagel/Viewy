@@ -9,7 +9,9 @@ two aiming directions. Application ID: `com.malagel.viewy`.
 
 1. Viewy opens mode selection with no active measurement. Tap **Long Distance**,
    then **Known Object Height**. Use the chevron **Mode** button to reopen selection.
-   Tap **Enter object height** and save the vertical distance
+   On first activation, read and dismiss the method tutorial. The **?** button
+   beside the settings gear reopens it; **Know more** explains the geometry and
+   limitations. Tap **Enter object height** and save the vertical distance
    between the object's endpoints in meters or decimal feet, then allow camera
    access when prompted by the viewfinder controls. Height entry and editing
    automatically focus the input and open the decimal keyboard.
@@ -25,9 +27,9 @@ The app uses Material 3's baseline dark palette. The normal portrait screen keep
 capture/navigation visible without scrolling; the input dialog handles the
 keyboard without shifting the measurement screen.
 Small windows or large text offer status/details dialogs; **Open viewfinder**
-opens a scrollable workspace in exceptionally constrained layouts. Debug builds
-expose diagnostics through the header's overflow button. The rounded Viewy
-wordmark uses bundled [Nunito Bold](https://github.com/google/fonts/blob/c7e2740188205a85323c7385547f6f59b4f2245a/ofl/nunito/Nunito-Bold.ttf)
+opens a scrollable workspace in exceptionally constrained layouts. Help stays
+scrollable in its centered card; the settings gear remains unavailable. The rounded
+Viewy wordmark uses bundled [Nunito Bold](https://github.com/google/fonts/blob/c7e2740188205a85323c7385547f6f59b4f2245a/ofl/nunito/Nunito-Bold.ttf)
 ([SIL Open Font License](app/src/main/assets/licenses/nunito_ofl.txt));
 no fonts are downloaded during use.
 

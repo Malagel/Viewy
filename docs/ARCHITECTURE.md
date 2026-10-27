@@ -40,6 +40,42 @@ methods return to modes, modes dismiss, and outside taps dismiss at either level
 The launcher remains composed in place throughout sheet opening and closing;
 the modal window blocks interaction with the background launcher while open.
 
+Method help uses one centered edge-to-edge Compose Dialog with a bounded-width,
+fixed-height Material 3 card constrained by system bars, cutouts and available
+window size. Close stays accessible above the vertically scrollable content;
+the detailed page also has Go back at the opposite end of that fixed control row.
+Basic and detailed pages share the same card bounds and modal window. Outside
+card taps, dialog Back and Close all dispatch a whole-card dismissal. Page-keyed
+scroll state resets on content changes, while sensor-state publication leaves it
+alone. The measurement surface remains composed in place, with no help-driven
+hardware reconciliation or workflow actions.
+
+Tutorial content distinguishes resource-backed prose from display equations.
+A small, pure TeX-style notation parser feeds native Compose fraction and
+subscript/superscript layout; this supports authored equations without a WebView,
+network access or rendering dependency. Unsupported/malformed notation falls
+back to its source. Each equation has a localized spoken description instead of
+fragmented symbol semantics. Equations retain font scaling and can scroll
+horizontally in constrained widths, within the vertically scrollable page.
+
+A pure `TutorialCoordinator`, owned by the ViewModel, retains pending requests,
+card identity and basic/detailed page across Activity recreation. A navigation
+token rejects obsolete sheet callbacks; card IDs reject obsolete page/dismissal
+callbacks. Selection schedules eligible first-use help, then the selector hides
+its sheet and removes its modal window. A post-composition acknowledgement is
+sent only with a closed selection and unmounted sheet. Only a matching token may
+present the pending tutorial. A recreated closed selector can acknowledge without
+animating a nonexistent sheet; repeated acknowledgements cannot duplicate or
+reopen a card. Navigation cancels pending/visible help without marking it seen.
+No timer coordinates the overlays.
+
+`LocalTutorialSeenStore` uses the dedicated app-private `method_tutorials`
+SharedPreferences file with boolean `seen.<stable method ID>` keys. Dismissal
+writes completion using `apply`; activation, page changes and manual opening do
+not. Only completion persists: process death starts inactive, and an undismissed
+tutorial is eligible on the next method activation. No selection, height, capture,
+result, card identity or page is restored from this file.
+
 Source paths below are relative to `app/src/main/java/com/malagel/viewy/`:
 
 | Component | Responsibility |
@@ -55,11 +91,15 @@ Source paths below are relative to `app/src/main/java/com/malagel/viewy/`:
 | `measurement/HeightInput.kt` | Decimal validation and meters/feet conversion without presentation rounding. |
 | `measurement/MeasurementSelection.kt` | Pure selection transitions, active method and independent mode/method browsing state. |
 | `ui/MeasurementSelection.kt` | Chevron launcher and reusable animated bottom sheet with scrollable mode/method entries, disabled modes and independent navigation transitions. |
+| `tutorial/TutorialCoordinator.kt` | Pure help coordination, navigation/card callback identity and temporary presentation state; no measurement or hardware access. |
+| `tutorial/LocalTutorialSeenStore.kt` | Small local completion store keyed by stable method ID. |
+| `ui/MethodTutorialContent.kt` and `ui/MethodTutorialDialog.kt` | Resource-based prose/equation blocks and reusable single-card presentation with basic/detailed pages. |
+| `ui/TutorialMathNotation.kt` and `ui/TutorialEquation.kt` | Pure authored-notation parsing and native mathematical layout with localized spoken descriptions. |
 | `ui/HeightLabelText.kt` | Locale-aware compact height labels with the existing six-significant-digit cap, trimmed zero padding and at least one decimal; stored inputs are untouched. |
 | `ui/MeasurementGuidance.kt` | Contextual hints from existing workflow gates; corrected live-condition notices disappear without changing capture eligibility. |
 | `measurement/KnownHeightWorkflow.kt` | Immutable top/bottom/correction/result state, compatibility/alignment gates, retry and restart. |
 | `ui/MeasurementViewModel.kt` | Selection state, one shared foreground sensor adapter, workflow and immutable StateFlow snapshots. |
-| `ui/OrientationDiagnosticsState.kt` and `ui/OrientationDiagnosticsPanel.kt` | Debug A/B captures, separate from measurement endpoints but sharing acquisition. |
+| `ui/OrientationDiagnosticsState.kt`, `ui/OrientationDiagnosticsPanel.kt` and `ui/DiagnosticsDialog.kt` | Debug A/B captures, separate from measurement endpoints but sharing acquisition. |
 
 Math and workflow logic are independent of Android/Compose. Sensor callbacks,
 workflow actions and periodic freshness updates are serialized on main. The
@@ -232,8 +272,10 @@ ViewModel ownership tokens also reject obsolete preview callbacks and disposal.
 
 Selection is held in the ViewModel separately from the measurement workflow.
 `MeasurementSelection` explicitly permits a null active method and uses typed
-Closed/Modes/Methods destinations. A new ViewModel starts inactive at Modes; no
-SharedPreferences are read or written, so legacy method selections have no effect.
+Closed/Modes/Methods destinations. A new ViewModel starts inactive at Modes;
+selection never reads or writes SharedPreferences, so legacy method selections
+have no effect. Tutorial completion
+uses a separate preference file and cannot activate a method.
 The Activity's existing ViewModel retention preserves active method and navigation
 across configuration recreation and background return. Process death creates a
 new inactive selection. Workflow interruption rules still invalidate captures on
@@ -269,7 +311,8 @@ camera position.
 
 Transient preview hints use a short delay and fades to avoid sensor-state flicker;
 this never delays capture gating. Permission/camera/orientation recovery remains
-persistent. Debug camera, endpoint and A/B diagnostics live in a scrollable dialog.
+persistent. Debug camera, endpoint and A/B diagnostics retain a scrollable dialog
+implementation, but no UI entry is exposed pending a future developer-access policy.
 
 There is no preview-exposure/sensor synchronization: neither tap time nor latest
 sensor timestamp identifies the displayed frame's exposure. Rendering, processing,
@@ -285,8 +328,8 @@ root buildscript to match the Compose compiler; do not also apply Kotlin Android
 JUnit 4 supports JVM tests. Camera2 interop opt-in stays in the camera adapter.
 The manifest requests CAMERA and removes the transitive network-state permission;
 there are no Internet, microphone, location or storage permissions. No navigation,
-dependency-injection or persistence framework is implemented; selection and
-workflow state are held only in memory.
+dependency-injection or persistence framework is implemented. Only tutorial
+completion uses SharedPreferences; selection and workflow state remain in memory.
 
 See [README](../README.md) for setup and [Validation](VALIDATION.md) for test
 coverage, recorded evidence and outstanding physical checks.

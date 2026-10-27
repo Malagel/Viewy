@@ -25,12 +25,35 @@ future validated features; they have no selectable methods.
 - Tapping Long Distance slides the mode list left and its method list in from the
   right. Back returns to modes with the opposite transition; Back from modes or
   an outside tap dismisses the sheet. Every reopening begins at modes. Entries
-  work by tapping and scroll when needed. There are no tutorial cards or pager.
+  work by tapping and scroll when needed. There is no pager.
 - Selecting Known Object Height closes the sheet and shows its existing workflow.
   Browsing, dismissing or reselecting it preserves inputs, captures and results,
   subject to existing interruption and capture-expiry rules. The measurement
   surface stays stationary, blurs gradually on Android 12+ and dims while the
   sheet opens; older versions use dimming. The sheet stays sharp.
+- Each implemented method has a contextual **?** control immediately left of the
+  unchanged settings gear. It is absent while no method is active. It opens one
+  centered, rounded, scrollable tutorial card over the stationary measurement
+  interface. **Know more** replaces the practical content with a technical
+  explanation with formatted equations in the same card. **Go back** appears at
+  the top left only in the detailed view, opposite **Close**, and restores the
+  practical content.
+  Switching content starts at the top. Outside tap, Android Back and **Close**
+  dismiss the entire card from either page; every reopening starts with basic
+  content. Opening or dismissing help does not reset inputs, captures, results or
+  acquisition; ordinary interruption and capture-expiry rules still apply.
+- The first activation of each method automatically opens its tutorial after the
+  selector has finished closing. Only tutorial dismissal records completion,
+  locally by stable method ID across launches and process death. Termination
+  before dismissal leaves first-use help eligible on the next activation.
+  Manual help remains available after completion. Tutorial completion is
+  independent of fresh-session inactive startup and method selection.
+- Known Object Height basic help gives a brief usage procedure and describes the
+  approximate horizontal-distance result. It emphasizes fixed phone position,
+  a vertical target, horizontal alignment and the 15-second capture limit.
+  The detailed view explains the geometry with formatted fractions and endpoint
+  subscripts, then covers sensor/camera/timing limitations and unquantified
+  accuracy. Steadiness is not presented as measurement accuracy.
 - The circular bottom-right Mode launcher uses an upward chevron and stays in
   place while the sheet opens and closes. The modal sheet blocks interaction
   with the background launcher while open.
@@ -79,8 +102,10 @@ future validated features; they have no selectable methods.
   controls within system insets. The normal measurement screen does not scroll.
   Constrained layouts offer a status dialog; exceptionally small windows or text
   scaling open a scrollable viewfinder workspace with fixed capture/navigation.
-  Android may override portrait on large screens. Debug-only diagnostics open
-  in a separate dialog and occupy no measurement-content space.
+  Android may override portrait on large screens. Diagnostic acquisition and
+  presentation remain in source for future developer access; there is currently
+  no diagnostics entry in the interface. Developer Options and long-press help
+  actions are not implemented.
 
 No photos, recording, measurement history, configurable settings, network access,
 analytics or ads are implemented. Hardware correctness and usability still need
