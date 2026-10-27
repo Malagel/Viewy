@@ -274,14 +274,10 @@ private fun decimalText(value: Double): String = java.math.BigDecimal.valueOf(va
 private fun Reticle(modifier: Modifier = Modifier) {
     val label = stringResource(R.string.reticle_description)
     Canvas(modifier.semantics { contentDescription = label }) {
-        val gap = 6.dp.toPx()
-        // Dark outline keeps the white reticle visible on bright and dark scenes.
-        listOf(Color.Black to 4.dp.toPx(), Color.White to 1.5.dp.toPx()).forEach { (color, stroke) ->
-            drawLine(color, Offset(center.x, 0f), Offset(center.x, center.y - gap), stroke, StrokeCap.Round)
-            drawLine(color, Offset(center.x, center.y + gap), Offset(center.x, size.height), stroke, StrokeCap.Round)
-            drawLine(color, Offset(0f, center.y), Offset(center.x - gap, center.y), stroke, StrokeCap.Round)
-            drawLine(color, Offset(center.x + gap, center.y), Offset(size.width, center.y), stroke, StrokeCap.Round)
-            drawCircle(color, radius = 2.dp.toPx(), style = Stroke(stroke))
+        // A fine dark outline keeps the thin plus visible on bright scenes.
+        listOf(Color.Black to 2.dp.toPx(), Color.White to 1.dp.toPx()).forEach { (color, stroke) ->
+            drawLine(color, Offset(center.x, 0f), Offset(center.x, size.height), stroke, StrokeCap.Round)
+            drawLine(color, Offset(0f, center.y), Offset(size.width, center.y), stroke, StrokeCap.Round)
         }
     }
 }
