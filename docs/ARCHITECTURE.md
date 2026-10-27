@@ -29,10 +29,16 @@ Each opening requests decimal-field focus and keyboard once after the dialog
 window gains focus, without reopening a deliberately dismissed keyboard during
 sensor-state recompositions.
 
-Method browsing applies Compose blur to the existing measurement surface,
-including the exceptional workspace dialog. The card carousel is in its own
-unblurred window. Preview ownership/composition and sensor sessions remain intact;
-Android below API 31 falls back to the dialog's dim scrim.
+Selection uses one Material 3 modal bottom sheet above the existing measurement
+surface, including the exceptional workspace dialog. Sheet offset drives Compose
+blur in place; Material's animated scrim dims the background, including below API
+31 where blur is unsupported. Preview ownership/composition and sensor sessions
+remain intact. A fixed, window-bounded sheet content area keeps the outer panel
+stationary while mode/method lists slide horizontally; each list scrolls for
+large text and compact windows. The sheet owns system insets and its Back handler:
+methods return to modes, modes dismiss, and outside taps dismiss at either level.
+The launcher remains composed in place throughout sheet opening and closing;
+the modal window blocks interaction with the background launcher while open.
 
 Source paths below are relative to `app/src/main/java/com/malagel/viewy/`:
 
@@ -48,7 +54,7 @@ Source paths below are relative to `app/src/main/java/com/malagel/viewy/`:
 | `camera/PreviewSession.kt` | Ownership tokens reject callbacks/disposal from obsolete previews and clear readiness on release. |
 | `measurement/HeightInput.kt` | Decimal validation and meters/feet conversion without presentation rounding. |
 | `measurement/MeasurementSelection.kt` | Pure selection transitions, active method and independent mode/method browsing state. |
-| `ui/MeasurementSelection.kt` | Single Mode launcher, staggered vertical mode pills and method-card carousel, including disabled placeholders, swipe navigation and documentation placeholder action. |
+| `ui/MeasurementSelection.kt` | Chevron launcher and reusable animated bottom sheet with scrollable mode/method entries, disabled modes and independent navigation transitions. |
 | `ui/HeightLabelText.kt` | Locale-aware compact height labels with the existing six-significant-digit cap, trimmed zero padding and at least one decimal; stored inputs are untouched. |
 | `ui/MeasurementGuidance.kt` | Contextual hints from existing workflow gates; corrected live-condition notices disappear without changing capture eligibility. |
 | `measurement/KnownHeightWorkflow.kt` | Immutable top/bottom/correction/result state, compatibility/alignment gates, retry and restart. |
@@ -106,8 +112,7 @@ are conditional on supplied bounds and assumptions, not confidence intervals;
 unspecified sensor bias, object tilt, translation and calibration errors are not
 included. Production supplies nominal inputs only and does not infer bounds from
 stationary variation. The main result is a concise approximate distance, with
-unquantified uncertainty described in the method card; there is no bounded-input
-editor.
+unquantified uncertainty exposed through the result accessibility description; there is no bounded-input editor.
 
 ## Coordinate systems and optical mapping
 
@@ -226,16 +231,23 @@ completion cannot revive a disposed or failed preview; retry creates a new owner
 ViewModel ownership tokens also reject obsolete preview callbacks and disposal.
 
 Selection is held in the ViewModel separately from the measurement workflow.
-The ViewModel reads only the active method's stable ID from private Android
-SharedPreferences before publishing initial state and writes it on valid method
-selection. Missing, malformed or unavailable IDs fall back to Known Object Height;
-selection menus start closed. Preview composition is keyed by active method;
-disposal releases its camera. Browsing overlays keep the active preview composed
-and do not reset captures. Activating the same method only closes selection;
-a different method invalidates captures and stops acquisition before reconciliation.
-Unavailable modes and empty method cards cannot activate a workflow. Only the
-method ID is persisted across process death; navigation, captures, results and
-hardware sessions are temporary.
+`MeasurementSelection` explicitly permits a null active method and uses typed
+Closed/Modes/Methods destinations. A new ViewModel starts inactive at Modes; no
+SharedPreferences are read or written, so legacy method selections have no effect.
+The Activity's existing ViewModel retention preserves active method and navigation
+across configuration recreation and background return. Process death creates a
+new inactive selection. Workflow interruption rules still invalidate captures on
+pause or preview rebinding; retaining navigation does not retain hardware sessions.
+
+Preview composition is keyed by active method. Browsing does not change that key,
+remove the preview or reconcile hardware. Reselecting the same method only closes
+the sheet. A different method clears captures, stops acquisition and revokes
+preview ownership before reconciliation; queued old preview callbacks/disposal
+cannot affect the next owner. Disposal releases the previous camera, and resource
+requirements gate the next preview/sensor session. Unavailable modes have no
+method identities or activation path. Camera and sensor eligibility both require
+an active method; inactive presentation never composes permission controls or a
+preview, even when saved dialog UI state exists after process recreation.
 
 Known Object Height requires a saved valid height before composing a preview or
 exposing camera-permission actions. The ViewModel independently gates its single
@@ -273,8 +285,8 @@ root buildscript to match the Compose compiler; do not also apply Kotlin Android
 JUnit 4 supports JVM tests. Camera2 interop opt-in stays in the camera adapter.
 The manifest requests CAMERA and removes the transitive network-state permission;
 there are no Internet, microphone, location or storage permissions. No navigation,
-dependency-injection or persistence framework is implemented; method selection
-uses platform SharedPreferences.
+dependency-injection or persistence framework is implemented; selection and
+workflow state are held only in memory.
 
 See [README](../README.md) for setup and [Validation](VALIDATION.md) for test
 coverage, recorded evidence and outstanding physical checks.

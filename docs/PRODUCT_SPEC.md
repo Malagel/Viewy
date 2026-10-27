@@ -9,33 +9,39 @@ communicate their assumptions and uncertainty honestly; short-term steadiness
 must not be presented as calibrated accuracy. Operation must remain local,
 without analytics or ads.
 
-Modes describe **what** the user measures; methods describe **how**. The current
-mode is **Long Distance** and its method is **Known Object Height — Two Endpoint
-Captures**. Short Distance and Height appear as unavailable mode placeholders;
-two empty method cards are reserved for future validated methods. They cannot start a
-measurement.
+Modes describe **what** the user measures; methods describe **how**. The
+implemented mode is **Long Distance** and its method is **Known Object Height**.
+Short Distance, Height and Calibration remain visible, disabled placeholders for
+future validated features; they have no selectable methods.
 
 ## Implemented behavior
 
-- A single circular Mode control opens vertically aligned floating pills with
-  staggered spring motion and consistent spacing. Long Distance opens a centered
-  method-card carousel with horizontal swiping and a page indicator. The
-  measurement background blurs on Android 12+ while cards remain sharp; older
-  Android versions retain dimming. Tap a method card to activate it; outside taps
-  or system Back dismiss selection. Each implemented card has a separate
-  **Know more** action showing a documentation placeholder.
-  Browsing, dismissing or reselecting the active method preserves its workflow,
-  subject to existing session interruption and capture-expiry rules.
-- Startup restores the last selected method from its locally stored stable ID,
-  defaulting to Known Object Height on fresh installs or unavailable saved IDs.
-  Captures, results and sensor sessions are never restored.
+- Each fresh application session starts with no active method and automatically
+  opens a Material 3 bottom sheet listing modes with short descriptions. Dismissing
+  it leaves only the dark Viewy background, header and Mode launcher; there is no
+  height entry, viewfinder placeholder, permission request or hardware acquisition.
+  Legacy saved method IDs are ignored. Activity recreation and returning from the
+  background retain the in-memory selection; process death starts inactive again.
+- Tapping Long Distance slides the mode list left and its method list in from the
+  right. Back returns to modes with the opposite transition; Back from modes or
+  an outside tap dismisses the sheet. Every reopening begins at modes. Entries
+  work by tapping and scroll when needed. There are no tutorial cards or pager.
+- Selecting Known Object Height closes the sheet and shows its existing workflow.
+  Browsing, dismissing or reselecting it preserves inputs, captures and results,
+  subject to existing interruption and capture-expiry rules. The measurement
+  surface stays stationary, blurs gradually on Android 12+ and dims while the
+  sheet opens; older versions use dimming. The sheet stays sharp.
+- The circular bottom-right Mode launcher uses an upward chevron and stays in
+  place while the sheet opens and closes. The modal sheet blocks interaction
+  with the background launcher while open.
 - A circular configurations placeholder with a standard rounded gear sits at
   top right and remains disabled. Restart is a circular
   arrow control matching Mode on the left of capture; the control row is raised
   above the navigation inset for easier thumb access. Restart and Mode sit
   symmetrically closer to the large, solid shutter-style Capture button.
   No settings screen is implemented.
-- Until a positive finite height is saved, a tonal rounded rectangle offers
+- After method selection, until a positive finite height is saved, a tonal rounded
+  rectangle offers
   a prominent **Enter object height** action without starting camera or
   orientation acquisition or requesting camera permission. Entry accepts meters or decimal feet, decimal
   point or comma, without grouping separators. A rounded, borderless preview-edge

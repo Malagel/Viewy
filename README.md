@@ -7,8 +7,9 @@ two aiming directions. Application ID: `com.malagel.viewy`.
 
 ## Basic usage
 
-1. Viewy opens the last used method (Known Object Height by default). Use **Mode**
-   to browse methods. Tap **Enter object height** and save the vertical distance
+1. Viewy opens mode selection with no active measurement. Tap **Long Distance**,
+   then **Known Object Height**. Use the chevron **Mode** button to reopen selection.
+   Tap **Enter object height** and save the vertical distance
    between the object's endpoints in meters or decimal feet, then allow camera
    access when prompted by the viewfinder controls. Height entry and editing
    automatically focus the input and open the decimal keyboard.

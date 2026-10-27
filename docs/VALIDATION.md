@@ -26,10 +26,11 @@ conditioning and conditional bounds; quaternion signs/order/formats and poles;
 spherical steadiness statistics, timestamps, discontinuities, reliability and
 source/frame/mapping isolation; inverse camera-pose mapping and fallbacks; height
 conversion; preview ownership across disposal, retries and late initialization;
-height-gated camera eligibility and contextual guidance; localized height-label
-formatting, whole/fractional values, display precision and scientific notation;
-selection availability,
-stable-ID restoration/fallback, activation, dismissal and reselection; and
+inactive/height-gated camera and foreground sensor eligibility and contextual
+guidance; localized height-label formatting, whole/fractional values, display
+precision and scientific notation; selection availability, inactive startup,
+automatic initial mode presentation, mode/method navigation, Back, disabled modes,
+activation, dismissal and reselection; and
 acquisition observations through workflow/calculator transitions,
 alignment/wraparound, interruption, correction and retry. Source and tests define
 the individual cases. Mocked deployment tests verify script decisions using
@@ -37,7 +38,7 @@ fictional devices/configuration, not real wireless reliability.
 
 ## Recorded verification and its scope
 
-The recorded verification for the current implementation passed JVM tests,
+The current implementation passed JVM tests,
 debug assembly and debug lint together. Lint reported no errors; warnings concern
 dependency updates, backup guidance and the intentional portrait request. This used installed JDK 17/API 37
 SDK and existing caches; a clean or release build was not verified. Inspection of
@@ -46,9 +47,14 @@ with no Internet, network-state, microphone, location or storage permissions.
 Deployment-script mocked unit tests and Bash syntax checks were also previously
 reported passing; they do not verify a physical connection.
 
-These are retained repository verification reports, not independently rerun
-results. Instrumentation tests are not implemented. Pure JVM tests do not prove
-Android registration, camera behavior, rendering or measurement accuracy.
+Deployment-script results are retained reports and were not rerun for navigation
+changes. Instrumentation tests are not implemented. Pure JVM tests do not prove
+Android registration, camera behavior, rendering or measurement accuracy. Navigation
+rendering, sheet Back dispatch, animation/inset behavior, Activity retention and
+legacy-preference upgrade behavior require the manual checks below; there is no
+instrumentation harness. Only one method is implemented, so switching between
+different real workflows cannot yet be exercised; JVM ownership tests cover
+revocation of both pending and ready previews.
 
 ### Developer-reported physical observations
 
@@ -97,7 +103,7 @@ Keep records externally; the app has no history/export feature.
 | Repeatability and return | Fixture fixed aim and compare debug A/B over 5/10/15 s, then move away and return within the pair limit. Repeat separately for each available sensor using new-session controls; no pair may span sources. Initial rotation-vector runs should avoid magnetic objects; record controlled magnetic disturbance separately. Differences combine return, fixture and sensor effects, not independently measured drift. |
 | Reference distances and repetition | Independently measure horizontal lens-to-target-line distance with tape/range instrument at several safe distances/heights and positive/negative endpoint elevations. Collect multiple full measurements with independent re-aims (for example ten per setup), recording every result/rejection, signed/absolute relative error and spread. Compare short/long capture durations and fixture/handheld results. Viewy output must not define its own reference. |
 | Lighting and focus | Repeat bright/dim/backlit scenes. Observe autofocus, lens breathing, center movement and preview delay. Wait for a clear stationary image; no claim ties the captured orientation to an earlier displayed frame. |
-| Mode and method selection | Verify fresh launch opens Known Object Height with menus closed. Open/close Mode (including rapid toggles) and check a single visible Mode launcher, straight vertical pill alignment with unchanged gaps, sequential spring/fade motion, reverse closing, disabled options and outside-gap/Back dismissal. Choose Long Distance: the background, including a live preview, should blur on Android 12+ while cards remain sharp; older Android versions retain dimming. Swipe all three tall floating cards and check the page indicator. Verify background blur clears on dismissal/reselection without interrupting the preview or resetting compatible captures. Tap **Know more** and confirm the coming-soon dialog does not select/dismiss the card; close it and tap the card body to activate; outside taps and system Back return directly to measurement. Capture a top endpoint or result, browse/dismiss/reselect promptly, and confirm preservation within existing session/expiry rules. Reopen after process death: only the selected method should restore. Configurations and unavailable modes/cards must not activate anything. Check portrait, platform-overridden orientations, large text, both system appearance settings and TalkBack (the app stays dark); card text must scroll and horizontal swiping remain usable. Check the thin plus reticle against bright and dark scenes. |
+| Mode and method selection | Start a new process, including an upgrade with a legacy saved method ID: expect no active method and an automatically opened mode sheet. Dismiss via outside tap and Back: only the header and chevron Mode launcher should remain, without height/capture controls, camera placeholder, permission prompt or sensor acquisition. Reopen: always start at modes. Long Distance slides left to Known Object Height; in-sheet Back and Android Back slide back to modes, and Back from modes closes. Outside taps close at both levels. Short Distance, Height and Calibration remain visible and disabled. Select Known Object Height to enter its unchanged height-gated workflow. During live preview, open the sheet: confirm stationary content, gradual blur on Android 12+, dimming on all supported versions, sharp panel and uninterrupted preview. Confirm reverse effects on closing, the Mode launcher stays in place behind the modal sheet without disappearing on tap, background interaction is blocked while open, and the control row does not move. Capture a top endpoint or result, browse/dismiss/reselect promptly, and confirm preservation within existing session/expiry rules; wait past 15 s while browsing to confirm expiry still applies. Exercise rapid repeated taps, outside dismissals, Back, drag dismissal, compact/split windows, platform-overridden orientations, large text and TalkBack. Lists must scroll and all entries remain reachable. Recreate the Activity and background/resume with the selector both open and closed: retain selection/navigation while real hardware interruption still clears captures. After process death, start inactive again; saved height/status dialogs must not appear. Settings and diagnostics keep their existing behavior. |
 | Layout and accessibility | Check the consistent dark palette under both system themes, large font/display sizes, TalkBack labels, small/split windows, platform-overridden orientations, height-dialog keyboard and navigation insets. On the normal screen, capture/navigation and the stage/result must stay visible without scrolling. Guidance should fade near the preview edge, never cover the reticle or persist for ordinary readiness; moving/settling/alignment changes should not flash. Verify persistent recovery actions and status dialogs in compact layouts. Exceptional windows/text scaling offer **Open viewfinder** with scrollable details and fixed controls. Check centered stage/≈ results in both units, a blank reserved caption area before height entry and unchanged preview bounds as top/bottom instructions appear or switch (also with large text), closer symmetric Restart/Mode placement, the solid shutter disc, enlarged initial height action, the rounded borderless height editor and the raised control row. Check the larger circular gear placeholder remains disabled. Whole heights should display one decimal, fractional heights should retain meaningful digits up to the existing precision cap, and opening height editing should preserve the full stored input. Check the bold rounded Viewy header and reduced preview at normal/large text sizes. No separate result-retry action should appear. Diagnostics must not push Capture offscreen. |
 
 ## Outstanding reliability limits
