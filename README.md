@@ -12,9 +12,12 @@ two aiming directions. Application ID: `com.malagel.viewy`.
    On first activation, read and dismiss the method tutorial. The **?** button
    beside the settings gear reopens it; **Know more** explains the geometry and
    limitations. Tap **Enter object height** and save the vertical distance
-   between the object's endpoints in meters or decimal feet, then allow camera
+   between the object's endpoints in the units selected in Settings (meters by
+   default, or decimal feet), then allow camera
    access when prompted by the viewfinder controls. Height entry and editing
-   automatically focus the input and open the decimal keyboard.
+   automatically focus the input and open the decimal keyboard. The card fades
+   in above it and keeps its position when the keyboard is hidden; closing fades
+   the card out.
 2. Keep the camera location fixed. Aim the centered reticle at the top, stop for
    about one second, then capture while still.
 3. Aim at the bottom on the same vertical line, settle, and capture within 15 s
@@ -28,7 +31,15 @@ capture/navigation visible without scrolling; the input dialog handles the
 keyboard without shifting the measurement screen.
 Small windows or large text offer status/details dialogs; **Open viewfinder**
 opens a scrollable workspace in exceptionally constrained layouts. Help stays
-scrollable in its centered card; the settings gear remains unavailable. The rounded
+scrollable in its centered card. The top-right gear opens Settings at any time
+outside another modal. Tap **Measurement units** to switch Metric/Imperial, or
+**Language** to select **English**, **Español**, or **Use device language** (default).
+Changes save automatically. Language and unit changes update the current screen
+in place, preserving compatible captures within normal session and expiry rules. **Developer Options** contains
+a persistent diagnostics preference (off by default; access is reserved for future
+implementation) and **Erase all app data**. Only confirming **Erase all data**
+requests Android to clear storage and permissions and close Viewy; the app remains
+installed. Reopen it manually for fresh defaults and tutorials. The rounded
 Viewy wordmark uses bundled [Nunito Bold](https://github.com/google/fonts/blob/c7e2740188205a85323c7385547f6f59b4f2245a/ofl/nunito/Nunito-Bold.ttf)
 ([SIL Open Font License](app/src/main/assets/licenses/nunito_ofl.txt));
 no fonts are downloaded during use.

@@ -2,7 +2,7 @@
 
 ## Components and ownership
 
-Viewy has one `app` module and one `ComponentActivity`. `MainActivity` owns
+Viewy has one `app` module and one `AppCompatActivity`. `MainActivity` owns
 edge-to-edge setup and resume/pause forwarding. `ViewyScreen` renders Material 3
 camera, height, guidance, capture and result controls; it collects state with
 lifecycle awareness. Insets, bounded width and a weighted preview reserve space
@@ -22,12 +22,38 @@ The complete [Material 3 baseline dark scheme](https://m3.material.io/styles/col
 supplies all Compose color roles;
 platform launch colors and system-bar icon styles match it. The Activity uses
 `adjustNothing` and measurement content excludes IME padding. Height input owns
-an edge-to-edge, top-anchored dialog with IME padding, scrollable fields and fixed
-save/cancel actions, so keyboard presentation does not resize or pan the preview.
-On constrained displays the input content may scroll; the dialog stays anchored.
-Each opening requests decimal-field focus and keyboard once after the dialog
-window gains focus, without reopening a deliberately dismissed keyboard during
-sensor-state recompositions.
+an edge-to-edge dialog with scrollable fields and fixed save/cancel actions, so
+keyboard presentation does not resize or pan the preview. `HeightDialogPlacement`
+records the largest current/target keyboard bottom inset during initial opening.
+Reveal waits for positive inset reports to settle briefly, with a one-second
+fallback for missing/floating/hardware keyboards, then freezes the observed peak.
+The card is bottom-aligned 20 dp above that frozen keyboard boundary. No live IME
+padding affects its visible position: hiding, reopening or resizing the keyboard
+leaves the card at the same position until dismissal. A new opening measures
+again; no keyboard height persists across openings.
+
+The field stays composed/focusable with zero opacity while placement is pending.
+One dialog-owned animation effect drives graphics-layer opacity after the frozen
+layout is applied: entry is 175 ms and exit is 170 ms, with linear exit opacity. There
+are no position or size transitions. Save, Cancel, outside tap and dialog Back
+record one pending close action. This cancels entry and fades out from the current
+opacity, retaining the modal window and frozen position until exit finishes.
+Closing explicitly requests keyboard hiding while the decimal field remains
+focused and attached. After the fade, it waits for both hidden IME visibility and
+zero animated bottom inset, with a 750 ms bound for missing/unreliable IME reports.
+It then clears focus and allows one frame of input cleanup before the caller
+removes the dialog or applies the captured height. This avoids disposing a numeric
+editor while its keyboard is still visibly closing; the ordering addresses a
+possible input-connection restart flash, whose actual device/IME behavior still
+requires manual verification.
+The pending action rejects duplicate requests and cancels reveal/focus work.
+Closing before the card is visible skips the opacity animation but still performs
+keyboard/focus cleanup. Hidden/closing content is excluded from accessibility and its
+save/cancel controls are disabled. On constrained displays the fields scroll while
+actions remain available. Each opening requests decimal-field focus and keyboard
+once after the dialog gains focus, without reopening a deliberately dismissed
+keyboard during sensor-state recompositions. Actual Activity/window destruction
+can still dispose a dialog immediately; pending animation work is cancelled.
 
 Selection uses one Material 3 modal bottom sheet above the existing measurement
 surface, including the exceptional workspace dialog. Sheet offset drives Compose
@@ -99,6 +125,10 @@ Source paths below are relative to `app/src/main/java/com/malagel/viewy/`:
 | `ui/MeasurementGuidance.kt` | Contextual hints from existing workflow gates; corrected live-condition notices disappear without changing capture eligibility. |
 | `measurement/KnownHeightWorkflow.kt` | Immutable top/bottom/correction/result state, compatibility/alignment gates, retry and restart. |
 | `ui/MeasurementViewModel.kt` | Selection state, one shared foreground sensor adapter, workflow and immutable StateFlow snapshots. |
+| `settings/AppPreferences.kt` | Typed global units and diagnostics preferences in one application-context Preferences DataStore, independent of tutorials. |
+| `settings/SettingsViewModel.kt` and `ui/SettingsScreen.kt` | Observable load/write/error state and retained, temporary full-screen settings navigation. |
+| `settings/AppLanguage.kt` | Android/AppCompat locale selection without duplicate preference storage. |
+| `settings/AppDataReset.kt` and `settings/AndroidAppDataReset.kt` | Injectable, confirmation-gated reset policy and isolated Android data-clear/locale adapter. |
 | `ui/OrientationDiagnosticsState.kt`, `ui/OrientationDiagnosticsPanel.kt` and `ui/DiagnosticsDialog.kt` | Debug A/B captures, separate from measurement endpoints but sharing acquisition. |
 
 Math and workflow logic are independent of Android/Compose. Sensor callbacks,
@@ -320,6 +350,75 @@ exposure and scheduling add unmeasured latency, potentially worse in low light.
 No constant latency correction or extrapolation is applied. Settling before and
 remaining still after capture is a mitigation, not a latency bound.
 
+## Settings, locales and application-data reset
+
+`SettingsViewModel` exposes immutable preference snapshots and explicit initial
+loading, write and storage-error states. Measurement UI waits for the first saved
+snapshot instead of briefly showing default units. DataStore edits are serialized;
+rows are disabled while writing and failures expose Retry. Units and diagnostics
+are independent of tutorial completion. Language is never copied into DataStore.
+The global presentation unit is passed into height/result rendering; the workflow
+owns only physical height in meters. Unit changes have no workflow/reconciliation
+call, preserving capture/result identity and internal precision. Editable height
+uses the display decimal separator, full plain-decimal precision and the existing
+point/comma parser. Saving untouched input reuses the exact stored meter value.
+
+Settings uses an opaque full-screen Compose surface with Main/Language/Developer
+navigation retained in the ViewModel. It renders in the current host window (the
+Activity or an already open exceptional workspace), so the first recreated frame
+includes Settings without waiting for another dialog window to attach. An open
+exceptional workspace also keeps a matching Settings backdrop in the Activity,
+without duplicate accessibility, Back handling or reset dialogs, to cover the
+workspace window's teardown/reattachment. The underlying measurement composition,
+lifecycle owner and CameraX binding stay mounted. Covered controls are excluded from touch, focus and accessibility;
+settings opening is gated while selection or pending/visible tutorial help owns
+interaction. Language selection applies the Android locale without navigating,
+including when the selected override has the same effective language as the device.
+Back from either child returns to main settings, then closes settings.
+No settings navigation or measurement session is restored after process death.
+Configuration recreation retains both ViewModels, but Activity pause and preview
+rebinding still invalidate hardware captures normally.
+
+The platform launch theme inherits dark `Theme.AppCompat.NoActionBar`; Compose
+keeps its existing Material 3 dark scheme and edge-to-edge setup. The locale config
+advertises English and Spanish to Android 13+ system settings.
+`AppCompatDelegate.setApplicationLocales` uses an empty list for device language;
+`getApplicationLocales` supplies the current choice, including system changes.
+AppCompat's `autoStoreLocales` metadata enables app-private storage on API 23–32
+and migration to system-managed locales on newer Android. Text and formatting use
+the Activity's localized resources/Compose locale; the application-context sensor
+adapter and pure math do not depend on locale. English default resources provide
+fallback for unsupported languages. See [Android per-app language support](https://developer.android.com/guide/topics/resources/app-languages).
+
+The Activity handles only language-related configuration changes in place:
+`locale`, `layoutDirection` and, on API 34+, `grammaticalGender`. Inherited
+AppCompat/Activity configuration dispatch updates Compose resources, layout
+direction and `LocalLocale` without replacing the window, Compose tree or preview.
+Strings are read through `stringResource`; numeric labels read `LocalLocale`, and
+the language picker also observes `LocalConfiguration`. No language callback
+restarts acquisition or edits the workflow. Other configuration changes retain
+normal Activity recreation and session invalidation. See Android's
+[Compose configuration guidance](https://developer.android.com/guide/topics/resources/runtime-changes).
+
+`ResetController` accepts an injectable `AppDataReset` and permits requests only
+from confirmation, with separate rejected/failed and terminal accepted states.
+Cancel has no deletion or locale effects. Before confirmation runs the adapter,
+the settings ViewModel blocks mutations and stops its preference collection;
+pending writes must finish before reset can be offered. Acceptance triggers no
+further preference reads/writes, success claim or relaunch. Android's
+[`ActivityManager.clearApplicationUserData`](https://developer.android.com/reference/android/app/ActivityManager#clearApplicationUserData())
+performs the actual full storage clear and runtime-permission revocation, retaining
+the installed APK. Tests use fakes and never call this platform operation.
+
+On API 33+, the reset adapter explicitly clears `LocaleManager.applicationLocales`
+before asking Android to erase data, since this override is system-owned rather
+than a DataStore preference. If the operation is rejected or throws, it attempts
+to restore the prior override before reporting failure. On older Android,
+AppCompat's auto-storage file is cleared with app data; the adapter avoids queuing
+compat locale writes/recreation during deletion. No manual preference-file deletion
+substitutes for the system reset. Actual process termination, permission revocation
+and locale reset across OS versions remain manual verification requirements.
+
 ## Build contracts
 
 Versions live in `gradle/libs.versions.toml` and Gradle build files; the wrapper
@@ -327,9 +426,10 @@ pins its distribution and checksum. AGP supplies built-in Kotlin, upgraded by th
 root buildscript to match the Compose compiler; do not also apply Kotlin Android.
 JUnit 4 supports JVM tests. Camera2 interop opt-in stays in the camera adapter.
 The manifest requests CAMERA and removes the transitive network-state permission;
-there are no Internet, microphone, location or storage permissions. No navigation,
-dependency-injection or persistence framework is implemented. Only tutorial
-completion uses SharedPreferences; selection and workflow state remain in memory.
+there are no Internet, microphone, location or storage permissions. No navigation or dependency-injection framework is implemented. Preferences
+DataStore stores units/diagnostics; only tutorial completion uses its dedicated
+SharedPreferences. Android/AppCompat owns locale persistence. Selection, settings
+navigation and workflow state remain in memory.
 
 See [README](../README.md) for setup and [Validation](VALIDATION.md) for test
 coverage, recorded evidence and outstanding physical checks.

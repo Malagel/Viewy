@@ -32,7 +32,7 @@ future validated features; they have no selectable methods.
   surface stays stationary, blurs gradually on Android 12+ and dims while the
   sheet opens; older versions use dimming. The sheet stays sharp.
 - Each implemented method has a contextual **?** control immediately left of the
-  unchanged settings gear. It is absent while no method is active. It opens one
+  settings gear. It is absent while no method is active. It opens one
   centered, rounded, scrollable tutorial card over the stationary measurement
   interface. **Know more** replaces the practical content with a technical
   explanation with formatted equations in the same card. **Go back** appears at
@@ -57,22 +57,56 @@ future validated features; they have no selectable methods.
 - The circular bottom-right Mode launcher uses an upward chevron and stays in
   place while the sheet opens and closes. The modal sheet blocks interaction
   with the background launcher while open.
-- A circular configurations placeholder with a standard rounded gear sits at
-  top right and remains disabled. Restart is a circular
+- A circular Settings control with a standard rounded gear sits at top right,
+  using a slightly richer purple than the other tonal controls.
+  It opens full-screen dark Material 3 settings with or without an active method.
+  Settings provides global Metric/Imperial units, language selection and a separate
+  Developer Options destination. Changes save automatically. Back from a child
+  destination returns to Settings; Back from Settings restores the measurement
+  surface. Modal settings, help and mode selection cannot be operated together.
+  Opening Settings preserves the selected method and camera composition; normal
+  sensor interruption and capture-expiry rules continue to apply.
+- Units default to Metric (meters); Imperial uses decimal feet for heights and
+  distances. Tapping the units row switches immediately, including existing
+  results. Height entry follows this preference without an independent selector.
+  Stored physical values remain in meters; changing units neither edits height nor
+  recalculates geometry or resets captures. Display precision is unchanged.
+- Language defaults to **Use device language**, with **English** and **Español**
+  overrides. Unsupported device languages fall back to English. Android per-app
+  language settings and the in-app picker share the same override on Android 13+;
+  AppCompat supports older versions. Language changes update text and number
+  formatting in place, without restarting the Activity or blanking the screen.
+  The language selector, method, height and compatible captures/results stay in
+  place, subject to ordinary hardware interruptions and capture expiry. Back
+  returns to main Settings. Language and units are independent.
+- Developer Options persists **Enable diagnostics**, off by default, for future
+  developer access; it does not expose diagnostics or add long-press gestures.
+  **Erase all app data** requires explicit confirmation explaining irreversibility,
+  preferences/tutorial removal and app closure. Cancel changes nothing. Android
+  performs the full storage clear and permission revocation without uninstalling.
+  A rejected/failed request shows an error; an accepted request is not reported as
+  completed and does not relaunch the app. Manual reopening starts inactive with
+  mode selection, Metric, diagnostics off, device language and first-use help eligible.
+- Restart is a circular
   arrow control matching Mode on the left of capture; the control row is raised
   above the navigation inset for easier thumb access. Restart and Mode sit
   symmetrically closer to the large, solid shutter-style Capture button.
-  No settings screen is implemented.
 - After method selection, until a positive finite height is saved, a tonal rounded
   rectangle offers
   a prominent **Enter object height** action without starting camera or
-  orientation acquisition or requesting camera permission. Entry accepts meters or decimal feet, decimal
+  orientation acquisition or requesting camera permission. Entry uses the global
+  unit system (meters or decimal feet), accepts decimal
   point or comma, without grouping separators. A rounded, borderless preview-edge
   control edits height. Its label omits zero padding, keeps one decimal for whole
   values and retains the six-significant-digit display cap; stored height remains
   unchanged. Both height actions focus the decimal field and request
-  its keyboard automatically. Height entry uses a top-anchored dialog; its
-  contents handle keyboard space without moving the measurement screen.
+  its keyboard automatically. The height-entry card fades in 20 dp above the
+  keyboard’s initially observed maximum height and keeps that position for the
+  entire opening, including when the keyboard is hidden or reopened. It waits
+  briefly for stable keyboard placement; if unavailable, it fades in after about
+  one second near the bottom inset and keeps that fallback position. Save, Cancel,
+  outside tap and Back fade the card out before closing it. Its contents handle
+  keyboard space without moving the measurement screen.
 - Rear-camera preview in a rounded rectangle with a thin, centered plus-shaped
   aiming reticle. Contextual guidance fades inside the preview; normal readiness
   adds no warning. Hardware/permission failures retain recovery controls.
@@ -104,10 +138,9 @@ future validated features; they have no selectable methods.
   scaling open a scrollable viewfinder workspace with fixed capture/navigation.
   Android may override portrait on large screens. Diagnostic acquisition and
   presentation remain in source for future developer access; there is currently
-  no diagnostics entry in the interface. Developer Options and long-press help
-  actions are not implemented.
+  no diagnostics entry in the interface. Long-press help actions are not implemented.
 
-No photos, recording, measurement history, configurable settings, network access,
+No photos, recording, measurement history, network access,
 analytics or ads are implemented. Hardware correctness and usability still need
 validation; see [Validation](VALIDATION.md).
 
@@ -115,9 +148,6 @@ validation; see [Validation](VALIDATION.md).
 
 - Built-in and custom object-height presets.
 - Estimated distances with uncertainty ranges when justified input bounds exist.
-- Broader metric/imperial support beyond the current meters/decimal-feet entry
-  and result display.
-- Locally stored settings and a settings control at bottom left.
 
 Preserve the minimalist interface, offline operation and honest accuracy claims
 as these capabilities are added.
