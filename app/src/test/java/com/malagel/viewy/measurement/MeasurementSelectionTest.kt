@@ -41,6 +41,23 @@ class MeasurementSelectionTest {
         assertEquals(selected, browsing.dismiss().toggleModes().browse(mode).dismiss())
     }
 
+    @Test fun missingOrUnavailableSavedIdsFallBackWithoutOpeningSelection() {
+        for (saved in listOf(null, "", "removed_method", "KNOWN_OBJECT_HEIGHT", "height")) {
+            assertEquals(MeasurementSelection(), MeasurementSelection.restore(saved))
+        }
+    }
+
+    @Test fun savedStableIdsRestoreOnlyTheActiveMethod() {
+        for (available in MeasurementMethod.entries) {
+            val selected = MeasurementSelection().browse(available.mode).activate(available)
+            val restored = MeasurementSelection.restore(selected.activeMethod.id)
+            assertEquals(available, restored.activeMethod)
+            assertNull(restored.browsingMode)
+            assertFalse(restored.modeMenuOpen)
+            assertEquals(restored, restored.toggleModes().browse(available.mode).dismiss())
+        }
+    }
+
     @Test fun catalogIdentitiesAreUniqueAndStable() {
         assertEquals("long_distance", mode.id)
         assertEquals("known_object_height", method.id)

@@ -1,7 +1,9 @@
 package com.malagel.viewy.ui
 
 import android.app.Application
+import android.content.Context
 import android.os.SystemClock
+import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import com.malagel.viewy.camera.CameraPreviewState
 import com.malagel.viewy.domain.MeasurementMethod
@@ -26,7 +28,13 @@ data class MeasurementUiState(
 /** Shares ONE foreground acquisition with measurement and debug tools. Everything runs on main. */
 class MeasurementViewModel(application: Application) : AndroidViewModel(application) {
     private val workflow = KnownHeightWorkflow()
-    private val mutableState = MutableStateFlow(MeasurementUiState())
+    private val selectionPreferences = application.getSharedPreferences("measurement_selection", Context.MODE_PRIVATE)
+    private val savedMethodId = try {
+        selectionPreferences.getString("active_method_id", null)
+    } catch (_: ClassCastException) {
+        null // Treat a malformed preference like an unavailable identifier.
+    }
+    private val mutableState = MutableStateFlow(MeasurementUiState(selection = MeasurementSelection.restore(savedMethodId)))
     val state = mutableState.asStateFlow()
     private var resumed = false
     private var activeMapping: String? = null
@@ -76,6 +84,9 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
             mutableState.value = mutableState.value.copy(camera = CameraPreviewState())
         }
         mutableState.value = mutableState.value.copy(selection = next)
+        if (previous.browsingMode == method.mode) {
+            selectionPreferences.edit { putString("active_method_id", next.activeMethod.id) }
+        }
         reconcile()
     }
 
