@@ -8,14 +8,27 @@ two aiming directions. Application ID: `com.malagel.viewy`.
 ## Basic usage
 
 1. Viewy opens the last used method (Known Object Height by default). Use **Mode**
-   to browse methods. Allow camera access and enter the vertical distance between the object's
-   endpoints in meters or decimal feet.
+   to browse methods. Tap **Enter object height** and save the vertical distance
+   between the object's endpoints in meters or decimal feet, then allow camera
+   access when prompted by the viewfinder controls. Height entry and editing
+   automatically focus the input and open the decimal keyboard.
 2. Keep the camera location fixed. Aim the centered reticle at the top, stop for
    about one second, then capture while still.
 3. Aim at the bottom on the same vertical line, settle, and capture within 15 s
    of the top capture. Remain still briefly after each capture.
-4. Read the approximate horizontal distance. Use recapture bottom or restart
-   to try again; saving a height starts a new measurement.
+4. Read the centered approximate horizontal distance below the preview. Use the
+   circular **Restart** arrow at bottom left to try again. The preview-edge height
+   control edits height; saving starts a new measurement.
+
+The app uses Material 3's baseline dark palette. The normal portrait screen keeps
+capture/navigation visible without scrolling; the input dialog handles the
+keyboard without shifting the measurement screen.
+Small windows or large text offer status/details dialogs; **Open viewfinder**
+opens a scrollable workspace in exceptionally constrained layouts. Debug builds
+expose diagnostics through the header's overflow button. The rounded Viewy
+wordmark uses bundled [Nunito Bold](https://github.com/google/fonts/blob/c7e2740188205a85323c7385547f6f59b4f2245a/ofl/nunito/Nunito-Bold.ttf)
+([SIL Open Font License](app/src/main/assets/licenses/nunito_ofl.txt));
+no fonts are downloaded during use.
 
 Follow alignment/stability guidance. Preview-center aiming and preview/sensor
 timing are approximate, and uncertainty is unquantified. No photos, recordings,

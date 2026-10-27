@@ -5,8 +5,34 @@
 Viewy has one `app` module and one `ComponentActivity`. `MainActivity` owns
 edge-to-edge setup and resume/pause forwarding. `ViewyScreen` renders Material 3
 camera, height, guidance, capture and result controls; it collects state with
-lifecycle awareness. Insets, bounded width and scrolling support constrained
-layouts. Product behavior is defined in [Product specification](PRODUCT_SPEC.md).
+lifecycle awareness. Insets, bounded width and a weighted preview reserve space
+for capture/navigation without scrolling. Constrained status and exceptional
+viewfinder dialogs preserve readable content; the latter keeps capture/navigation
+fixed while details scroll. Stage/result text spans the preview width and is
+centered after height is configured. The stage area reserves the larger measured
+height of the top/bottom captions even when empty, accounting for font size and
+wrapping without adding hidden text or changing the weighted preview's size. Restart and Mode share a circular action component in a centered,
+bounded-width control row around the solid shutter disc. A spacious header and
+bundled Nunito Bold wordmark reserve more room above the flexible preview. The
+control row reserves space above the navigation inset. The manifest requests
+portrait for the Activity; large-screen Android policies may override this. Product behavior is defined in
+[Product specification](PRODUCT_SPEC.md).
+
+The complete [Material 3 baseline dark scheme](https://m3.material.io/styles/color/the-color-system/key-colors-tones)
+supplies all Compose color roles;
+platform launch colors and system-bar icon styles match it. The Activity uses
+`adjustNothing` and measurement content excludes IME padding. Height input owns
+an edge-to-edge, top-anchored dialog with IME padding, scrollable fields and fixed
+save/cancel actions, so keyboard presentation does not resize or pan the preview.
+On constrained displays the input content may scroll; the dialog stays anchored.
+Each opening requests decimal-field focus and keyboard once after the dialog
+window gains focus, without reopening a deliberately dismissed keyboard during
+sensor-state recompositions.
+
+Method browsing applies Compose blur to the existing measurement surface,
+including the exceptional workspace dialog. The card carousel is in its own
+unblurred window. Preview ownership/composition and sensor sessions remain intact;
+Android below API 31 falls back to the dialog's dim scrim.
 
 Source paths below are relative to `app/src/main/java/com/malagel/viewy/`:
 
@@ -19,9 +45,12 @@ Source paths below are relative to `app/src/main/java/com/malagel/viewy/`:
 | `orientation/AndroidOrientationAcquisition.kt` | Sensor discovery/registration, callback isolation, freshness publication and cleanup. |
 | `camera/CameraDirectionMapping.kt` | Pure policy mapping the selected optical axis into native device axes. |
 | `camera/CameraPreview.kt` | CameraX Preview selection/pinning, metadata, stream/errors and unbinding. |
+| `camera/PreviewSession.kt` | Ownership tokens reject callbacks/disposal from obsolete previews and clear readiness on release. |
 | `measurement/HeightInput.kt` | Decimal validation and meters/feet conversion without presentation rounding. |
 | `measurement/MeasurementSelection.kt` | Pure selection transitions, active method and independent mode/method browsing state. |
-| `ui/MeasurementSelection.kt` | Floating mode pills and centered method-card carousel, including disabled placeholders and swipe navigation. |
+| `ui/MeasurementSelection.kt` | Single Mode launcher, staggered vertical mode pills and method-card carousel, including disabled placeholders, swipe navigation and documentation placeholder action. |
+| `ui/HeightLabelText.kt` | Locale-aware compact height labels with the existing six-significant-digit cap, trimmed zero padding and at least one decimal; stored inputs are untouched. |
+| `ui/MeasurementGuidance.kt` | Contextual hints from existing workflow gates; corrected live-condition notices disappear without changing capture eligibility. |
 | `measurement/KnownHeightWorkflow.kt` | Immutable top/bottom/correction/result state, compatibility/alignment gates, retry and restart. |
 | `ui/MeasurementViewModel.kt` | Selection state, one shared foreground sensor adapter, workflow and immutable StateFlow snapshots. |
 | `ui/OrientationDiagnosticsState.kt` and `ui/OrientationDiagnosticsPanel.kt` | Debug A/B captures, separate from measurement endpoints but sharing acquisition. |
@@ -76,8 +105,9 @@ use Double arithmetic, not formally outward-rounded interval arithmetic. They
 are conditional on supplied bounds and assumptions, not confidence intervals;
 unspecified sensor bias, object tilt, translation and calibration errors are not
 included. Production supplies nominal inputs only and does not infer bounds from
-stationary variation. The result renderer supports the domain's conditional
-bounded, unbounded and indeterminate states, but there is no bounded-input editor.
+stationary variation. The main result is a concise approximate distance, with
+unquantified uncertainty described in the method card; there is no bounded-input
+editor.
 
 ## Coordinate systems and optical mapping
 
@@ -191,7 +221,9 @@ Capture requires OPEN plus STREAMING and resumed Activity. Permission is recheck
 on resume; denial and camera errors expose recovery. Startup timeout runs only
 while STARTED so background initialization does not spuriously fail. Compose owns
 the preview through DisposableEffect; CameraX owns lifecycle start/stop. Disposal
-removes observers/display listeners and unbinds only this Preview.
+removes observers/display listeners and unbinds only this Preview. Async provider
+completion cannot revive a disposed or failed preview; retry creates a new owner.
+ViewModel ownership tokens also reject obsolete preview callbacks and disposal.
 
 Selection is held in the ViewModel separately from the measurement workflow.
 The ViewModel reads only the active method's stable ID from private Android
@@ -205,20 +237,27 @@ Unavailable modes and empty method cards cannot activate a workflow. Only the
 method ID is persisted across process death; navigation, captures, results and
 hardware sessions are temporary.
 
-The ViewModel enables its single sensor adapter only with an active method that
-requires orientation, while resumed and camera ready. Only methods requiring a
-camera compose a preview. Pause, camera loss/reconfiguration, recreation or
+Known Object Height requires a saved valid height before composing a preview or
+exposing camera-permission actions. The ViewModel independently gates its single
+sensor adapter on that requirement, an orientation-using method, resumed Activity
+and camera readiness. Releasing the preview clears its ready state and stops the
+sensor session. Pause, camera loss/reconfiguration, recreation or
 source/frame/mapping changes invalidate endpoints/results. Pause removes the sensor listener/freshness
 timer; ViewModel cleanup releases acquisition. No session survives process death.
 Debug A/B captures share this pipeline without sharing measurement endpoints.
 
 The workflow owns top/bottom/correction/result transitions, finite height,
-compatibility checks and retry. Saving height restarts; bottom recapture reuses
-top only while frame/time validity permits. Alignment works independently of height
+compatibility checks and retry. Saving height restarts. The workflow retains
+bottom-recapture support with frame/time checks; the measurement UI exposes
+Restart as its only retry action. Alignment works independently of height
 or distance geometry: positive **current minus top** wrapped bearing means turn
 physically right (decrease bearing), negative means left. Screen orientation and
 roll do not change that gravity-relative meaning. Gates cannot establish fixed
 camera position.
+
+Transient preview hints use a short delay and fades to avoid sensor-state flicker;
+this never delays capture gating. Permission/camera/orientation recovery remains
+persistent. Debug camera, endpoint and A/B diagnostics live in a scrollable dialog.
 
 There is no preview-exposure/sensor synchronization: neither tap time nor latest
 sensor timestamp identifies the displayed frame's exposure. Rendering, processing,
