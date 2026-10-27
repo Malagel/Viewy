@@ -1,6 +1,7 @@
 package com.malagel.viewy.ui
 
 import android.app.Application
+import android.content.Context
 import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import com.malagel.viewy.camera.CameraPreviewState
@@ -13,6 +14,10 @@ import com.malagel.viewy.measurement.KnownHeightWorkflow
 import com.malagel.viewy.measurement.MeasurementState
 import com.malagel.viewy.measurement.MeasurementNotice
 import com.malagel.viewy.orientation.*
+import com.malagel.viewy.tutorial.LocalTutorialSeenStore
+import com.malagel.viewy.tutorial.TutorialCoordinator
+import com.malagel.viewy.tutorial.TutorialPage
+import com.malagel.viewy.tutorial.TutorialState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
@@ -22,6 +27,7 @@ data class MeasurementUiState(
     val camera: CameraPreviewState = CameraPreviewState(),
     val acquisition: AcquisitionState = AcquisitionState(),
     val diagnostics: OrientationDiagnosticsState = OrientationDiagnosticsState(),
+    val tutorial: TutorialState = TutorialState(),
 ) {
     val needsCamera: Boolean get() = selection.activeMethod?.requiresCamera == true && measurement.heightMeters != null
     fun needsOrientation(resumed: Boolean): Boolean = resumed && needsCamera && camera.ready &&
@@ -31,6 +37,10 @@ data class MeasurementUiState(
 /** Shares ONE foreground acquisition with measurement and debug tools. Everything runs on main. */
 class MeasurementViewModel(application: Application) : AndroidViewModel(application) {
     private val workflow = KnownHeightWorkflow()
+    private val tutorials = TutorialCoordinator(
+        LocalTutorialSeenStore(application.getSharedPreferences(LocalTutorialSeenStore.FILE_NAME, Context.MODE_PRIVATE)),
+        methodTutorials.keys,
+    )
     private val mutableState = MutableStateFlow(MeasurementUiState())
     val state = mutableState.asStateFlow()
     private val previewSession = PreviewSession()
@@ -81,10 +91,21 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
         publish()
     }
 
-    fun openModes() { mutableState.value = mutableState.value.copy(selection = mutableState.value.selection.openModes()) }
-    fun backSelection() { mutableState.value = mutableState.value.copy(selection = mutableState.value.selection.back()) }
-    fun dismissSelection() { mutableState.value = mutableState.value.copy(selection = mutableState.value.selection.dismiss()) }
-    fun browseMode(mode: MeasurementMode) { mutableState.value = mutableState.value.copy(selection = mutableState.value.selection.browse(mode)) }
+    private fun updateSelection(next: MeasurementSelection, activated: MeasurementMethod? = null) {
+        tutorials.selectionChanged(next, activated)
+        mutableState.value = mutableState.value.copy(selection = next, tutorial = tutorials.state)
+    }
+
+    fun openModes() = updateSelection(mutableState.value.selection.openModes())
+    fun backSelection() = updateSelection(mutableState.value.selection.back())
+    fun dismissSelection() = updateSelection(mutableState.value.selection.dismiss())
+    fun browseMode(mode: MeasurementMode) = updateSelection(mutableState.value.selection.browse(mode))
+
+    fun selectionHidden(token: Long) { tutorials.selectorHidden(token); publishTutorial() }
+    fun openTutorial() { tutorials.openManually(); publishTutorial() }
+    fun dismissTutorial(cardId: Long) { tutorials.dismiss(cardId); publishTutorial() }
+    fun changeTutorialPage(cardId: Long, page: TutorialPage) { tutorials.changePage(cardId, page); publishTutorial() }
+    private fun publishTutorial() { mutableState.value = mutableState.value.copy(tutorial = tutorials.state) }
 
     fun selectMethod(method: MeasurementMethod) {
         val previous = mutableState.value.selection
@@ -97,7 +118,7 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
             previewSession.invalidate()
             mutableState.value = mutableState.value.copy(camera = previewSession.state)
         }
-        mutableState.value = mutableState.value.copy(selection = next)
+        updateSelection(next, activated = method)
         if (next.activeMethod != previous.activeMethod) reconcile()
     }
 

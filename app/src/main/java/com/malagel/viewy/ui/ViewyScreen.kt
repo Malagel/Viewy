@@ -55,7 +55,6 @@ import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.malagel.viewy.BuildConfig
 import com.malagel.viewy.R
 import com.malagel.viewy.camera.CameraPreview
 import com.malagel.viewy.measurement.*
@@ -69,7 +68,6 @@ fun ViewyScreen(state: MeasurementUiState, model: MeasurementViewModel) {
     var requested by rememberSaveable { mutableStateOf(false) }
     var cameraAttempt by remember { mutableIntStateOf(0) }
     var editHeight by rememberSaveable { mutableStateOf(false) }
-    var showDebug by rememberSaveable { mutableStateOf(false) }
     var showWorkspace by rememberSaveable { mutableStateOf(false) }
     var showStatus by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(state.selection.activeMethod) {
@@ -105,7 +103,10 @@ fun ViewyScreen(state: MeasurementUiState, model: MeasurementViewModel) {
         delay(if (candidate == null) 500 else 250)
         hint = candidate
     }
-    MeasurementSelector(state.selection, model::dismissSelection, model::backSelection, model::browseMode, model::selectMethod) { methodBackdrop ->
+    MeasurementSelector(
+        state.selection, model::dismissSelection, model::backSelection, model::browseMode, model::selectMethod,
+        state.tutorial.navigationToken, model::selectionHidden,
+    ) { methodBackdrop ->
         Scaffold(modifier = methodBackdrop) { insets ->
             BoxWithConstraints(Modifier.fillMaxSize().padding(insets), contentAlignment = Alignment.TopCenter) {
                 val compact = maxHeight < 500.dp || LocalDensity.current.fontScale > 1.5f || maxWidth < 320.dp
@@ -119,7 +120,7 @@ fun ViewyScreen(state: MeasurementUiState, model: MeasurementViewModel) {
                             Modifier.weight(1f).then(if (overflow) Modifier.verticalScroll(rememberScrollState()) else Modifier),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            ViewyHeader(compact, overflow, true, { showDebug = true }, { showWorkspace = false })
+                            ViewyHeader(compact, overflow, true, model::openTutorial, { showWorkspace = false })
                             key(state.selection.activeMethod) {
                                 BoxWithConstraints(
                                     Modifier.fillMaxWidth().then(if (overflow) Modifier.height(320.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)) else Modifier.weight(1f)).clip(RoundedCornerShape(28.dp))
@@ -199,9 +200,10 @@ fun ViewyScreen(state: MeasurementUiState, model: MeasurementViewModel) {
                 // capture/navigation row stays fixed; the regular portrait screen never scrolls.
                 val exceptional = maxHeight < 360.dp || maxWidth < 280.dp || LocalDensity.current.fontScale > 2f
                 if (state.selection.activeMethod == null) {
-                    InactiveMeasurementScreen(compact, { showDebug = true }) { ModeControl(model::openModes) }
+                    InactiveMeasurementScreen(compact) { ModeControl(model::openModes) }
                 } else if (exceptional) {
                     Column(Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        ViewyHeader(compact, false, true, model::openTutorial, {})
                         TextButton(onClick = { showWorkspace = true }, modifier = Modifier.weight(1f)) {
                             Text(stringResource(R.string.open_viewfinder))
                         }
@@ -233,8 +235,8 @@ fun ViewyScreen(state: MeasurementUiState, model: MeasurementViewModel) {
                 }
             }, confirmButton = { TextButton(onClick = { showStatus = false }) { Text(stringResource(R.string.close)) } },
         )
-        if (BuildConfig.DEBUG && showDebug) DiagnosticsDialog(state, model) { showDebug = false }
     }
+    state.tutorial.card?.let { MethodTutorialDialog(it, model::dismissTutorial, model::changeTutorialPage) }
 }
 
 @Composable
@@ -355,35 +357,6 @@ private fun MeasurementControls(
         }
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { modeControl() }
     }
-}
-
-@Composable
-private fun DiagnosticsDialog(state: MeasurementUiState, model: MeasurementViewModel, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss, title = { Text(stringResource(R.string.show_diagnostics)) },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(state.camera.diagnostic)
-                state.measurement.result?.let { result ->
-                    val measurement = state.measurement
-                    Text("Uncertainty: ${result.uncertainty}")
-                    Text("Height ${measurement.heightMeters} m · horizontal distance ${result.horizontalDistanceMeters} m\n" +
-                        "Top/bottom elevation ${Math.toDegrees(result.diagnostics.topElevationRadians)}° / ${Math.toDegrees(result.diagnostics.bottomElevationRadians)}°\n" +
-                        "Elevation separation ${Math.toDegrees(result.diagnostics.elevationSeparationRadians)}°\n" +
-                        "Bearing error ${Math.toDegrees(result.diagnostics.alignmentErrorRadians)}°\n" +
-                        "Duration ${measurement.bottom?.timestampNanos?.minus(measurement.top!!.timestampNanos)?.div(1e9)} s\n" +
-                        "Sensitivity top/bottom ${result.diagnostics.topSensitivityMetersPerRadian} / ${result.diagnostics.bottomSensitivityMetersPerRadian} m/rad")
-                    listOf("Top" to measurement.top, "Bottom" to measurement.bottom).forEach { (label, observation) ->
-                        observation?.let {
-                            Text("$label sensor t ${it.timestampNanos} ns · capture age ${it.quality.ageNanos?.div(1e6)} ms\n" +
-                                "Captured RMS/max ${it.quality.rmsVariationRadians?.let(Math::toDegrees)}° / ${it.quality.maximumVariationRadians?.let(Math::toDegrees)}°")
-                        }
-                    }
-                }
-                OrientationDiagnosticsPanel(state.diagnostics, model::captureDiagnostic, model::restartSource, model::clearDiagnostics)
-            }
-        }, confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) } },
-    )
 }
 
 @Composable

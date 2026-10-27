@@ -67,6 +67,8 @@ internal fun MeasurementSelector(
     onBack: () -> Unit,
     onMode: (MeasurementMode) -> Unit,
     onSelect: (MeasurementMethod) -> Unit,
+    dismissalToken: Long,
+    onHidden: (Long) -> Unit,
     content: @Composable (backdrop: Modifier) -> Unit,
 ) {
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -88,6 +90,12 @@ internal fun MeasurementSelector(
             sheet.hide()
             mounted = false
         }
+    }
+    val currentOnHidden by rememberUpdatedState(onHidden)
+    // A separate effect runs after the composition removing ModalBottomSheet commits.
+    // Recreation with a closed selection has no sheet to hide and can acknowledge at once.
+    LaunchedEffect(selection.isOpen, mounted, dismissalToken) {
+        if (!selection.isOpen && !mounted) currentOnHidden(dismissalToken)
     }
     // Blur is a no-op below Android 12; Material's animated scrim still dims those versions.
     content(Modifier.blur(12.dp * progress))

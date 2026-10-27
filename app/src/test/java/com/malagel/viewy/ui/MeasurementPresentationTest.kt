@@ -5,6 +5,9 @@ import com.malagel.viewy.domain.MeasurementMethod
 import com.malagel.viewy.domain.ViewingDirection
 import com.malagel.viewy.measurement.*
 import com.malagel.viewy.orientation.*
+import com.malagel.viewy.tutorial.TutorialCoordinator
+import com.malagel.viewy.tutorial.TutorialPage
+import com.malagel.viewy.tutorial.TutorialSeenStore
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -54,6 +57,40 @@ class MeasurementPresentationTest {
         assertFalse(ready.needsOrientation(resumed = false))
         assertFalse(ready.copy(camera = ready.camera.copy(ready = false)).needsOrientation(resumed = true))
         assertFalse(ready.copy(measurement = ready.measurement.copy(heightMeters = null)).needsOrientation(resumed = true))
+    }
+
+    @Test fun tutorialActionsPreserveMeasurementAndResourceStateThroughBothPagesAndReopening() {
+        val method = MeasurementMethod.KNOWN_OBJECT_HEIGHT
+        val tutorials = TutorialCoordinator(object : TutorialSeenStore {
+            override fun hasSeen(methodId: String) = true
+            override fun markSeen(methodId: String) = Unit
+        }, methodTutorials.keys)
+        val browsing = MeasurementSelection().browse(method.mode)
+        tutorials.selectionChanged(browsing)
+        tutorials.selectionChanged(selected, method)
+        tutorials.selectorHidden(tutorials.state.navigationToken)
+
+        fun assertPreserved() {
+            val state = ready.copy(tutorial = tutorials.state)
+            assertSame(ready.measurement, state.measurement)
+            assertSame(ready.measurement.latest, state.measurement.latest)
+            assertSame(ready.camera, state.camera)
+            assertSame(ready.acquisition, state.acquisition)
+            assertSame(ready.selection, state.selection)
+            assertTrue(state.needsCamera)
+            assertTrue(state.needsOrientation(resumed = true))
+        }
+        tutorials.openManually()
+        assertPreserved()
+        val id = tutorials.state.card!!.id
+        tutorials.changePage(id, TutorialPage.DETAILS)
+        assertPreserved()
+        tutorials.changePage(id, TutorialPage.BASIC)
+        assertPreserved()
+        tutorials.dismiss(id)
+        assertPreserved()
+        tutorials.openManually()
+        assertPreserved()
     }
 
     @Test fun normalReadinessHasNoWarningAndResolvedLiveNoticesDisappear() {
