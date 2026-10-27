@@ -59,7 +59,6 @@
     <string name="camera_stopped">Camera stopped</string>
     <string name="short_distance">Short Distance</string>
     <string name="height_mode">Height</string>
-    <string name="configurations_placeholder">Configurations (unavailable)</string>
     <string name="known_height_method">Known Object Height</string>
     <string name="preview_status">Viewfinder status and recovery</string>
     <string name="horizontal_result">Approximate horizontal distance: %1$s; uncertainty is not quantified.</string>
@@ -107,4 +106,24 @@
     <string name="tutorial_known_height_height_equation_spoken">Height equals horizontal distance times the difference between the tangents of the top and bottom elevation angles.</string>
     <string name="tutorial_known_height_solve">Rearranging gives the horizontal distance:</string>
     <string name="tutorial_known_height_equation_spoken">Horizontal distance equals height divided by the difference between the tangents of the top and bottom elevation angles.</string>
+    <string name="settings">Settings</string>
+    <string name="measurement_units">Measurement units</string>
+    <string name="metric">Metric</string>
+    <string name="imperial">Imperial</string>
+    <string name="language">Language</string>
+    <string name="language_device">Use device language</string>
+    <string name="language_english" translatable="false">English</string>
+    <string name="language_spanish" translatable="false">Español</string>
+    <string name="developer_options">Developer Options</string>
+    <string name="enable_diagnostics">Enable diagnostics</string>
+    <string name="erase_app_data">Erase all app data</string>
+    <string name="erase_all_data">Erase all data</string>
+    <string name="erase_confirmation">This permanently erases all Viewy data, including saved preferences and tutorial progress, resets the app language to the device language, and revokes granted permissions. This cannot be undone. The application will close and remain installed.</string>
+    <string name="reset_failed_title">Could not erase app data</string>
+    <string name="reset_failed">Android did not accept the request to erase app data. You can try again or clear Viewy’s storage in Android Settings.</string>
+    <string name="reset_requested">Data erasure requested. Waiting for Android to close Viewy…</string>
+    <string name="back">Back</string>
+    <string name="retry">Retry</string>
+    <string name="settings_loading">Loading…</string>
+    <string name="settings_storage_error">Could not read or save preferences. Retry to load the saved settings.</string>
 </resources>

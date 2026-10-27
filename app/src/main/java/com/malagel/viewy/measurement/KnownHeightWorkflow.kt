@@ -37,7 +37,6 @@ fun alignment(top: ViewingDirection, current: ViewingDirection): Alignment {
 
 data class MeasurementState(
     val heightMeters: Double? = null,
-    val unit: HeightUnit = HeightUnit.METERS,
     val cameraReady: Boolean = false,
     val stage: MeasurementStage = MeasurementStage.TOP,
     val top: OrientationObservation? = null,
@@ -60,10 +59,10 @@ class KnownHeightWorkflow(private val policy: AcquisitionPolicy = AcquisitionPol
         private set
     private var lastTapNanos: Long? = null
 
-    fun setHeight(meters: Double, unit: HeightUnit) {
+    fun setHeight(meters: Double) {
         require(meters.isFinite() && meters > 0.0 && HeightUnit.entries.all { it.fromMeters(meters).isFinite() })
         restart()
-        state = state.copy(heightMeters = meters, unit = unit)
+        state = state.copy(heightMeters = meters)
     }
 
     fun cameraReady(ready: Boolean) {

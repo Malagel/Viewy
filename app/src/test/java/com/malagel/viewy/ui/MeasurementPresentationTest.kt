@@ -25,7 +25,7 @@ class MeasurementPresentationTest {
     @Test fun heightIsRequiredBeforeCameraUseAndRestartRetainsIt() {
         val workflow = KnownHeightWorkflow()
         assertFalse(MeasurementUiState(selection = selected, measurement = workflow.state).needsCamera)
-        workflow.setHeight(2.0, HeightUnit.FEET)
+        workflow.setHeight(2.0)
         assertTrue(MeasurementUiState(selection = selected, measurement = workflow.state).needsCamera)
         workflow.restart()
         assertTrue(MeasurementUiState(selection = selected, measurement = workflow.state).needsCamera)

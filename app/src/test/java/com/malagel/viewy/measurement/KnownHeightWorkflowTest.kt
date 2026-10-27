@@ -20,7 +20,7 @@ class KnownHeightWorkflowTest {
     private fun observation(e: Double, time: Long = base, bearing: Double = 90.0) =
         OrientationObservation(ray(e, bearing), time, "frame", OrientationSource.GAME_ROTATION_VECTOR, quality, "camera")
     private fun workflow(): KnownHeightWorkflow = KnownHeightWorkflow().also {
-        it.setHeight(2.0, HeightUnit.METERS)
+        it.setHeight(2.0)
         it.cameraReady(true)
         it.update(observation(30.0), "frame", true, base)
     }
@@ -48,7 +48,7 @@ class KnownHeightWorkflowTest {
     @Test fun actualAcquisitionObservationsDriveTheCompleteWorkflow() {
         val session = OrientationSession(OrientationSource.GAME_ROTATION_VECTOR)
         val w = KnownHeightWorkflow()
-        w.setHeight(2.0, HeightUnit.METERS)
+        w.setHeight(2.0)
         w.cameraReady(true)
         fun feed(elevation: Double, start: Long): Long {
             val pitch = Math.PI/2 + Math.toRadians(elevation)
@@ -79,7 +79,7 @@ class KnownHeightWorkflowTest {
         w.update(observation(30.0), "frame", true, base)
         w.capture(CaptureResult.Captured(observation(30.0)), base)
         assertNull(w.state.top)
-        w.setHeight(2.0, HeightUnit.FEET)
+        w.setHeight(2.0)
         w.capture(CaptureResult.Captured(observation(30.0)), base)
         assertNull(w.state.top)
     }
@@ -189,11 +189,10 @@ class KnownHeightWorkflowTest {
         val w = workflow()
         top(w)
         bottom(w)
-        w.setHeight(3.5, HeightUnit.FEET)
+        w.setHeight(3.5)
         assertNull(w.state.result)
         assertNull(w.state.top)
         assertEquals(3.5, w.state.heightMeters!!, 0.0)
-        assertEquals(HeightUnit.FEET, w.state.unit)
     }
     @Test fun alignmentUsesShortArcAndCorrectPhysicalTurnSign() {
         assertEquals(Alignment.ALIGNED, alignment(ray(30.0, 179.5), ray(0.0, -179.5)))

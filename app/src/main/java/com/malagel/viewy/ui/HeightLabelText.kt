@@ -17,3 +17,12 @@ internal fun heightLabelText(value: Double, locale: Locale): String {
     }
     return decimal + formatted.substring(exponentAt)
 }
+
+/** Editable values keep full precision, no grouping or exponent, using a supported decimal separator. */
+internal fun heightInputText(value: Double, locale: Locale): String {
+    val separator = DecimalFormatSymbols.getInstance(locale).decimalSeparator.takeIf { it == ',' } ?: '.'
+    return java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString().replace('.', separator)
+}
+
+internal fun distanceText(meters: Double, unit: com.malagel.viewy.measurement.HeightUnit, locale: Locale): String =
+    "${String.format(locale, "%.2g", unit.fromMeters(meters))} ${unit.label}"

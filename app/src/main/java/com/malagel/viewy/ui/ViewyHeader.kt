@@ -5,6 +5,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -22,7 +23,7 @@ import com.malagel.viewy.R
 private val ViewyWordmarkFont = FontFamily(Font(R.font.nunito_bold, weight = FontWeight.Bold))
 
 @Composable
-internal fun ViewyHeader(compact: Boolean, overflow: Boolean, active: Boolean, onHelp: () -> Unit, onCloseWorkspace: () -> Unit) {
+internal fun ViewyHeader(compact: Boolean, overflow: Boolean, active: Boolean, onHelp: () -> Unit, onCloseWorkspace: () -> Unit, onSettings: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().padding(top = if (compact) 4.dp else 12.dp, bottom = if (compact) 12.dp else 28.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -49,10 +50,15 @@ internal fun ViewyHeader(compact: Boolean, overflow: Boolean, active: Boolean, o
             }
             Spacer(Modifier.width(8.dp))
         }
-        val configurationsLabel = stringResource(R.string.configurations_placeholder)
+        val settingsLabel = stringResource(R.string.settings)
         FilledTonalIconButton(
-            onClick = {}, enabled = false, shape = CircleShape,
-            modifier = Modifier.size(52.dp).semantics { contentDescription = configurationsLabel },
+            onClick = onSettings, shape = CircleShape,
+            // A slightly richer purple than the shared tonal actions, using theme roles.
+            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                containerColor = lerp(MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.primaryContainer, 0.25f),
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            ),
+            modifier = Modifier.size(52.dp).semantics { contentDescription = settingsLabel },
         ) {
             Icon(painterResource(R.drawable.ic_settings), contentDescription = null, modifier = Modifier.size(28.dp))
         }
@@ -60,14 +66,14 @@ internal fun ViewyHeader(compact: Boolean, overflow: Boolean, active: Boolean, o
 }
 
 @Composable
-internal fun InactiveMeasurementScreen(compact: Boolean, modeControl: @Composable () -> Unit) {
+internal fun InactiveMeasurementScreen(compact: Boolean, onSettings: () -> Unit, modeControl: @Composable () -> Unit) {
     Column(
         Modifier.widthIn(max = 600.dp).fillMaxSize().padding(
             start = if (compact) 12.dp else 20.dp, end = if (compact) 12.dp else 20.dp,
             top = 8.dp, bottom = if (compact) 16.dp else 32.dp,
         ), horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        ViewyHeader(compact, false, false, {}, {})
+        ViewyHeader(compact, false, false, {}, {}, onSettings)
         Spacer(Modifier.weight(1f))
         Row(Modifier.widthIn(max = 320.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Spacer(Modifier.weight(1f))

@@ -6,8 +6,12 @@ activity = "1.13.0"
 junit = "4.13.2"
 lifecycle = "2.9.4"
 camerax = "1.6.2"
+appcompat = "1.7.1"
+datastore = "1.2.1"
 
 [libraries]
+androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
+androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
 androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }
 androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
 androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }

@@ -61,7 +61,10 @@ import com.malagel.viewy.measurement.*
 import kotlinx.coroutines.delay
 
 @Composable
-fun ViewyScreen(state: MeasurementUiState, model: MeasurementViewModel) {
+fun ViewyScreen(
+    state: MeasurementUiState, model: MeasurementViewModel, unit: HeightUnit, onSettings: () -> Unit,
+    settingsOpen: Boolean, settingsContent: @Composable (backdropOnly: Boolean) -> Unit,
+) {
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
     var permission by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) }
@@ -85,12 +88,15 @@ fun ViewyScreen(state: MeasurementUiState, model: MeasurementViewModel) {
         owner.lifecycle.addObserver(observer)
         onDispose { owner.lifecycle.removeObserver(observer) }
     }
+    val openAppSettings = {
+        if (state.canOpenSettings) onSettings()
+    }
     val measurement = state.measurement
     val textMeasurer = rememberTextMeasurer()
     val density = LocalDensity.current
     val previewStatusLabel = stringResource(R.string.preview_status)
     val resultDescription = measurement.result?.let {
-        stringResource(R.string.horizontal_result, distance(it.horizontalDistanceMeters, measurement.unit))
+        stringResource(R.string.horizontal_result, distance(it.horizontalDistanceMeters, unit))
     }
     val requestPermission = { requested = true; launcher.launch(Manifest.permission.CAMERA) }
     val openSettings = {
@@ -120,7 +126,7 @@ fun ViewyScreen(state: MeasurementUiState, model: MeasurementViewModel) {
                             Modifier.weight(1f).then(if (overflow) Modifier.verticalScroll(rememberScrollState()) else Modifier),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            ViewyHeader(compact, overflow, true, model::openTutorial, { showWorkspace = false })
+                            ViewyHeader(compact, overflow, true, model::openTutorial, { showWorkspace = false }, openAppSettings)
                             key(state.selection.activeMethod) {
                                 BoxWithConstraints(
                                     Modifier.fillMaxWidth().then(if (overflow) Modifier.height(320.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)) else Modifier.weight(1f)).clip(RoundedCornerShape(28.dp))
@@ -171,7 +177,7 @@ fun ViewyScreen(state: MeasurementUiState, model: MeasurementViewModel) {
                                                 }
                                             }
                                         }
-                                        val heightLabel = stringResource(R.string.height_edit, heightLabelText(measurement.unit.fromMeters(measurement.heightMeters!!), LocalLocale.current.platformLocale), measurement.unit.label)
+                                        val heightLabel = stringResource(R.string.height_edit, heightLabelText(unit.fromMeters(measurement.heightMeters!!), LocalLocale.current.platformLocale), unit.label)
                                         if (compact) {
                                             LabeledIconButton(R.string.object_height, "↕", { editHeight = true }, Modifier.align(Alignment.TopEnd), heightLabel)
                                         } else {
@@ -185,7 +191,7 @@ fun ViewyScreen(state: MeasurementUiState, model: MeasurementViewModel) {
                                 }
                             }
                             MeasurementStageArea(
-                                measurement, resultDescription, textMeasurer,
+                                measurement, unit, resultDescription, textMeasurer,
                                 if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
                             )
                         }
@@ -199,26 +205,36 @@ fun ViewyScreen(state: MeasurementUiState, model: MeasurementViewModel) {
                 // An exceptional window gets a readable, scrollable workspace dialog. Its
                 // capture/navigation row stays fixed; the regular portrait screen never scrolls.
                 val exceptional = maxHeight < 360.dp || maxWidth < 280.dp || LocalDensity.current.fontScale > 2f
-                if (state.selection.activeMethod == null) {
-                    InactiveMeasurementScreen(compact) { ModeControl(model::openModes) }
-                } else if (exceptional) {
-                    Column(Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        ViewyHeader(compact, false, true, model::openTutorial, {})
-                        TextButton(onClick = { showWorkspace = true }, modifier = Modifier.weight(1f)) {
-                            Text(stringResource(R.string.open_viewfinder))
+                val workspaceDialogOpen = exceptional && state.selection.activeMethod != null && showWorkspace
+                // Cover the Activity as well as the workspace window: the backdrop
+                // remains visible while Android tears down/recreates that dialog.
+                SettingsOverlay(settingsOpen, settings = { settingsContent(workspaceDialogOpen) }) {
+                    if (state.selection.activeMethod == null) {
+                        InactiveMeasurementScreen(compact, openAppSettings) { ModeControl(model::openModes) }
+                    } else if (exceptional) {
+                        Column(Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            ViewyHeader(compact, false, true, model::openTutorial, {}, openAppSettings)
+                            TextButton(onClick = { showWorkspace = true }, modifier = Modifier.weight(1f)) {
+                                Text(stringResource(R.string.open_viewfinder))
+                            }
+                            MeasurementControls(measurement.top == null, measurement.canCapture, true, model::restart, model::capture) {
+                                ModeControl(model::openModes)
+                            }
                         }
-                        MeasurementControls(measurement.top == null, measurement.canCapture, true, model::restart, model::capture) {
-                            ModeControl(model::openModes)
+                        if (showWorkspace) Dialog(
+                            onDismissRequest = { if (!settingsOpen) showWorkspace = false },
+                            properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = !settingsOpen),
+                        ) {
+                            Surface(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout)).then(methodBackdrop)) {
+                                SettingsOverlay(settingsOpen, settings = { settingsContent(false) }) { workspace(true) }
+                            }
                         }
-                    }
-                    if (showWorkspace) Dialog(onDismissRequest = { showWorkspace = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-                        Surface(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout)).then(methodBackdrop)) { workspace(true) }
-                    }
-                } else workspace(false)
+                    } else workspace(false)
+                }
             }
         }
-        if (editHeight && state.selection.activeMethod != null) HeightDialog(measurement, onDismiss = { editHeight = false }) { meters, unit ->
-            model.setHeight(meters, unit)
+        if (editHeight && state.selection.activeMethod != null) HeightDialog(measurement, unit, onDismiss = { editHeight = false }) { meters ->
+            model.setHeight(meters)
             editHeight = false
         }
         if (showStatus && state.selection.activeMethod != null) AlertDialog(
@@ -226,7 +242,7 @@ fun ViewyScreen(state: MeasurementUiState, model: MeasurementViewModel) {
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(stringResource(R.string.measurement_method_subtitle))
-                    Text(stageText(measurement))
+                    Text(stageText(measurement, unit))
                     if (!state.needsCamera) TextButton(onClick = { showStatus = false; editHeight = true }) { Text(stringResource(R.string.enter_height)) }
                     else {
                         RecoveryControls(state, permission, requested, requestPermission, openSettings, { cameraAttempt++ }, { model.restartSource(null) })
@@ -281,6 +297,7 @@ private fun LivePreview(model: MeasurementViewModel) {
 @Composable
 private fun MeasurementStageArea(
     measurement: MeasurementState,
+    unit: HeightUnit,
     resultDescription: String?,
     textMeasurer: TextMeasurer,
     style: TextStyle,
@@ -298,7 +315,7 @@ private fun MeasurementStageArea(
         }
         Box(Modifier.fillMaxWidth().heightIn(min = with(density) { reservedHeight.toDp() }), contentAlignment = Alignment.Center) {
             if (measurement.heightMeters != null) Text(
-                stageText(measurement), Modifier.fillMaxWidth().semantics {
+                stageText(measurement, unit), Modifier.fillMaxWidth().semantics {
                     liveRegion = LiveRegionMode.Polite
                     if (resultDescription != null) contentDescription = resultDescription
                 }, textAlign = TextAlign.Center, style = style,
@@ -308,8 +325,8 @@ private fun MeasurementStageArea(
 }
 
 @Composable
-private fun stageText(state: MeasurementState): String = state.result?.let {
-    stringResource(R.string.distance_estimate, distance(it.horizontalDistanceMeters, state.unit))
+private fun stageText(state: MeasurementState, unit: HeightUnit): String = state.result?.let {
+    stringResource(R.string.distance_estimate, distance(it.horizontalDistanceMeters, unit))
 } ?: stringResource(when {
     state.heightMeters == null -> R.string.known_height_method
     state.stage == MeasurementStage.TOP -> R.string.measurement_stage_top
@@ -325,8 +342,7 @@ internal fun LabeledIconButton(@StringRes label: Int, symbol: String, onClick: (
 
 /** Two significant digits for estimates; precision of internal calculations is retained. */
 @Composable
-private fun distance(meters: Double, unit: HeightUnit): String = "${String.format(LocalLocale.current.platformLocale, "%.2g", unit.fromMeters(meters))} ${unit.label}"
-private fun decimalText(value: Double): String = java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString()
+private fun distance(meters: Double, unit: HeightUnit): String = distanceText(meters, unit, LocalLocale.current.platformLocale)
 
 @Composable
 private fun MeasurementControls(
@@ -360,9 +376,10 @@ private fun MeasurementControls(
 }
 
 @Composable
-private fun HeightDialog(state: MeasurementState, onDismiss: () -> Unit, onSave: (Double, HeightUnit) -> Unit) {
-    var unit by remember { mutableStateOf(state.unit) }
-    var text by remember { mutableStateOf(state.heightMeters?.let { decimalText(state.unit.fromMeters(it)) } ?: "") }
+private fun HeightDialog(state: MeasurementState, unit: HeightUnit, onDismiss: () -> Unit, onSave: (Double) -> Unit) {
+    val locale = LocalLocale.current.platformLocale
+    val originalText = rememberSaveable { state.heightMeters?.let { heightInputText(unit.fromMeters(it), locale) } ?: "" }
+    var text by rememberSaveable { mutableStateOf(originalText) }
     val meters = heightInMeters(text, unit)
     // Only this dialog responds to the IME. Top anchoring prevents the card from
     // recentering when the keyboard opens; constrained content scrolls above it.
@@ -402,15 +419,6 @@ private fun HeightDialog(state: MeasurementState, onDismiss: () -> Unit, onSave:
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Text(stringResource(R.string.height_instructions))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            HeightUnit.entries.forEach { choice ->
-                                FilterChip(selected = unit == choice, onClick = {
-                                    val current = heightInMeters(text, unit)
-                                    if (current != null) text = decimalText(choice.fromMeters(current))
-                                    unit = choice
-                                }, label = { Text(choice.label) })
-                            }
-                        }
                         OutlinedTextField(
                             modifier = Modifier.focusRequester(focusRequester),
                             value = text, onValueChange = { text = it }, label = { Text(stringResource(R.string.height_label, unit.label)) },
@@ -421,7 +429,7 @@ private fun HeightDialog(state: MeasurementState, onDismiss: () -> Unit, onSave:
                     }
                     FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                         TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
-                        TextButton(onClick = { meters?.let { onSave(it, unit) } }, enabled = meters != null) { Text(stringResource(R.string.save_height)) }
+                        TextButton(onClick = { meters?.let { onSave(if (text == originalText) state.heightMeters ?: it else it) } }, enabled = meters != null) { Text(stringResource(R.string.save_height)) }
                     }
                 }
             }

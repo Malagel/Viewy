@@ -39,4 +39,17 @@ class HeightLabelTextTest {
         assertEquals("6.0", heightLabelText(HeightUnit.FEET.fromMeters(whole), Locale.US))
         assertEquals("6.12345", heightLabelText(HeightUnit.FEET.fromMeters(fractional), Locale.US))
     }
+    @Test fun globalHeightEntryAndDistanceFormattingUseTheDisplayLocaleWithoutGrouping() {
+        val spanish = Locale.forLanguageTag("es-CL")
+        val meters = heightInMeters("6,125", HeightUnit.FEET)!!
+        val input = heightInputText(HeightUnit.FEET.fromMeters(meters), spanish)
+        assertEquals("6,125", input)
+        assertEquals(meters, heightInMeters(input, HeightUnit.FEET)!!, 1e-15)
+        assertEquals("2,343123456", heightInputText(2.343123456, spanish))
+        assertEquals("0.0000001", heightInputText(0.0000001, Locale.US))
+        assertEquals("3.1 m", distanceText(3.05, HeightUnit.METERS, Locale.US))
+        assertEquals("3,1 m", distanceText(3.05, HeightUnit.METERS, spanish))
+        assertEquals("10 ft", distanceText(3.05, HeightUnit.FEET, Locale.US))
+        assertEquals("6,125", heightLabelText(HeightUnit.FEET.fromMeters(meters), spanish))
+    }
 }

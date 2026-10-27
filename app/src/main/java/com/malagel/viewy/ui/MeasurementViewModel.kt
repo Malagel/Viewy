@@ -9,7 +9,6 @@ import com.malagel.viewy.camera.PreviewSession
 import com.malagel.viewy.domain.MeasurementMethod
 import com.malagel.viewy.domain.MeasurementMode
 import com.malagel.viewy.measurement.MeasurementSelection
-import com.malagel.viewy.measurement.HeightUnit
 import com.malagel.viewy.measurement.KnownHeightWorkflow
 import com.malagel.viewy.measurement.MeasurementState
 import com.malagel.viewy.measurement.MeasurementNotice
@@ -29,6 +28,7 @@ data class MeasurementUiState(
     val diagnostics: OrientationDiagnosticsState = OrientationDiagnosticsState(),
     val tutorial: TutorialState = TutorialState(),
 ) {
+    val canOpenSettings: Boolean get() = !selection.isOpen && tutorial.card == null && tutorial.pendingMethod == null
     val needsCamera: Boolean get() = selection.activeMethod?.requiresCamera == true && measurement.heightMeters != null
     fun needsOrientation(resumed: Boolean): Boolean = resumed && needsCamera && camera.ready &&
         selection.activeMethod?.requiresOrientation == true
@@ -122,7 +122,7 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
         if (next.activeMethod != previous.activeMethod) reconcile()
     }
 
-    fun setHeight(meters: Double, unit: HeightUnit) { workflow.setHeight(meters, unit); publish(); reconcile() }
+    fun setHeight(meters: Double) { workflow.setHeight(meters); publish(); reconcile() }
     fun restart() { workflow.restart(); publish() }
     fun recaptureBottom() { workflow.recaptureBottom(); publish() }
     fun capture() {
