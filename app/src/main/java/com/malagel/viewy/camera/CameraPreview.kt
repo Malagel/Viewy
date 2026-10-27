@@ -86,10 +86,10 @@ class CameraPreview(
         try {
             val future = ProcessCameraProvider.getInstance(context)
             future.addListener({
-                if (!disposed) try {
+                if (!disposed && !failed) try {
                     provider = future.get()
                     // Wait until attached: display rotation may be unavailable during composition.
-                    view.post { if (!disposed) bind(provider!!) }
+                    view.post { if (!disposed && !failed) bind(provider!!) }
                 } catch (error: Exception) {
                     fail(R.string.camera_start_failed, error.javaClass.simpleName)
                 }
@@ -100,7 +100,7 @@ class CameraPreview(
     }
 
     private fun bind(cameraProvider: ProcessCameraProvider) {
-        if (disposed) return
+        if (disposed || failed) return
         cameraInfo?.cameraState?.removeObserver(cameraObserver)
         preview?.let { cameraProvider.unbind(it) }
         open = false

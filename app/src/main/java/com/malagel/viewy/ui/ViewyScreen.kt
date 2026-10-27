@@ -3,12 +3,17 @@ package com.malagel.viewy.ui
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.content.res.Configuration
 import android.provider.Settings
 import androidx.annotation.StringRes
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.view.PreviewView
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -22,38 +27,46 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLocale
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.*
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.camera.view.PreviewView
 import com.malagel.viewy.BuildConfig
 import com.malagel.viewy.R
-import com.malagel.viewy.ui.theme.ViewyTheme
-import com.malagel.viewy.domain.KnownHeightDistance
-import com.malagel.viewy.domain.KnownHeightResult
-import com.malagel.viewy.domain.ViewingDirection
 import com.malagel.viewy.camera.CameraPreview
-import com.malagel.viewy.camera.CameraPreviewState
-import com.malagel.viewy.domain.DistanceUncertainty
 import com.malagel.viewy.measurement.*
-import com.malagel.viewy.measurement.Alignment as AimAlignment
-import com.malagel.viewy.orientation.CaptureStatus
-import java.util.Locale
+import kotlinx.coroutines.delay
+
+private val ViewyWordmarkFont = FontFamily(Font(R.font.nunito_bold, weight = FontWeight.Bold))
 
 @Composable
 fun ViewyScreen(state: MeasurementUiState, model: MeasurementViewModel) {
@@ -64,8 +77,9 @@ fun ViewyScreen(state: MeasurementUiState, model: MeasurementViewModel) {
     var cameraAttempt by remember { mutableIntStateOf(0) }
     var editHeight by rememberSaveable { mutableStateOf(false) }
     var showDebug by rememberSaveable { mutableStateOf(false) }
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> permission = granted }
-    // Settings can change permission while the Activity is stopped.
+    var showWorkspace by rememberSaveable { mutableStateOf(false) }
+    var showStatus by rememberSaveable { mutableStateOf(false) }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { permission = it }
     DisposableEffect(owner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) permission = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
@@ -74,139 +88,323 @@ fun ViewyScreen(state: MeasurementUiState, model: MeasurementViewModel) {
         onDispose { owner.lifecycle.removeObserver(observer) }
     }
     val measurement = state.measurement
-    Scaffold { insets ->
+    val textMeasurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val previewStatusLabel = stringResource(R.string.preview_status)
+    val resultDescription = measurement.result?.let {
+        stringResource(R.string.horizontal_result, distance(it.horizontalDistanceMeters, measurement.unit))
+    }
+    val requestPermission = { requested = true; launcher.launch(Manifest.permission.CAMERA) }
+    val openSettings = {
+        context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:${context.packageName}".toUri()))
+    }
+    val candidate = contextualGuidance(state)
+    // Delay changing sensor hints; capture eligibility itself is never delayed.
+    var hint by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(candidate) {
+        delay(if (candidate == null) 500 else 250)
+        hint = candidate
+    }
+    // Blur the existing content in place: browsing must not dispose the preview or its session.
+    // Compose uses platform blur on Android 12+; the dialog's dim scrim remains on older devices.
+    val methodBackdrop = if (state.selection.browsingMode != null) Modifier.blur(12.dp) else Modifier
+    Scaffold(modifier = methodBackdrop) { insets ->
         BoxWithConstraints(Modifier.fillMaxSize().padding(insets), contentAlignment = Alignment.TopCenter) {
-            val previewHeight = (maxHeight - 340.dp).coerceIn(240.dp, 580.dp)
-            Column(
-                Modifier.widthIn(max = 600.dp).fillMaxWidth()
-                    .verticalScroll(rememberScrollState()).heightIn(min = maxHeight).padding(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineLarge)
-                        Text(stringResource(R.string.measurement_method_subtitle), style = MaterialTheme.typography.bodyMedium)
-                    }
-                    val configurationsLabel = stringResource(R.string.configurations_placeholder)
-                    FilledTonalIconButton(
-                        onClick = {}, enabled = false,
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        ),
-                        modifier = Modifier.semantics { contentDescription = configurationsLabel },
+            val compact = maxHeight < 500.dp || LocalDensity.current.fontScale > 1.5f || maxWidth < 320.dp
+            val workspace: @Composable (Boolean) -> Unit = { overflow ->
+                Column(
+                    Modifier.widthIn(max = 600.dp).fillMaxSize().padding(start = if (compact) 12.dp else 20.dp, end = if (compact) 12.dp else 20.dp, top = 8.dp, bottom = if (compact) 16.dp else 32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Column(
+                        Modifier.weight(1f).then(if (overflow) Modifier.verticalScroll(rememberScrollState()) else Modifier),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Text(stringResource(R.string.configurations_symbol), fontSize = 24.sp)
-                    }
-                }
-                key(state.selection.activeMethod) {
-                    if (state.selection.activeMethod.requiresCamera) {
-                        Box(
-                            Modifier.fillMaxWidth().height(previewHeight).clip(RoundedCornerShape(32.dp))
-                                .background(Color.Black), contentAlignment = Alignment.Center,
+                        Row(
+                            Modifier.fillMaxWidth().padding(top = if (compact) 4.dp else 12.dp, bottom = if (compact) 12.dp else 28.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            if (permission) {
-                                key(cameraAttempt) { LivePreview(model::previewChanged) }
-                                Reticle(Modifier.size(44.dp))
-                            } else {
-                                Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(stringResource(R.string.camera_permission_explanation), color = Color.White)
-                                    Button(onClick = { requested = true; launcher.launch(Manifest.permission.CAMERA) }) {
-                                        Text(if (requested) stringResource(R.string.camera_permission_retry) else stringResource(R.string.camera_permission_allow))
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineLarge.copy(
+                                    fontFamily = ViewyWordmarkFont, fontWeight = FontWeight.Bold,
+                                    fontSize = if (compact) 30.sp else 38.sp,
+                                    lineHeight = if (compact) 38.sp else 46.sp,
+                                ))
+                                if (!compact) Text(stringResource(R.string.measurement_method_subtitle), style = MaterialTheme.typography.bodySmall)
+                            }
+                            if (BuildConfig.DEBUG) LabeledIconButton(R.string.show_diagnostics, "⋯", { showDebug = true })
+                            if (overflow) LabeledIconButton(R.string.close, "×", { showWorkspace = false })
+                            val configurationsLabel = stringResource(R.string.configurations_placeholder)
+                            FilledTonalIconButton(
+                                onClick = {}, enabled = false, shape = CircleShape,
+                                modifier = Modifier.size(52.dp).semantics { contentDescription = configurationsLabel },
+                            ) {
+                                Icon(painterResource(R.drawable.ic_settings), contentDescription = null, modifier = Modifier.size(28.dp))
+                            }
+                        }
+                        key(state.selection.activeMethod) {
+                            BoxWithConstraints(
+                                Modifier.fillMaxWidth().then(if (overflow) Modifier.height(320.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)) else Modifier.weight(1f)).clip(RoundedCornerShape(28.dp))
+                                    .background(if (state.needsCamera) Color.Black else MaterialTheme.colorScheme.secondaryContainer),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                val hintText = hint?.let { stringResource(it) }
+                                val hintStyle = MaterialTheme.typography.bodyMedium
+                                val hintHeight = remember(hintText, hintStyle, maxWidth, density) {
+                                    hintText?.let {
+                                        textMeasurer.measure(it, hintStyle, constraints = Constraints(maxWidth = with(density) { (maxWidth - 52.dp).roundToPx().coerceAtLeast(1) })).size.height
+                                    } ?: 0
+                                }
+                                val recoveryNeeded = !permission || !state.camera.ready || !state.acquisition.running
+                                val useStatusDialog = !overflow && ((compact && recoveryNeeded) || hintHeight > with(density) { (maxHeight / 2 - 54.dp).toPx() })
+                                if (state.needsCamera && permission) {
+                                    key(cameraAttempt) { LivePreview(model) }
+                                    if (state.camera.ready && state.acquisition.running) Reticle(Modifier.size(40.dp))
+                                }
+                                if (!state.needsCamera) {
+                                    Button(
+                                        onClick = { editHeight = true },
+                                        modifier = Modifier.padding(20.dp).widthIn(min = 240.dp, max = 320.dp).heightIn(min = 64.dp),
+                                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+                                    ) { Text(stringResource(R.string.enter_height), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center) }
+                                } else {
+                                    // Long recovery text has a scrollable dialog in constrained windows.
+                                    if (useStatusDialog) {
+                                        FilledTonalIconButton(onClick = { showStatus = true }, modifier = Modifier.align(Alignment.BottomStart).padding(4.dp)
+                                            .semantics { contentDescription = previewStatusLabel }) {
+                                            Text(if (!permission || !state.camera.ready || !state.acquisition.running || hint != null) "!" else "i")
+                                        }
+                                    } else if (recoveryNeeded) {
+                                        Surface(Modifier.fillMaxWidth().align(Alignment.BottomCenter), color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.95f)) {
+                                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                RecoveryControls(state, permission, requested, requestPermission, openSettings, { cameraAttempt++ }, { model.restartSource(null) })
+                                            }
+                                        }
+                                    } else {
+                                        AnimatedContent(
+                                            targetState = hint,
+                                            modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
+                                            transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "Preview guidance",
+                                        ) { message ->
+                                            if (message != null) Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.9f), shape = RoundedCornerShape(16.dp)) {
+                                                Text(stringResource(message), Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                                                    .semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.bodyMedium)
+                                            }
+                                        }
                                     }
-                                    if (requested) TextButton(onClick = {
-                                        context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:${context.packageName}".toUri()))
-                                    }) { Text(stringResource(R.string.open_app_settings), color = Color.White) }
-                                }
-                            }
-                            if (permission && !state.camera.ready) {
-                                Column(Modifier.align(Alignment.BottomCenter).background(Color.Black.copy(alpha = 0.8f)).padding(16.dp)) {
-                                    Text(stringResource(state.camera.messageRes), color = Color.White)
-                                    TextButton(onClick = { cameraAttempt++ }) { Text(stringResource(R.string.camera_retry), color = Color.White) }
+                                    val heightLabel = stringResource(R.string.height_edit, heightLabelText(measurement.unit.fromMeters(measurement.heightMeters!!), LocalLocale.current.platformLocale), measurement.unit.label)
+                                    if (compact) {
+                                        LabeledIconButton(R.string.object_height, "↕", { editHeight = true }, Modifier.align(Alignment.TopEnd), heightLabel)
+                                    } else {
+                                        FilledTonalButton(
+                                            onClick = { editHeight = true }, shape = CircleShape,
+                                            modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
+                                            colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f)),
+                                        ) { Text(heightLabel) }
+                                    }
                                 }
                             }
                         }
-                    }
-                    Text(
-                        when (measurement.stage) {
-                            MeasurementStage.TOP -> stringResource(R.string.measurement_stage_top)
-                            MeasurementStage.BOTTOM, MeasurementStage.CORRECTION -> stringResource(R.string.measurement_stage_bottom)
-                            MeasurementStage.RESULT -> stringResource(R.string.measurement_stage_result)
-                        }, style = MaterialTheme.typography.titleLarge,
-                    )
-                    OutlinedButton(onClick = { editHeight = true }) {
-                        Text(measurement.heightMeters?.let {
-                            stringResource(R.string.height_edit, String.format(Locale.getDefault(), "%.6g", measurement.unit.fromMeters(it)), measurement.unit.label)
-                        } ?: stringResource(R.string.enter_height))
-                    }
-                    measurement.result?.let { MeasurementResult(it, measurement.unit) }
-                    if (measurement.result == null) {
-                        Text(stringResource(guidance(state)), style = MaterialTheme.typography.bodyLarge)
-                        measurement.notice?.let { Text(stringResource(noticeResource(it)), color = MaterialTheme.colorScheme.primary) }
-                        if (measurement.cameraReady && !state.acquisition.running) {
-                            TextButton(onClick = { model.restartSource(null) }) { Text(stringResource(R.string.orientation_retry)) }
-                        }
+                        MeasurementStageArea(
+                            measurement, resultDescription, textMeasurer,
+                            if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                        )
                     }
                     MeasurementControls(
                         captureTop = measurement.top == null, canCapture = measurement.canCapture,
-                        onRestart = model::restart, onCapture = model::capture,
+                        compact = compact, onRestart = model::restart, onCapture = model::capture,
                         modeControl = { ModeControl(state.selection, model::toggleModes, model::dismissSelection, model::browseMode) },
                     )
-                    if (measurement.result != null) {
-                        Button(onClick = model::restart) { Text(stringResource(R.string.new_measurement)) }
-                        OutlinedButton(onClick = model::recaptureBottom) { Text(stringResource(R.string.recapture_bottom)) }
-                    } else Text(if (measurement.top == null) stringResource(R.string.capture_top) else stringResource(R.string.capture_bottom), style = MaterialTheme.typography.labelLarge)
-                    Text(stringResource(R.string.capture_instructions), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.aiming_limitation), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (BuildConfig.DEBUG) {
-                        TextButton(onClick = { showDebug = !showDebug }) { Text(if (showDebug) stringResource(R.string.hide_diagnostics) else stringResource(R.string.show_diagnostics)) }
-                        if (showDebug) {
-                            Text(state.camera.diagnostic)
-                            measurement.result?.let { result ->
-                                Text("Height ${measurement.heightMeters} m · distance ${result.horizontalDistanceMeters} m\n" +
-                                    "Top/bottom elevation ${Math.toDegrees(result.diagnostics.topElevationRadians)}° / ${Math.toDegrees(result.diagnostics.bottomElevationRadians)}°\n" +
-                                    "Elevation separation ${Math.toDegrees(result.diagnostics.elevationSeparationRadians)}°\n" +
-                                    "Bearing error ${Math.toDegrees(result.diagnostics.alignmentErrorRadians)}°\n" +
-                                    "Duration ${measurement.bottom?.timestampNanos?.minus(measurement.top!!.timestampNanos)?.div(1e9)} s\n" +
-                                    "Sensitivity top/bottom ${result.diagnostics.topSensitivityMetersPerRadian} / ${result.diagnostics.bottomSensitivityMetersPerRadian} m/rad")
-                                listOf("Top" to measurement.top, "Bottom" to measurement.bottom).forEach { (label, observation) ->
-                                    observation?.let {
-                                        Text("$label sensor t ${it.timestampNanos} ns · capture age ${it.quality.ageNanos?.div(1e6)} ms\n" +
-                                            "Captured RMS/max ${it.quality.rmsVariationRadians?.let(Math::toDegrees)}° / ${it.quality.maximumVariationRadians?.let(Math::toDegrees)}°")
-                                    }
-                                }
-                            }
-                            OrientationDiagnosticsPanel(state.diagnostics, model::captureDiagnostic, model::restartSource, model::clearDiagnostics)
-                        }
-                    }
                 }
             }
+            // An exceptional window gets a readable, scrollable workspace dialog. Its
+            // capture/navigation row stays fixed; the regular portrait screen never scrolls.
+            val exceptional = maxHeight < 360.dp || maxWidth < 280.dp || LocalDensity.current.fontScale > 2f
+            if (exceptional) {
+                Column(Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    TextButton(onClick = { showWorkspace = true }, modifier = Modifier.weight(1f)) {
+                        Text(stringResource(R.string.open_viewfinder))
+                    }
+                    MeasurementControls(measurement.top == null, measurement.canCapture, true, model::restart, model::capture) {
+                        ModeControl(state.selection, model::toggleModes, model::dismissSelection, model::browseMode)
+                    }
+                }
+                if (showWorkspace) Dialog(onDismissRequest = { showWorkspace = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+                    Surface(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout)).then(methodBackdrop)) { workspace(true) }
+                }
+            } else workspace(false)
         }
     }
     if (editHeight) HeightDialog(measurement, onDismiss = { editHeight = false }) { meters, unit ->
         model.setHeight(meters, unit)
         editHeight = false
     }
-    state.selection.browsingMode?.let { mode ->
-        MethodSelectionCarousel(mode, model::selectMethod, model::dismissSelection)
+    if (showStatus) AlertDialog(
+        onDismissRequest = { showStatus = false }, title = { Text(stringResource(R.string.preview_status)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(stringResource(R.string.measurement_method_subtitle))
+                Text(stageText(measurement))
+                if (!state.needsCamera) TextButton(onClick = { showStatus = false; editHeight = true }) { Text(stringResource(R.string.enter_height)) }
+                else {
+                    RecoveryControls(state, permission, requested, requestPermission, openSettings, { cameraAttempt++ }, { model.restartSource(null) })
+                    candidate?.let { Text(stringResource(it)) }
+                }
+            }
+        }, confirmButton = { TextButton(onClick = { showStatus = false }) { Text(stringResource(R.string.close)) } },
+    )
+    if (BuildConfig.DEBUG && showDebug) DiagnosticsDialog(state, model) { showDebug = false }
+    state.selection.browsingMode?.let { mode -> MethodSelectionCarousel(mode, model::selectMethod, model::dismissSelection) }
+}
+
+@Composable
+private fun RecoveryControls(
+    state: MeasurementUiState, permission: Boolean, requested: Boolean,
+    onPermission: () -> Unit, onSettings: () -> Unit, onCameraRetry: () -> Unit, onOrientationRetry: () -> Unit,
+) {
+    when {
+        !permission -> {
+            Text(stringResource(R.string.camera_permission_explanation))
+            TextButton(onClick = onPermission) { Text(stringResource(if (requested) R.string.camera_permission_retry else R.string.camera_permission_allow)) }
+            if (requested) TextButton(onClick = onSettings) { Text(stringResource(R.string.open_app_settings)) }
+        }
+        !state.camera.ready -> {
+            Text(stringResource(state.camera.messageRes))
+            TextButton(onClick = onCameraRetry) { Text(stringResource(R.string.camera_retry)) }
+        }
+        !state.acquisition.running -> {
+            Text(stringResource(R.string.guidance_orientation))
+            TextButton(onClick = onOrientationRetry) { Text(stringResource(R.string.orientation_retry)) }
+        }
     }
 }
 
 @Composable
-private fun LivePreview(onState: (CameraPreviewState) -> Unit) {
+private fun LivePreview(model: MeasurementViewModel) {
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
-    val latestCallback by rememberUpdatedState(onState)
     val view = remember(context) { PreviewView(context) }
     AndroidView(factory = { view }, modifier = Modifier.fillMaxSize())
-    DisposableEffect(view, owner) {
-        val preview = CameraPreview(context, owner, view) { latestCallback(it) }
+    DisposableEffect(view, owner, model) {
+        val token = model.startPreview()
+        val preview = token?.let { CameraPreview(context, owner, view) { camera -> model.previewChanged(it, camera) } }
         onDispose {
-            preview.close()
-            latestCallback(CameraPreviewState(messageRes = R.string.camera_stopped))
+            preview?.close()
+            if (token != null) model.stopPreview(token)
         }
     }
+}
+
+/** Reserve both caption layouts even before height entry, including wrapping at large text sizes. */
+@Composable
+private fun MeasurementStageArea(
+    measurement: MeasurementState,
+    resultDescription: String?,
+    textMeasurer: TextMeasurer,
+    style: TextStyle,
+) {
+    val top = stringResource(R.string.measurement_stage_top)
+    val bottom = stringResource(R.string.measurement_stage_bottom)
+    val density = LocalDensity.current
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val width = constraints.maxWidth
+        val reservedHeight = remember(top, bottom, style, width, density, textMeasurer) {
+            maxOf(
+                textMeasurer.measure(top, style, constraints = Constraints(maxWidth = width)).size.height,
+                textMeasurer.measure(bottom, style, constraints = Constraints(maxWidth = width)).size.height,
+            )
+        }
+        Box(Modifier.fillMaxWidth().heightIn(min = with(density) { reservedHeight.toDp() }), contentAlignment = Alignment.Center) {
+            if (measurement.heightMeters != null) Text(
+                stageText(measurement), Modifier.fillMaxWidth().semantics {
+                    liveRegion = LiveRegionMode.Polite
+                    if (resultDescription != null) contentDescription = resultDescription
+                }, textAlign = TextAlign.Center, style = style,
+            )
+        }
+    }
+}
+
+@Composable
+private fun stageText(state: MeasurementState): String = state.result?.let {
+    stringResource(R.string.distance_estimate, distance(it.horizontalDistanceMeters, state.unit))
+} ?: stringResource(when {
+    state.heightMeters == null -> R.string.known_height_method
+    state.stage == MeasurementStage.TOP -> R.string.measurement_stage_top
+    else -> R.string.measurement_stage_bottom
+})
+
+@Composable
+private fun LabeledIconButton(@StringRes label: Int, symbol: String, onClick: () -> Unit, modifier: Modifier = Modifier, description: String = stringResource(label)) {
+    FilledTonalIconButton(onClick = onClick, modifier = modifier.semantics { contentDescription = description }) {
+        Text(symbol, fontSize = with(LocalDensity.current) { 24.dp.toSp() }, modifier = Modifier.clearAndSetSemantics {})
+    }
+}
+
+/** Two significant digits for estimates; precision of internal calculations is retained. */
+@Composable
+private fun distance(meters: Double, unit: HeightUnit): String = "${String.format(LocalLocale.current.platformLocale, "%.2g", unit.fromMeters(meters))} ${unit.label}"
+private fun decimalText(value: Double): String = java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString()
+
+@Composable
+private fun MeasurementControls(
+    captureTop: Boolean, canCapture: Boolean, compact: Boolean,
+    onRestart: () -> Unit, onCapture: () -> Unit, modeControl: @Composable () -> Unit,
+) {
+    Row(Modifier.widthIn(max = 320.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+            MeasurementActionButton(label = stringResource(R.string.restart_measurement), onClick = onRestart) {
+                Icon(painterResource(R.drawable.ic_restart), contentDescription = null)
+            }
+        }
+        val captureLabel = stringResource(if (captureTop) R.string.capture_top else R.string.capture_bottom)
+        Button(
+            onClick = onCapture, enabled = canCapture,
+            modifier = Modifier.size(if (compact) 72.dp else 88.dp).semantics { contentDescription = captureLabel },
+            shape = CircleShape, contentPadding = PaddingValues(0.dp),
+            border = BorderStroke(2.dp, if (canCapture) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                contentColor = MaterialTheme.colorScheme.primary,
+                disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+            ),
+        ) {
+            val color = LocalContentColor.current
+            Canvas(Modifier.fillMaxSize().padding(6.dp)) { drawCircle(color) }
+        }
+        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { modeControl() }
+    }
+}
+
+@Composable
+private fun DiagnosticsDialog(state: MeasurementUiState, model: MeasurementViewModel, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss, title = { Text(stringResource(R.string.show_diagnostics)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(state.camera.diagnostic)
+                state.measurement.result?.let { result ->
+                    val measurement = state.measurement
+                    Text("Uncertainty: ${result.uncertainty}")
+                    Text("Height ${measurement.heightMeters} m · horizontal distance ${result.horizontalDistanceMeters} m\n" +
+                        "Top/bottom elevation ${Math.toDegrees(result.diagnostics.topElevationRadians)}° / ${Math.toDegrees(result.diagnostics.bottomElevationRadians)}°\n" +
+                        "Elevation separation ${Math.toDegrees(result.diagnostics.elevationSeparationRadians)}°\n" +
+                        "Bearing error ${Math.toDegrees(result.diagnostics.alignmentErrorRadians)}°\n" +
+                        "Duration ${measurement.bottom?.timestampNanos?.minus(measurement.top!!.timestampNanos)?.div(1e9)} s\n" +
+                        "Sensitivity top/bottom ${result.diagnostics.topSensitivityMetersPerRadian} / ${result.diagnostics.bottomSensitivityMetersPerRadian} m/rad")
+                    listOf("Top" to measurement.top, "Bottom" to measurement.bottom).forEach { (label, observation) ->
+                        observation?.let {
+                            Text("$label sensor t ${it.timestampNanos} ns · capture age ${it.quality.ageNanos?.div(1e6)} ms\n" +
+                                "Captured RMS/max ${it.quality.rmsVariationRadians?.let(Math::toDegrees)}° / ${it.quality.maximumVariationRadians?.let(Math::toDegrees)}°")
+                        }
+                    }
+                }
+                OrientationDiagnosticsPanel(state.diagnostics, model::captureDiagnostic, model::restartSource, model::clearDiagnostics)
+            }
+        }, confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) } },
+    )
 }
 
 @Composable
@@ -214,61 +412,70 @@ private fun HeightDialog(state: MeasurementState, onDismiss: () -> Unit, onSave:
     var unit by remember { mutableStateOf(state.unit) }
     var text by remember { mutableStateOf(state.heightMeters?.let { decimalText(state.unit.fromMeters(it)) } ?: "") }
     val meters = heightInMeters(text, unit)
-    AlertDialog(
-        onDismissRequest = onDismiss, title = { Text(stringResource(R.string.object_height)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(stringResource(R.string.height_instructions))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    HeightUnit.entries.forEach { choice ->
-                        FilterChip(selected = unit == choice, onClick = {
-                            val current = heightInMeters(text, unit)
-                            if (current != null) text = decimalText(choice.fromMeters(current))
-                            unit = choice
-                        }, label = { Text(choice.label) })
+    // Only this dialog responds to the IME. Top anchoring prevents the card from
+    // recentering when the keyboard opens; constrained content scrolls above it.
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        val focusRequester = remember { FocusRequester() }
+        val keyboard = LocalSoftwareKeyboardController.current
+        val windowInfo = LocalWindowInfo.current
+        var requestedInitialFocus by remember { mutableStateOf(false) }
+        LaunchedEffect(windowInfo.isWindowFocused) {
+            if (windowInfo.isWindowFocused && !requestedInitialFocus) {
+                // Wait for the dialog's field to attach; never steal focus again on recomposition
+                // or reopen a keyboard the user has deliberately dismissed.
+                withFrameNanos { }
+                focusRequester.requestFocus()
+                keyboard?.show()
+                requestedInitialFocus = true
+            }
+        }
+        Box(
+            Modifier.fillMaxSize()
+                .windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout))
+                .imePadding().padding(24.dp),
+            contentAlignment = Alignment.TopCenter,
+        ) {
+            Surface(
+                modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth(),
+                shape = MaterialTheme.shapes.extraLarge,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ) {
+                Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text(stringResource(R.string.object_height), style = MaterialTheme.typography.headlineSmall)
+                    Column(
+                        Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text(stringResource(R.string.height_instructions))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            HeightUnit.entries.forEach { choice ->
+                                FilterChip(selected = unit == choice, onClick = {
+                                    val current = heightInMeters(text, unit)
+                                    if (current != null) text = decimalText(choice.fromMeters(current))
+                                    unit = choice
+                                }, label = { Text(choice.label) })
+                            }
+                        }
+                        OutlinedTextField(
+                            modifier = Modifier.focusRequester(focusRequester),
+                            value = text, onValueChange = { text = it }, label = { Text(stringResource(R.string.height_label, unit.label)) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true,
+                            isError = text.isNotEmpty() && meters == null,
+                            supportingText = { Text(if (text.isNotEmpty() && meters == null) stringResource(R.string.height_invalid) else stringResource(R.string.height_hint)) },
+                        )
+                    }
+                    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+                        TextButton(onClick = { meters?.let { onSave(it, unit) } }, enabled = meters != null) { Text(stringResource(R.string.save_height)) }
                     }
                 }
-                OutlinedTextField(
-                    value = text, onValueChange = { text = it }, label = { Text(stringResource(R.string.height_label, unit.label)) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true,
-                    isError = text.isNotEmpty() && meters == null,
-                    supportingText = { Text(if (text.isNotEmpty() && meters == null) stringResource(R.string.height_invalid) else stringResource(R.string.height_hint)) },
-                )
             }
-        },
-        confirmButton = { TextButton(onClick = { meters?.let { onSave(it, unit) } }, enabled = meters != null) { Text(stringResource(R.string.save_height)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
-    )
-}
-
-@StringRes
-private fun guidance(state: MeasurementUiState): Int {
-    val measurement = state.measurement
-    if (!measurement.cameraReady) return R.string.guidance_camera
-    if (!state.acquisition.running) return R.string.guidance_orientation
-    if (measurement.heightMeters == null) return R.string.guidance_height
-    if (measurement.latest?.direction?.let { kotlin.math.hypot(it.x, it.y) < MeasurementPolicy.minimumHorizontalNorm } == true) {
-        return R.string.guidance_near_vertical
-    }
-    return when (measurement.latest?.quality?.status) {
-        CaptureStatus.MOVING -> R.string.guidance_moving
-        CaptureStatus.STALE, CaptureStatus.WAITING, null -> R.string.guidance_waiting
-        CaptureStatus.UNRELIABLE -> R.string.guidance_unreliable
-        CaptureStatus.SETTLING -> R.string.guidance_settling
-        CaptureStatus.READY -> when (measurement.alignment) {
-            AimAlignment.TURN_LEFT -> R.string.guidance_left
-            AimAlignment.TURN_RIGHT -> R.string.guidance_right
-            AimAlignment.NEAR_VERTICAL -> R.string.guidance_near_vertical
-            AimAlignment.ALIGNED -> R.string.guidance_bottom
-            null -> R.string.guidance_top
         }
     }
 }
-
-/** Two significant digits for estimates; precision of internal calculations is retained. */
-private fun distance(meters: Double, unit: HeightUnit): String = "${String.format(Locale.getDefault(), "%.2g", unit.fromMeters(meters))} ${unit.label}"
-private fun number(value: Double): String = String.format(Locale.getDefault(), "%.2f", value)
-private fun decimalText(value: Double): String = java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString()
 
 @Composable
 private fun Reticle(modifier: Modifier = Modifier) {
@@ -280,79 +487,4 @@ private fun Reticle(modifier: Modifier = Modifier) {
             drawLine(color, Offset(0f, center.y), Offset(size.width, center.y), stroke, StrokeCap.Round)
         }
     }
-}
-
-@Composable
-private fun MeasurementResult(result: KnownHeightResult.Estimate, unit: HeightUnit) {
-    Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.large) {
-        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.distance_estimate, distance(result.horizontalDistanceMeters, unit)), style = MaterialTheme.typography.headlineLarge)
-            Text(stringResource(R.string.distance_assumption))
-            Text(stringResource(R.string.alignment_difference, number(Math.toDegrees(result.diagnostics.alignmentErrorRadians))))
-            when (val uncertainty = result.uncertainty) {
-                DistanceUncertainty.Unavailable -> Text(stringResource(R.string.uncertainty_unavailable))
-                is DistanceUncertainty.Bounded -> Text(stringResource(R.string.uncertainty_bounded, distance(uncertainty.lowerMeters, unit), distance(uncertainty.upperMeters, unit)))
-                is DistanceUncertainty.Unbounded -> Text(stringResource(R.string.uncertainty_unbounded, distance(uncertainty.lowerMeters, unit)))
-                DistanceUncertainty.NumericallyIndeterminate -> Text(stringResource(R.string.uncertainty_indeterminate))
-            }
-        }
-    }
-}
-
-@Composable
-private fun MeasurementControls(
-    captureTop: Boolean,
-    canCapture: Boolean,
-    onRestart: () -> Unit,
-    onCapture: () -> Unit,
-    modeControl: @Composable () -> Unit,
-) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        TextButton(onClick = onRestart, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.restart_measurement)) }
-        val captureLabel = if (captureTop) stringResource(R.string.capture_top) else stringResource(R.string.capture_bottom)
-        Button(
-            onClick = onCapture, enabled = canCapture,
-            modifier = Modifier.size(88.dp).semantics { contentDescription = captureLabel },
-            shape = CircleShape, contentPadding = PaddingValues(0.dp),
-        ) {
-            val color = LocalContentColor.current
-            Canvas(Modifier.size(42.dp)) {
-                drawCircle(color, style = Stroke(width = 2.dp.toPx()))
-                drawCircle(color, radius = 12.dp.toPx())
-            }
-        }
-        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { modeControl() }
-    }
-}
-
-@Preview(name = "Measurement · Light", showBackground = true)
-@Preview(name = "Measurement · Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
-@Composable
-private fun MeasurementPreview() {
-    val result = KnownHeightDistance.estimate(
-        1.2, ViewingDirection(1.0, 0.0, 0.2), ViewingDirection(1.0, 0.0, -0.2),
-    ) as KnownHeightResult.Estimate
-    ViewyTheme {
-        Surface {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                MeasurementResult(result, HeightUnit.METERS)
-                MeasurementControls(captureTop = false, canCapture = true, onRestart = {}, onCapture = {}, modeControl = { TextButton(onClick = {}) { Text(stringResource(R.string.mode)) } })
-            }
-        }
-    }
-}
-
-@StringRes
-private fun noticeResource(notice: MeasurementNotice): Int = when (notice) {
-    MeasurementNotice.CAMERA_INTERRUPTED -> R.string.notice_camera_interrupted
-    MeasurementNotice.SESSION_CHANGED -> R.string.notice_session_changed
-    MeasurementNotice.CAPTURE_EXPIRED -> R.string.notice_expired
-    MeasurementNotice.WAIT_FOR_STABILITY -> R.string.notice_wait_stability
-    MeasurementNotice.NEAR_VERTICAL -> R.string.notice_near_vertical
-    MeasurementNotice.INCOMPATIBLE_CAPTURES -> R.string.notice_incompatible
-    MeasurementNotice.ALIGN_WITH_TOP -> R.string.notice_align
-    MeasurementNotice.AIM_BELOW_TOP -> R.string.notice_below_top
-    MeasurementNotice.UNUSABLE_ENDPOINTS -> R.string.notice_unusable
-    MeasurementNotice.SMALL_SEPARATION -> R.string.notice_small_separation
-    MeasurementNotice.SENSOR_RESTARTED -> R.string.notice_sensor_restarted
 }

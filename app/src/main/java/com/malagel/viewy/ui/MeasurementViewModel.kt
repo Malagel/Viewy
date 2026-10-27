@@ -6,6 +6,7 @@ import android.os.SystemClock
 import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import com.malagel.viewy.camera.CameraPreviewState
+import com.malagel.viewy.camera.PreviewSession
 import com.malagel.viewy.domain.MeasurementMethod
 import com.malagel.viewy.domain.MeasurementMode
 import com.malagel.viewy.measurement.MeasurementSelection
@@ -23,7 +24,9 @@ data class MeasurementUiState(
     val camera: CameraPreviewState = CameraPreviewState(),
     val acquisition: AcquisitionState = AcquisitionState(),
     val diagnostics: OrientationDiagnosticsState = OrientationDiagnosticsState(),
-)
+) {
+    val needsCamera: Boolean get() = selection.activeMethod.requiresCamera && measurement.heightMeters != null
+}
 
 /** Shares ONE foreground acquisition with measurement and debug tools. Everything runs on main. */
 class MeasurementViewModel(application: Application) : AndroidViewModel(application) {
@@ -36,6 +39,7 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
     }
     private val mutableState = MutableStateFlow(MeasurementUiState(selection = MeasurementSelection.restore(savedMethodId)))
     val state = mutableState.asStateFlow()
+    private val previewSession = PreviewSession()
     private var resumed = false
     private var activeMapping: String? = null
     private var requestedSource: OrientationSource? = null
@@ -51,8 +55,23 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
     fun resume() { resumed = true; reconcile() }
     fun pause() { resumed = false; reconcile() }
 
-    fun previewChanged(camera: CameraPreviewState) {
-        mutableState.value = mutableState.value.copy(camera = camera)
+    fun startPreview(): Long? {
+        if (!mutableState.value.needsCamera) return null
+        val token = previewSession.start()
+        mutableState.value = mutableState.value.copy(camera = previewSession.state)
+        reconcile()
+        return token
+    }
+
+    fun previewChanged(token: Long, camera: CameraPreviewState) {
+        if (!mutableState.value.needsCamera || !previewSession.update(token, camera)) return
+        mutableState.value = mutableState.value.copy(camera = previewSession.state)
+        reconcile()
+    }
+
+    fun stopPreview(token: Long) {
+        if (!previewSession.stop(token)) return
+        mutableState.value = mutableState.value.copy(camera = previewSession.state)
         reconcile()
     }
 
@@ -60,7 +79,7 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
         val camera = mutableState.value.camera
         val mapping = camera.mapping
         val method = mutableState.value.selection.activeMethod
-        val desired = if (resumed && method.requiresOrientation && camera.ready) mapping else null
+        val desired = if (resumed && mutableState.value.needsCamera && method.requiresOrientation && camera.ready) mapping else null
         workflow.cameraReady(desired != null)
         if (desired?.id != activeMapping) {
             activeMapping = desired?.id
@@ -90,7 +109,7 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
         reconcile()
     }
 
-    fun setHeight(meters: Double, unit: HeightUnit) { workflow.setHeight(meters, unit); publish() }
+    fun setHeight(meters: Double, unit: HeightUnit) { workflow.setHeight(meters, unit); publish(); reconcile() }
     fun restart() { workflow.restart(); publish() }
     fun recaptureBottom() { workflow.recaptureBottom(); publish() }
     fun capture() {

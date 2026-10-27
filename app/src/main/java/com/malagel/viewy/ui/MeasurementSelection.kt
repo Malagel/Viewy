@@ -1,6 +1,18 @@
 package com.malagel.viewy.ui
 
 import androidx.annotation.StringRes
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.stateDescription
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
@@ -49,7 +61,7 @@ private object ModeMenuPosition : PopupPositionProvider {
         val x = if (layoutDirection == LayoutDirection.Ltr) anchorBounds.right - popupContentSize.width else anchorBounds.left
         return IntOffset(
             x.coerceIn(0, (windowSize.width - popupContentSize.width).coerceAtLeast(0)),
-            (anchorBounds.top - popupContentSize.height).coerceIn(0, (windowSize.height - popupContentSize.height).coerceAtLeast(0)),
+            (anchorBounds.bottom - popupContentSize.height).coerceIn(0, (windowSize.height - popupContentSize.height).coerceAtLeast(0)),
         )
     }
 }
@@ -61,39 +73,88 @@ internal fun ModeControl(
     onDismiss: () -> Unit,
     onMode: (MeasurementMode) -> Unit,
 ) {
-    val menuMaxHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() * 0.7f }
+    val density = LocalDensity.current
+    val window = LocalWindowInfo.current.containerSize
+    val menuWidth = with(density) { (window.width.toDp() - 24.dp).coerceIn(0.dp, 296.dp) }
+    val menuMaxHeight = with(density) { (window.height.toDp() - 24.dp).coerceAtLeast(0.dp) }
+    val scrollMenu = menuMaxHeight < 260.dp * density.fontScale.coerceAtLeast(1f)
+    val progress = remember { List(MeasurementMode.entries.size) { Animatable(0f) } }
+    val heights = remember { mutableStateListOf(0, 0, 0) }
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(selection.modeMenuOpen) {
+        if (selection.modeMenuOpen) visible = true
+        coroutineScope {
+            progress.forEachIndexed { index, animation ->
+                launch {
+                    delay((if (selection.modeMenuOpen) index else progress.lastIndex - index) * 65L)
+                    animation.animateTo(if (selection.modeMenuOpen) 1f else 0f, spring(dampingRatio = 0.85f, stiffness = 450f))
+                }
+            }
+        }
+        if (!selection.modeMenuOpen) visible = false
+    }
+    val label = stringResource(R.string.mode)
+    val expanded = stringResource(if (selection.modeMenuOpen) R.string.expanded else R.string.collapsed)
     Box {
-        TextButton(onClick = onToggle) { Text(stringResource(R.string.mode)) }
-        if (selection.modeMenuOpen) {
-            Popup(
-                popupPositionProvider = ModeMenuPosition, onDismissRequest = onDismiss,
-                properties = PopupProperties(focusable = true),
-            ) {
+        MeasurementActionButton(
+            label = label, onClick = onToggle,
+            modifier = Modifier.semantics { stateDescription = expanded },
+        ) {
+            val color = LocalContentColor.current
+            Canvas(Modifier.size(24.dp)) {
+                // Three choices make the circular launcher recognizable without an icon dependency.
+                listOf(0.2f, 0.5f, 0.8f).forEach { y ->
+                    drawCircle(color, radius = 2.dp.toPx(), center = Offset(size.width * 0.2f, size.height * y))
+                    drawLine(color, Offset(size.width * 0.4f, size.height * y), Offset(size.width, size.height * y), 2.dp.toPx())
+                }
+            }
+        }
+        if (visible) Popup(
+            popupPositionProvider = ModeMenuPosition, onDismissRequest = onDismiss,
+            properties = PopupProperties(focusable = selection.modeMenuOpen),
+        ) {
+            Column(Modifier.width(menuWidth).heightIn(max = menuMaxHeight).pointerInput(onDismiss) { detectTapGestures { onDismiss() } }, horizontalAlignment = Alignment.End) {
                 Column(
-                    Modifier.widthIn(max = 280.dp).width(IntrinsicSize.Max)
-                        .heightIn(max = menuMaxHeight)
-                        .verticalScroll(rememberScrollState()).padding(8.dp),
+                    Modifier.weight(1f, fill = false).then(if (scrollMenu) Modifier.verticalScroll(rememberScrollState()) else Modifier).padding(vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    MeasurementMode.entries.forEach { mode ->
-                        ElevatedButton(
-                            onClick = { onMode(mode) }, enabled = mode.available,
-                            modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp),
-                            elevation = ButtonDefaults.elevatedButtonElevation(defaultElevation = 4.dp),
-                            colors = ButtonDefaults.elevatedButtonColors(
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                                disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                            ),
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(stringResource(mode.title()))
-                                if (!mode.available) Text(stringResource(R.string.not_available), style = MaterialTheme.typography.labelSmall)
+                    // Nearest choice opens first; all pills share the same horizontal position.
+                    MeasurementMode.entries.reversed().forEachIndexed { row, mode ->
+                        val index = MeasurementMode.entries.indexOf(mode)
+                        Box(Modifier.fillMaxWidth()) {
+                            ElevatedButton(
+                                onClick = { onMode(mode) }, enabled = mode.available && selection.modeMenuOpen,
+                                modifier = Modifier.fillMaxWidth()
+                                    .onSizeChanged { heights[row] = it.height }
+                                    .graphicsLayer {
+                                        val fraction = progress[index].value
+                                        translationY = (heights.drop(row + 1).sum() + with(density) { (64.dp + 10.dp * (2 - row)).toPx() }) * (1f - fraction)
+                                        transformOrigin = TransformOrigin(1f, 1f)
+                                        alpha = fraction
+                                        scaleX = 0.25f + 0.75f * fraction
+                                        scaleY = scaleX
+                                    }.then(if (!selection.modeMenuOpen) Modifier.clearAndSetSemantics {} else Modifier)
+                                    .heightIn(min = 56.dp),
+                                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp), shape = RoundedCornerShape(32.dp),
+                                elevation = ButtonDefaults.elevatedButtonElevation(defaultElevation = 4.dp),
+                                colors = ButtonDefaults.elevatedButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                                ),
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(stringResource(mode.title()))
+                                    if (!mode.available) Text(stringResource(R.string.not_available), style = MaterialTheme.typography.labelSmall)
+                                }
                             }
                         }
                     }
                 }
+                // Reserve the animation's path to the real launcher without drawing it again.
+                // Tapping this transparent area dismisses through the popup's tap handler.
+                Spacer(Modifier.size(56.dp))
             }
         }
     }
@@ -107,6 +168,7 @@ internal fun MethodSelectionCarousel(
 ) {
     // Empty slots deliberately have no method identity or activation behavior.
     val cards: List<MeasurementMethod?> = remember(mode) { mode.methods + listOf(null, null) }
+    var comingSoon by remember { mutableStateOf(false) }
     val pager = rememberPagerState { cards.size }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         // Cards consume taps; unhandled taps around them dismiss.
@@ -143,6 +205,7 @@ internal fun MethodSelectionCarousel(
                                 Text(stringResource(R.string.method_procedure))
                                 Text(stringResource(R.string.method_requires), style = MaterialTheme.typography.bodyMedium)
                                 Text(stringResource(R.string.method_limitations), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                TextButton(onClick = { comingSoon = true }) { Text(stringResource(R.string.know_more)) }
                             }
                         }
                     } else {
@@ -166,4 +229,10 @@ internal fun MethodSelectionCarousel(
             }
         }
     }
+    if (comingSoon) AlertDialog(
+        onDismissRequest = { comingSoon = false }, title = { Text(stringResource(R.string.know_more)) },
+        text = { Text(stringResource(R.string.documentation_coming_soon)) },
+        confirmButton = { TextButton(onClick = { comingSoon = false }) { Text(stringResource(R.string.close)) } },
+    )
+
 }

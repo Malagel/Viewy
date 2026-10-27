@@ -14,6 +14,8 @@
         android:theme="@style/Theme.Viewy">
         <activity
             android:name=".MainActivity"
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustNothing"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

@@ -33,7 +33,7 @@ fun OrientationDiagnosticsPanel(
     val observation = acquisition.observation
     Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.large) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Phase B · Orientation diagnostics (debug)", style = MaterialTheme.typography.titleMedium)
+            Text("Orientation diagnostics (debug)", style = MaterialTheme.typography.titleMedium)
             Text("Shared foreground acquisition. A/B diagnostics are separate from measurement endpoints.")
             Text("Available: ${acquisition.availableSources.joinToString().ifEmpty { "none" }}")
             Text("Active: ${acquisition.activeSource ?: "none"} · ${acquisition.sensorName ?: "—"}")
