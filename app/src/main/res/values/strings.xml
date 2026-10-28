@@ -241,4 +241,7 @@
     <string name="diag_indeterminate">Conditional bounds are numerically indeterminate.</string>
     <string name="diag_method_limits">This is horizontal distance to the object’s vertical line, not slant distance. Sensitivities are derivatives per degree, not estimates of actual measurement error. The method assumes a fixed camera position, a vertical object and aligned endpoints within 15 seconds. Camera-axis error, translation, sensor drift and preview latency remain unquantified. Missing values are unavailable, not zero.</string>
     <string name="diag_startup_fallback">Startup fallback after registration failure</string>
+    <string name="zoom_in">Zoom in</string>
+    <string name="zoom_out">Zoom out</string>
+    <string name="zoom_ratio">Zoom %1$s</string>
 </resources>

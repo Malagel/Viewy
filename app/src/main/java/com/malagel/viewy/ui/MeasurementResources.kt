@@ -29,6 +29,7 @@ internal class MeasurementResources(
     private var orientationRequired = false
     private var activeMapping: String? = null
     private var releasePreview: ((Boolean) -> Unit)? = null
+    private var zoomRequest: ((Float) -> Unit)? = null
     private val recovery = CameraRecovery()
     private var cancelRetry: (() -> Unit)? = null
     private var retryGeneration = 0L
@@ -47,17 +48,19 @@ internal class MeasurementResources(
             preview.invalidate(preserveDescription = true)
             val release = releasePreview
             releasePreview = null
+            zoomRequest = null
             if (wasEligible) previewEpoch++
             release?.invoke(animateRelease)
         }
         reconcileOrientation()
     }
 
-    fun startPreview(release: (Boolean) -> Unit): Long? {
+    fun startPreview(requestZoom: (Float) -> Unit = {}, release: (Boolean) -> Unit): Long? {
         if (!eligible || recovery.waiting || recovery.needsUser) return null
         preview.invalidate()
         releasePreview?.invoke(false)
         releasePreview = release
+        zoomRequest = requestZoom
         val token = preview.start()
         reconcileOrientation()
         return token
@@ -72,6 +75,7 @@ internal class MeasurementResources(
             preview.invalidate(preserveDescription = true)
             val release = releasePreview
             releasePreview = null
+            zoomRequest = null
             release?.invoke(false)
             val delay = recovery.failure(camera.retryable)
             if (delay != null) {
@@ -87,6 +91,12 @@ internal class MeasurementResources(
             }
         }
         return true
+    }
+
+    fun requestZoom(ratio: Float) {
+        if (eligible && camera.zoom.editable(camera.ready, workflow.state.top != null, workflow.state.completed)) {
+            zoomRequest?.invoke(ratio)
+        }
     }
 
     fun retryCamera() {
@@ -106,6 +116,7 @@ internal class MeasurementResources(
     fun stopPreview(token: Long) {
         if (!preview.stop(token)) return
         releasePreview = null
+        zoomRequest = null
         reconcileOrientation()
     }
 

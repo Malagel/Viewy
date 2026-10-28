@@ -28,6 +28,7 @@ import androidx.lifecycle.Observer
 
 data class CameraPreviewState(
     val ready: Boolean = false,
+    val zoom: PreviewZoom = PreviewZoom(),
     @StringRes val messageRes: Int = R.string.camera_starting,
     val mapping: CameraDirectionMapping? = null,
     val logicalCameraId: String? = null,
@@ -39,7 +40,7 @@ data class CameraPreviewState(
     val errorDetail: String? = null,
 )
 
-/** Preview only. One explicit rear camera/physical output, no images, zoom gestures or storage. */
+/** Preview only. One explicit rear camera/physical output, CameraX zoom, no images or storage. */
 @androidx.annotation.OptIn(ExperimentalCamera2Interop::class)
 class CameraPreview(
     private val context: Context,
@@ -53,7 +54,12 @@ class CameraPreview(
     private var provider: ProcessCameraProvider? = null
     private var preview: Preview? = null
     private var cameraInfo: androidx.camera.core.CameraInfo? = null
+    private var cameraControl: androidx.camera.core.CameraControl? = null
+    private val zoom = PreviewZoomSession()
+    private var zoomTimeout: Runnable? = null
+    private var zoomSettling: Runnable? = null
     private var description = CameraPreviewState()
+    private var hasOpened = false
     private var open = false
     private var streaming = false
     private var failed = false
@@ -68,6 +74,7 @@ class CameraPreview(
         publish()
     }
     private val cameraObserver = Observer<CameraState> {
+        val wasOpen = open
         open = it.type == CameraState.Type.OPEN
         if (it.error != null) {
             val code = it.error!!.code
@@ -80,7 +87,18 @@ class CameraPreview(
             fail(message,
                 code.toString(), retryable = code == CameraState.ERROR_CAMERA_IN_USE ||
                     code == CameraState.ERROR_MAX_CAMERAS_IN_USE || code == CameraState.ERROR_OTHER_RECOVERABLE_ERROR)
-        } else publish()
+        } else {
+            if (wasOpen && !open) {
+                // CameraX resets controls on closure, even if the use case remains bound.
+                // Revoke acknowledgements immediately; the readiness watchdog owns recovery.
+                zoom.request(zoom.state.ratio)
+                zoomTimeout?.let(handler::removeCallbacks)
+                zoomSettling?.let(handler::removeCallbacks)
+            }
+            if (open && !wasOpen && hasOpened) initializeZoom()
+            if (open) hasOpened = true
+            publish()
+        }
     }
     private val displayListener = object : DisplayManager.DisplayListener {
         override fun onDisplayAdded(displayId: Int) = Unit
@@ -121,9 +139,11 @@ class CameraPreview(
 
     private fun bind(cameraProvider: ProcessCameraProvider) {
         if (disposed || failed) return
+        clearZoom()
         cameraInfo?.cameraState?.removeObserver(cameraObserver)
         preview?.let { cameraProvider.unbind(it) }
         open = false
+        hasOpened = false
         streaming = false
         failed = false
         try {
@@ -172,6 +192,9 @@ class CameraPreview(
             }.build()
             val camera = cameraProvider.bindToLifecycle(owner, selector, useCase)
             cameraInfo = camera.cameraInfo
+            cameraControl = camera.cameraControl
+            initializeZoom()
+            if (disposed || failed) return
             camera.cameraInfo.cameraState.observe(owner, cameraObserver)
         } catch (error: Exception) {
             fail(R.string.camera_configuration_failed, error.javaClass.simpleName,
@@ -183,18 +206,77 @@ class CameraPreview(
         if (disposed || failed) return
         val ready = open && streaming
         scheduleWatchdog(ready)
-        description = description.copy(ready = ready, open = open, streaming = streaming, messageRes = if (ready) R.string.camera_ready else R.string.camera_waiting)
+        description = description.copy(zoom = zoom.state, ready = ready, open = open, streaming = streaming, messageRes = if (ready) R.string.camera_ready else R.string.camera_waiting)
         onState(description)
     }
 
     private fun fail(@StringRes messageRes: Int, diagnostic: String?, retryable: Boolean = true) {
         if (disposed || failed) return
         failed = true
+        clearZoom()
         handler.removeCallbacks(timeout)
         cameraInfo?.cameraState?.removeObserver(cameraObserver)
         preview?.let { useCase -> runCatching { provider?.unbind(useCase) } }
-        description = description.copy(ready = false, open = false, streaming = false, failed = true, retryable = retryable, messageRes = messageRes, errorDetail = diagnostic)
+        description = description.copy(zoom = zoom.state, ready = false, open = false, streaming = false, failed = true, retryable = retryable, messageRes = messageRes, errorDetail = diagnostic)
         onState(description)
+    }
+
+    private fun initializeZoom() {
+        val limits = cameraInfo?.zoomState?.value
+        val initial = limits?.let { zoom.reset(it.minZoomRatio, it.maxZoomRatio) }
+        if (initial == null) {
+            fail(R.string.camera_configuration_failed, "Invalid CameraX zoom capabilities", retryable = false)
+        } else applyZoom(initial)
+    }
+
+    fun requestZoom(ratio: Float) {
+        if (disposed || failed || !open || !streaming) return
+        if (!ratio.isFinite() || !zoom.state.available) return
+        val bounded = ratio.coerceIn(zoom.state.minimum, zoom.state.maximum)
+        if (bounded == zoom.state.ratio) return
+        zoom.request(bounded)?.let(::applyZoom)
+    }
+
+    private fun applyZoom(token: Long) {
+        zoomTimeout?.let(handler::removeCallbacks)
+        zoomSettling?.let(handler::removeCallbacks)
+        publish() // Block capture before submitting platform work.
+        val deadline = Runnable {
+            if (zoom.owns(token) && !disposed && !failed) fail(R.string.camera_timeout, "Zoom acknowledgement timed out")
+        }
+        zoomTimeout = deadline
+        handler.postDelayed(deadline, if (open && streaming) 4_000L else 12_000L)
+        try {
+            val future = cameraControl!!.setZoomRatio(zoom.state.ratio)
+            future.addListener({
+                if (!disposed && !failed && zoom.owns(token)) {
+                    try {
+                        future.get() // LiveData reports the target immediately; only this future acknowledges application.
+                        if (zoom.applied(token, SystemClock.elapsedRealtime())) {
+                            handler.removeCallbacks(deadline)
+                            val settle = Runnable {
+                                if (!disposed && !failed && zoom.settle(token, SystemClock.elapsedRealtime())) publish()
+                            }
+                            zoomSettling = settle
+                            handler.postDelayed(settle, PreviewZoomSession.SETTLE_MILLIS)
+                        }
+                    } catch (error: Exception) {
+                        fail(R.string.camera_interrupted, "Zoom: " + error.javaClass.simpleName)
+                    }
+                }
+            }, ContextCompat.getMainExecutor(context))
+        } catch (error: Exception) {
+            fail(R.string.camera_interrupted, "Zoom: " + error.javaClass.simpleName)
+        }
+    }
+
+    private fun clearZoom() {
+        zoom.close() // Revoke queued futures and drain callbacks before releasing the camera.
+        cameraControl = null
+        zoomTimeout?.let(handler::removeCallbacks)
+        zoomSettling?.let(handler::removeCallbacks)
+        zoomTimeout = null
+        zoomSettling = null
     }
 
     // Provider initialization can finish while STOPPED. CameraX waits for STARTED
@@ -231,6 +313,7 @@ class CameraPreview(
     fun close() {
         if (disposed) return
         disposed = true
+        clearZoom()
         handler.removeCallbacks(timeout)
         displayManager.unregisterDisplayListener(displayListener)
         owner.lifecycle.removeObserver(this)

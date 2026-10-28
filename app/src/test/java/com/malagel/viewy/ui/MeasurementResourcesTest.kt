@@ -72,6 +72,49 @@ class MeasurementResourcesTest {
 
     private class Retry(val delay: Long, val action: () -> Unit, var canceled: Boolean = false)
 
+    @Test fun zoomUsesCurrentOwnerLocksAfterTopAndUnlocksAfterRestartOrInvalidation() {
+        val h = Harness()
+        h.reconcile()
+        val requested = mutableListOf<Float>()
+        val token = h.resources.startPreview(requestZoom = { requested += it }) { h.releases += it }!!
+        val zoomCamera = camera.copy(zoom = com.malagel.viewy.camera.PreviewZoom(1f, 4f, 1f, true, true))
+        h.resources.previewChanged(token, zoomCamera)
+        h.resources.requestZoom(2f)
+        assertEquals(listOf(2f), requested)
+        val starts = h.starts
+        val epoch = h.resources.previewEpoch
+        h.resources.previewChanged(token, zoomCamera.copy(zoom = zoomCamera.zoom.copy(ratio = 2f, settled = false)))
+        h.sample(0.5)
+        val ui = h.ui.copy(measurement = h.workflow.state, camera = h.resources.camera)
+        assertTrue(ui.measurement.canCapture)
+        assertFalse(ui.canCapture)
+        h.resources.previewChanged(token, zoomCamera.copy(zoom = zoomCamera.zoom.copy(ratio = 2f)))
+        assertTrue(ui.copy(camera = h.resources.camera).canCapture)
+        assertEquals(starts, h.starts)
+        assertEquals(epoch, h.resources.previewEpoch)
+        assertTrue(h.releases.isEmpty())
+        h.capture(0.5)
+        h.resources.requestZoom(3f)
+        assertEquals(listOf(2f), requested)
+        h.workflow.restart()
+        h.reconcile()
+        h.resources.requestZoom(3f)
+        assertEquals(listOf(2f, 3f), requested)
+        h.capture(0.5)
+        // Pair expiry is an invalidation that allows zoom again without a rebind.
+        h.now += 16_000_000_000L
+        h.sample(0.0)
+        assertNull(h.workflow.state.top)
+        h.resources.requestZoom(4f)
+        assertEquals(listOf(2f, 3f, 4f), requested)
+        h.capture(0.5)
+        h.capture(0.0)
+        assertTrue(h.workflow.state.completed)
+        h.resources.requestZoom(1f)
+        assertEquals(3, requested.size)
+        assertFalse(h.resources.previewChanged(token, zoomCamera))
+    }
+
     @Test fun repeatedOverlayCyclesInvalidateIncompletePairRetainHeightAndRequireFreshSessions() {
         val h = Harness()
         val base = h.ui

@@ -285,7 +285,8 @@ logical output, readable physical rear candidates are ordered deterministically
 and the one with largest reported sensor area is pinned through Camera2 interop.
 This is not a field-of-view/accuracy guarantee. If inspection/pinning/binding fails,
 report failure rather than silently allow lens switching. Nonlogical/older outputs
-retain the selected camera ID. There is no zoom command or lens-switch UI.
+retain the selected camera ID. CameraX zoom preserves this selection; there is no
+lens-switch UI.
 
 A 4:3 stream is requested with supported-resolution fallback. PreviewView uses
 COMPATIBLE/TextureView for rounded clipping/overlays and FILL_CENTER for
@@ -317,6 +318,44 @@ sensor publications or recomposition. Disposal/retry callbacks from an older
 owner cannot stop or revive its replacement; asynchronous CameraX provider work
 also checks disposal/failure. Sensor registration tokens reject queued data and
 accuracy callbacks after stop, failed registration or retry.
+
+`PreviewZoomSession` owns pure zoom limits, latest-request tokens and settling
+state, outside the geometry layer. Each binding uses an effective minimum of
+`max(1×, CameraX minimum)` and the full CameraX `ZoomState` maximum, with no upper
+product cap. It explicitly requests 1.0× (or a higher supported minimum) through
+`CameraControl.setZoomRatio` at initialization and reopening. The same effective
+range drives button bounds, pinch/button request clamping, the request and the
+label; sub-1× zoom is never selectable. A range entirely below 1× fails closed.
+There is no Compose image scaling. Zoom changes do
+not rebind or change the selected logical/physical camera or orientation mapping.
+
+The 1× floor avoids zoom-out ratios whose logical-camera behavior can depend on
+another lens: [`setPhysicalCameraId`](https://developer.android.com/reference/androidx/camera/camera2/interop/Camera2Interop.Extender#setPhysicalCameraId(java.lang.String))
+forces the selected physical output, whereas Android's
+[zoom-ratio contract](https://developer.android.com/reference/android/hardware/camera2/CaptureRequest#CONTROL_ZOOM_RATIO)
+allows optical lens switching. Physical field-of-view behavior remains subject to
+device validation.
+
+The preview's native scale detector and localized Compose buttons route through
+`MeasurementResources`, which rejects changes after top capture, on completion or
+without eligible, ready acquisition. Resource ownership clears the request callback
+before release; adapter generations reject futures and settling callbacks from
+superseded requests, rebinding and closure.
+
+CameraX zoom LiveData reports targets before application; capture instead waits
+for the latest request future ([repeating-request acknowledgement](https://developer.android.com/reference/androidx/camera/core/CameraControl#setZoomRatio(float))), then a 350 ms
+preview drain interval. This is an unvalidated usability guard, not an exposure
+synchronization or latency bound. Zoom settling gates both shutter enablement and
+the ViewModel capture entry point, separately from camera readiness, so ordinary
+zoom changes neither invalidate sensor sessions nor restart acquisition. Failed,
+closed or timed-out current requests enter existing camera recovery with capture
+blocked; obsolete failures are ignored. Requests have a four-second deadline
+(twelve seconds during startup). Every replacement binding resets zoom rather
+than restoring a potentially incompatible target. An OPEN loss revokes pending
+zoom work; reopening an otherwise still-bound camera also resets and acknowledges
+zoom before capture can resume. Fixed 1× cameras remain usable
+with disabled zoom controls; invalid capability ranges fail closed. The localized
+ratio label stays visible with the controls, using nearly opaque surfaces.
 
 Capture requires OPEN plus STREAMING and current orientation readiness. Permission
 is rechecked on resume; denial retains permission recovery controls. Camera readiness

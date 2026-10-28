@@ -239,4 +239,7 @@
     <string name="diag_indeterminate">Los límites condicionales son numéricamente indeterminados.</string>
     <string name="diag_method_limits">Es la distancia horizontal a la línea vertical del objeto, no la distancia inclinada. Las sensibilidades son derivadas por grado, no estimaciones del error real de medición. El método supone una cámara fija, un objeto vertical y extremos alineados capturados dentro de 15 segundos. El error del eje de cámara, la traslación, la deriva del sensor y la latencia de la vista previa siguen sin cuantificarse. Los valores faltantes no están disponibles; no son cero.</string>
     <string name="diag_startup_fallback">Uso de fuente alternativa al iniciar tras un fallo de registro</string>
+    <string name="zoom_in">Acercar</string>
+    <string name="zoom_out">Alejar</string>
+    <string name="zoom_ratio">Zoom %1$s</string>
 </resources>

@@ -143,6 +143,21 @@ future validated features; they have no selectable methods.
   only exhausted retries or conditions requiring user action show camera recovery
   controls. Permission recovery remains available. Unexpected sustained preview
   loss is recoverable; brief stream transitions do not trigger rebinding.
+- Known Object Height offers minimalist **+** and **−** controls inside the
+  rounded preview and pinch-to-zoom. Both use the same CameraX zoom ratio across
+  a range starting at 1× (or the camera's higher supported minimum) and ending
+  at the CameraX-reported maximum, including above 20× when supported. Neither
+  buttons nor pinch can select a ratio below 1×. Buttons
+  have 48 dp touch targets, localized accessibility descriptions and current-ratio
+  semantics; the current ratio label remains visible with the controls. Button
+  and ratio backgrounds are nearly opaque for readability. Zoom is
+  available before top capture, locked while that capture remains valid and hidden
+  after completion. Restart or capture invalidation unlocks it. Recreated camera
+  sessions explicitly request and display 1.0×, independently of the supported
+  minimum. A higher supported minimum is requested and displayed instead where
+  necessary; a reported range entirely below 1× cannot start acquisition.
+  Capture is blocked during asynchronous zoom application and a short settling
+  interval. Zoom does not establish camera-center stability or calibrated accuracy.
 - Top capture followed by bottom capture within 15 s. **Aim at the top** and
   **Aim at the bottom** remain the stable primary instructions. Routine movement,
   settling, startup, readiness, missing/stale/unreliable sensor readings, small

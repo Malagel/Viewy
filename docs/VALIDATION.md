@@ -60,7 +60,59 @@ canceled entry, settings forward/Back direction and settled restored destination
 Source and tests define the individual cases. Mocked deployment tests verify script decisions using
 fictional devices/configuration, not real wireless reliability.
 
+## Camera zoom verification
+
+JVM tests cover the 1× floor and full CameraX maximum (including above 20×),
+fixed/invalid/entirely-sub-1× ranges, clamping of repeated pinch and button requests,
+button/pinch target composition, latest-request
+ownership, acknowledgement and settling deadlines, 1× startup/reset independent
+of reported minimum (including a 0.6×–30× regression case), a higher camera
+minimum when 1× is unavailable, closure/replacement callback rejection, top-capture locking,
+Restart and pair-expiry unlocking, completion rejection, capture enablement and
+preservation of camera/sensor ownership through zoom publications.
+
+Galaxy S22 physical validation remains required; no device was accessed for this
+change. With Known Object Height configured:
+
+1. On fresh activation and after each camera rebind/reopen, verify the label starts
+   at 1.0× and compare the view with an explicitly selected 1.0×. Check returning
+   after both minimum and high zoom. A higher supported minimum must be used and
+   displayed when necessary. Verify minus is disabled at 1× and repeated zoom-out
+   pinches cannot select 0.6× or any sub-1× ratio. The upper limit must match the
+   configuration's CameraX maximum, including above 20× where supported; check both
+   limits, rapid alternating button taps and continuous pinch. Confirm buttons,
+   bounds and persistent ratio label stay synchronized. Confirm the label remains
+   visible after waiting and the nearly opaque controls remain readable. Check TalkBack labels,
+   current-ratio descriptions and touch targets in English and Spanish.
+2. Keep the phone fixed and center a distant landmark under the reticle. Sweep
+   zoom slowly and rapidly, checking preview-center drift, responsiveness and any
+   delayed/cropped-frame jumps after the shutter re-enables. Repeat in low light.
+   Acknowledgement alone does not prove visual magnification. The 350 ms guard is
+   not a validated preview latency bound or proof of stability.
+3. Compare logical/physical IDs and mapping in Developer Options → diagnostics at
+   different ratios. Diagnostics intentionally releases the camera; each return
+   resets zoom. Also inspect the CameraX/Camera2 session on-device if needed to
+   verify actual physical-output identity throughout a live sweep; metadata pinning
+   alone does not prove device behavior.
+4. Verify capture stays disabled throughout zoom application/settling; capture top
+   and confirm buttons and pinch cannot change zoom. Complete bottom capture and
+   confirm zoom controls disappear. Restart, pair expiry and invalidation must
+   permit zoom again; the displayed result and alignment behavior must be unchanged.
+5. Background/resume, rotate/recreate, open/close Settings/help/height editing and
+   exercise permission loss and camera contention. Confirm immediate release,
+   safe reset at rebinding, bounded recovery and rejection of obsolete zoom work.
+   Check repeated overlay cycles for preview freezes and resource leaks.
+
 ## Recorded verification and its scope
+
+CameraX zoom controls with a 1× floor and uncapped supported maximum, the
+persistent ratio label, 1× startup/reset policy and capture/session guards passed the JVM suite, debug assembly and lint
+using the bounded invocation above with installed JDK 17 and
+API 37 SDK. Lint reported no errors and retained warnings for dependency updates,
+backup guidance, portrait orientation, the locale-config attribute and a discouraged
+platform API.
+No device, emulator or instrumentation validation was performed. The Galaxy S22
+checks above remain outstanding.
 
 Quiet aiming and event-driven workflow errors, including progress-aware
 interruption handling, passed the JVM suite, debug assembly and lint with bounded,

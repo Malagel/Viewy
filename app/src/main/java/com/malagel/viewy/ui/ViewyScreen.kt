@@ -1,5 +1,7 @@
 package com.malagel.viewy.ui
 
+import android.view.ScaleGestureDetector
+import android.view.MotionEvent
 import android.graphics.Bitmap
 import android.Manifest
 import android.content.Intent
@@ -178,6 +180,9 @@ fun ViewyScreen(
                                     val useStatusDialog = !overflow && ((compact && recoveryNeeded) || hintHeight > with(density) { (maxHeight / 2 - 54.dp).toPx() })
                                     if (state.heightConfigured) {
                                         LivePreview(model, state)
+                                        if (!measurement.completed && state.acquisitionEligible && state.camera.ready) {
+                                            ZoomControls(state, model::requestZoom, Modifier.align(Alignment.TopStart).padding(8.dp))
+                                        }
                                         if (state.camera.ready && state.acquisition.running) Reticle(Modifier.size(40.dp))
                                     }
                                     if (!state.heightConfigured) {
@@ -232,7 +237,7 @@ fun ViewyScreen(
                             )
                         }
                         MeasurementControls(
-                            captureTop = measurement.top == null, canCapture = measurement.canCapture,
+                            captureTop = measurement.top == null, canCapture = state.canCapture,
                             compact = compact, onRestart = model::restart, onCapture = model::capture,
                             captureRestriction = captureRestriction,
                             modeControl = { ModeControl(model::openModes) },
@@ -262,7 +267,7 @@ fun ViewyScreen(
                             TextButton(onClick = { showWorkspace = true }, modifier = Modifier.weight(1f)) {
                                 Text(stringResource(R.string.open_viewfinder))
                             }
-                            MeasurementControls(measurement.top == null, measurement.canCapture, true, model::restart, model::capture,
+                            MeasurementControls(measurement.top == null, state.canCapture, true, model::restart, model::capture,
                                 captureRestriction) {
                                 ModeControl(model::openModes)
                             }
@@ -365,6 +370,20 @@ private fun LivePreview(model: MeasurementViewModel, state: MeasurementUiState) 
         }
         frozen = null
     }
+    DisposableEffect(view, model) {
+        val detector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            override fun onScale(detector: ScaleGestureDetector): Boolean {
+                model.scaleZoom(detector.scaleFactor)
+                return true
+            }
+        })
+        view.setOnTouchListener { touched, event ->
+            detector.onTouchEvent(event)
+            if (event.actionMasked == MotionEvent.ACTION_UP) touched.performClick()
+            true
+        }
+        onDispose { view.setOnTouchListener(null) }
+    }
     AndroidView(factory = { view }, modifier = Modifier.fillMaxSize().graphicsLayer { alpha = liveAlpha })
     frozen?.let { bitmap ->
         Image(bitmap.asImageBitmap(), contentDescription = null, contentScale = ContentScale.FillBounds,
@@ -373,7 +392,7 @@ private fun LivePreview(model: MeasurementViewModel, state: MeasurementUiState) 
     DisposableEffect(view, owner, model, state.acquisitionEligible, state.previewEpoch) {
         var preview: CameraPreview? = null
         var released = false
-        val token = if (state.acquisitionEligible) model.startPreview { animate ->
+        val token = if (state.acquisitionEligible) model.startPreview(requestZoom = { ratio -> preview?.requestZoom(ratio) }) { animate ->
             // Snapshot only intentional visible suspensions. Never delay unbinding for motion.
             frozen = if (animate && currentAlpha > 0f) runCatching { view.bitmap }.getOrNull() else null
             released = true
@@ -385,6 +404,36 @@ private fun LivePreview(model: MeasurementViewModel, state: MeasurementUiState) 
         onDispose {
             preview?.close()
             if (token != null) model.stopPreview(token)
+        }
+    }
+}
+
+/** One snapshot drives gestures, button bounds and the persistent ratio label. */
+@Composable
+private fun ZoomControls(state: MeasurementUiState, onZoom: (Float) -> Unit, modifier: Modifier = Modifier) {
+    val zoom = state.camera.zoom
+    val editable = zoom.editable(state.camera.ready, state.measurement.top != null, state.measurement.completed)
+    val zoomIn = stringResource(R.string.zoom_in)
+    val zoomOut = stringResource(R.string.zoom_out)
+    val ratioLabel = String.format(LocalLocale.current.platformLocale, "%.1f×", zoom.ratio)
+    val description = stringResource(R.string.zoom_ratio, ratioLabel)
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.95f)) {
+            Column {
+                IconButton(onClick = { onZoom(zoom.ratio + 0.5f) }, enabled = editable && zoom.ratio < zoom.maximum,
+                    modifier = Modifier.size(48.dp).semantics { contentDescription = zoomIn; stateDescription = description }) {
+                    Text("+", style = MaterialTheme.typography.titleLarge)
+                }
+                IconButton(onClick = { onZoom(zoom.ratio - 0.5f) }, enabled = editable && zoom.ratio > zoom.minimum,
+                    modifier = Modifier.size(48.dp).semantics { contentDescription = zoomOut; stateDescription = description }) {
+                    Text("−", style = MaterialTheme.typography.titleLarge)
+                }
+            }
+        }
+        Surface(Modifier.padding(top = 4.dp), shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.95f)) {
+            Text(ratioLabel, Modifier.padding(horizontal = 8.dp, vertical = 4.dp).semantics { contentDescription = description },
+                style = MaterialTheme.typography.labelMedium)
         }
     }
 }

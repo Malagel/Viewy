@@ -36,6 +36,7 @@ data class MeasurementUiState(
     val cameraFailureVisible: Boolean = false,
     val guidance: Int? = null,
 ) {
+    val canCapture: Boolean get() = measurement.canCapture && camera.zoom.settled
     val recoveryVisible: Boolean get() = requiresCamera && heightConfigured && !measurement.completed &&
         (if (!visibility.permissionGranted) resumed && visibility.surfaceVisible && visibility.windowFocused &&
             !visibility.covered && !visibility.heightEditing && !diagnosticsOpen && !selection.isOpen &&
@@ -90,10 +91,15 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
         reconcile()
     }
 
-    fun startPreview(release: (Boolean) -> Unit): Long? = resources.startPreview(release).also { publish() }
+    fun startPreview(requestZoom: (Float) -> Unit = {}, release: (Boolean) -> Unit): Long? = resources.startPreview(requestZoom, release).also { publish() }
 
     fun previewChanged(token: Long, camera: CameraPreviewState) {
         if (resources.previewChanged(token, camera)) publish()
+    }
+
+    fun requestZoom(ratio: Float) = resources.requestZoom(ratio)
+    fun scaleZoom(factor: Float) {
+        if (factor.isFinite() && factor > 0f) requestZoom(resources.camera.zoom.ratio * factor)
     }
 
     fun stopPreview(token: Long) { resources.stopPreview(token); publish() }
@@ -147,7 +153,7 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
     fun recaptureBottom() { workflow.recaptureBottom(); publish(); reconcile() }
     fun capture() {
         // Freshness is recomputed NOW, not trusted from the last 100 ms UI snapshot.
-        if (!mutableState.value.acquisitionEligible) return
+        if (!mutableState.value.acquisitionEligible || !resources.camera.zoom.settled) return
         val captured = acquisition.capture()
         workflow.capture(captured, SystemClock.elapsedRealtimeNanos())
         publish()
