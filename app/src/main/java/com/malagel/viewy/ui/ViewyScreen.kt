@@ -11,6 +11,9 @@ import androidx.annotation.StringRes
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -35,6 +38,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Color
@@ -180,8 +186,12 @@ fun ViewyScreen(
                                     val useStatusDialog = !overflow && ((compact && recoveryNeeded) || hintHeight > with(density) { (maxHeight / 2 - 54.dp).toPx() })
                                     if (state.heightConfigured) {
                                         LivePreview(model, state)
-                                        if (!measurement.completed && state.acquisitionEligible && state.camera.ready) {
-                                            ZoomControls(state, model::requestZoom, Modifier.align(Alignment.TopStart).padding(8.dp))
+                                        var retainedZoomState by remember { mutableStateOf(state) }
+                                        SideEffect { if (state.previewVisible) retainedZoomState = state }
+                                        PreviewControlFade(state.previewVisible, Modifier.align(Alignment.TopStart)) {
+                                            // Keep the outgoing ratio and enabled appearance until its fade completes.
+                                            ZoomControls(if (state.previewVisible) state else retainedZoomState,
+                                                model::requestZoom, Modifier.padding(8.dp))
                                         }
                                         if (state.camera.ready && state.acquisition.running) Reticle(Modifier.size(40.dp))
                                     }
@@ -219,14 +229,16 @@ fun ViewyScreen(
                                             }
                                         }
                                         val heightLabel = stringResource(R.string.height_edit, heightLabelText(unit.fromMeters(measurement.heightMeters!!), LocalLocale.current.platformLocale), unit.label)
-                                        if (compact) {
-                                            LabeledIconButton(R.string.object_height, "↕", openHeight, Modifier.align(Alignment.TopEnd), heightLabel)
-                                        } else {
-                                            FilledTonalButton(
-                                                onClick = openHeight, shape = CircleShape,
-                                                modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
-                                                colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f)),
-                                            ) { Text(heightLabel) }
+                                        PreviewControlFade(state.previewHeightEditVisible, Modifier.align(Alignment.TopEnd)) {
+                                            if (compact) {
+                                                LabeledIconButton(R.string.object_height, "↕", openHeight, description = heightLabel)
+                                            } else {
+                                                FilledTonalButton(
+                                                    onClick = openHeight, shape = CircleShape,
+                                                    modifier = Modifier.padding(12.dp),
+                                                    colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f)),
+                                                ) { Text(heightLabel) }
+                                            }
                                         }
                                     }
                                 }
@@ -349,6 +361,29 @@ private fun MeasurementVisibilityEffect(model: MeasurementViewModel, permission:
 }
 
 private const val CAMERA_FADE_MILLIS = 165
+private const val PREVIEW_CONTROL_FADE_MILLIS = 225
+
+/** Retain outgoing controls visually while revoking touch, focus and accessibility immediately. */
+@Composable
+private fun PreviewControlFade(visible: Boolean, modifier: Modifier, content: @Composable () -> Unit) {
+    val transition = updateTransition(visible, label = "Preview control visibility")
+    transition.AnimatedVisibility(
+        visible = { it }, modifier = modifier,
+        enter = fadeIn(tween(PREVIEW_CONTROL_FADE_MILLIS)),
+        exit = fadeOut(tween(PREVIEW_CONTROL_FADE_MILLIS)),
+    ) {
+        val blocked = !visible || transition.isRunning || transition.currentState != transition.targetState
+        Box(Modifier.focusProperties { canFocus = !blocked }
+            .then(if (blocked) Modifier.clearAndSetSemantics {} else Modifier)) {
+            content()
+            if (blocked) Box(Modifier.matchParentSize().pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+                }
+            })
+        }
+    }
+}
 
 @Composable
 private fun LivePreview(model: MeasurementViewModel, state: MeasurementUiState) {
@@ -358,7 +393,7 @@ private fun LivePreview(model: MeasurementViewModel, state: MeasurementUiState) 
     var frozen by remember { mutableStateOf<Bitmap?>(null) }
     val frozenAlpha = remember { Animatable(0f) }
     val liveAlpha by animateFloatAsState(
-        if (state.acquisitionEligible && state.camera.ready) 1f else 0f,
+        if (state.previewVisible) 1f else 0f,
         tween(CAMERA_FADE_MILLIS), label = "Streaming preview",
     )
     val currentAlpha by rememberUpdatedState(liveAlpha)

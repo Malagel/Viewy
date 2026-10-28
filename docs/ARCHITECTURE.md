@@ -398,6 +398,19 @@ stored or exposed to accessibility. Failure to obtain the bitmap skips the fade;
 backgrounding/disposal does not wait for it. The live preview fades in only after
 OPEN plus STREAMING, also over 165 ms. Presentation never extends a hardware session for an animation.
 
+`MeasurementUiState.previewVisible` supplies the same eligible-and-ready target
+for the live camera and zoom controls. The preview-edge height editor shares that
+target during acquisition, with an uncovered, focused result/recovery exception
+that keeps height editable without a live camera. Common viewfinder interaction
+gates hide both controls for overlays, height editing, focus loss and inactivity.
+The controls use fade-only Compose transitions over 225 ms in either direction,
+slightly longer than the preview. Outgoing zoom retains its last visible ratio and
+button appearance until exit completes, even when camera snapshots reset.
+Transitioning controls exclude touch, focus and accessibility immediately and
+become interactive after entry settles. Interrupted fades reverse in place;
+system animation scaling applies. Fade state never delays hardware release or
+changes binding keys, zoom/capture state, alignment or result presentation.
+
 Selection is held in the ViewModel separately from the workflow.
 `MeasurementSelection` permits a null active method and typed Closed/Modes/Methods
 destinations. A new ViewModel starts inactive at Modes; legacy persisted selection

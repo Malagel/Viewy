@@ -38,19 +38,21 @@ data class MeasurementUiState(
 ) {
     val canCapture: Boolean get() = measurement.canCapture && camera.zoom.settled
     val recoveryVisible: Boolean get() = requiresCamera && heightConfigured && !measurement.completed &&
-        (if (!visibility.permissionGranted) resumed && visibility.surfaceVisible && visibility.windowFocused &&
-            !visibility.covered && !visibility.heightEditing && !diagnosticsOpen && !selection.isOpen &&
-            !tutorial.selectorExiting && tutorial.card == null && tutorial.pendingMethod == null
+        (if (!visibility.permissionGranted) viewfinderInteractive
         else acquisitionEligible && (cameraFailureVisible || (camera.ready && !acquisition.running)))
     val canOpenSettings: Boolean get() = !diagnosticsOpen && !selection.isOpen && !tutorial.selectorExiting && tutorial.card == null && tutorial.pendingMethod == null
     val canOpenHelp: Boolean get() = selection.activeMethod != null && !selection.isOpen && !tutorial.selectorExiting && tutorial.card == null && tutorial.pendingMethod == null
     val requiresCamera: Boolean get() = selection.activeMethod?.requiresCamera == true
     val requiresOrientation: Boolean get() = selection.activeMethod?.requiresOrientation == true
     val heightConfigured: Boolean get() = measurement.heightMeters != null
-    val acquisitionEligible: Boolean get() = requiresCamera && heightConfigured && !measurement.completed &&
-        resumed && visibility.surfaceVisible && visibility.windowFocused && visibility.permissionGranted &&
+    val viewfinderInteractive: Boolean get() = resumed && visibility.surfaceVisible && visibility.windowFocused &&
         !visibility.covered && !visibility.heightEditing && !diagnosticsOpen && !selection.isOpen &&
         !tutorial.selectorExiting && tutorial.card == null && tutorial.pendingMethod == null
+    val acquisitionEligible: Boolean get() = requiresCamera && heightConfigured && !measurement.completed &&
+        visibility.permissionGranted && viewfinderInteractive
+    val previewVisible: Boolean get() = acquisitionEligible && camera.ready
+    val previewHeightEditVisible: Boolean get() = requiresCamera && heightConfigured && viewfinderInteractive &&
+        (previewVisible || measurement.completed || recoveryVisible)
 }
 
 /** Owns ONE foreground acquisition; diagnostics only observes its snapshots. Everything runs on main. */

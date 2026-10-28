@@ -23,6 +23,44 @@ class MeasurementPresentationTest {
         acquisition = AcquisitionState(running = true),
     )
 
+    @Test fun previewAndHeightControlsShareVisibilityThroughStartupAndSuspension() {
+        assertTrue(ready.previewVisible)
+        assertTrue(ready.previewHeightEditVisible)
+        val starting = ready.copy(camera = ready.camera.copy(ready = false), acquisition = AcquisitionState())
+        assertFalse(starting.previewVisible)
+        assertFalse(starting.previewHeightEditVisible)
+        val suspended = listOf(
+            ready.copy(resumed = false),
+            ready.copy(visibility = ready.visibility.copy(windowFocused = false)),
+            ready.copy(visibility = ready.visibility.copy(surfaceVisible = false)),
+            ready.copy(visibility = ready.visibility.copy(covered = true)),
+            ready.copy(visibility = ready.visibility.copy(heightEditing = true)),
+            ready.copy(selection = selected.openModes()),
+            ready.copy(diagnosticsOpen = true),
+            ready.copy(tutorial = com.malagel.viewy.tutorial.TutorialState(pendingMethod = selected.activeMethod)),
+        )
+        suspended.forEach {
+            assertFalse(it.previewVisible)
+            assertFalse(it.previewHeightEditVisible)
+        }
+        assertTrue(starting.copy(camera = ready.camera, acquisition = ready.acquisition).previewHeightEditVisible)
+    }
+
+    @Test fun heightRemainsEditableForRecoveryAndResultsButHidesWhenCovered() {
+        val permission = ready.copy(visibility = ready.visibility.copy(permissionGranted = false))
+        val failure = ready.copy(camera = ready.camera.copy(ready = false), cameraFailureVisible = true)
+        val result = com.malagel.viewy.domain.KnownHeightDistance.estimate(2.0,
+            ViewingDirection(1.0, 0.0, 0.5), observation.direction) as com.malagel.viewy.domain.KnownHeightResult.Estimate
+        val completed = ready.copy(measurement = ready.measurement.copy(result = result))
+        for (state in listOf(permission, failure, completed)) {
+            assertFalse(state.previewVisible)
+            assertTrue(state.previewHeightEditVisible)
+            assertFalse(state.copy(visibility = state.visibility.copy(covered = true)).previewHeightEditVisible)
+            assertFalse(state.copy(visibility = state.visibility.copy(windowFocused = false)).previewHeightEditVisible)
+        }
+        assertFalse(ready.copy(selection = MeasurementSelection()).previewHeightEditVisible)
+    }
+
     @Test fun capabilityIsIndependentOfHeightForegroundAndCompletion() {
         val workflow = KnownHeightWorkflow()
         assertTrue(MeasurementUiState(selection = selected).requiresCamera)

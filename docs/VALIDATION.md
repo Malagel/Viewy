@@ -102,11 +102,22 @@ change. With Known Object Height configured:
    exercise permission loss and camera contention. Confirm immediate release,
    safe reset at rebinding, bounded recovery and rejection of obsolete zoom work.
    Check repeated overlay cycles for preview freezes and resource leaks.
+6. Open/close Settings, modes, help and height editing, and lose/restore window
+   focus. Check that zoom buttons/ratio and the height editor start fading with the
+   preview, taking 225 ms versus the preview's 165 ms. The outgoing ratio must not
+   jump to 1× before fading out. Reverse transitions rapidly and try tapping or
+   focusing outgoing/entering controls: they must not act until fully visible.
+   Repeat in compact/exceptional layouts and with system animations disabled.
+   Confirm height can still be edited after completion or during permission/camera
+   recovery. JVM visibility-policy tests cover shared startup/suspension gates and
+   these idle editing exceptions; actual animation timing and touch/accessibility
+   rendering remain manual checks.
 
 ## Recorded verification and its scope
 
 CameraX zoom controls with a 1× floor and uncapped supported maximum, the
-persistent ratio label, 1× startup/reset policy and capture/session guards passed the JVM suite, debug assembly and lint
+persistent ratio label, 1× startup/reset policy, preview-control visibility gates
+and capture/session guards passed the JVM suite, debug assembly and lint
 using the bounded invocation above with installed JDK 17 and
 API 37 SDK. Lint reported no errors and retained warnings for dependency updates,
 backup guidance, portrait orientation, the locale-config attribute and a discouraged

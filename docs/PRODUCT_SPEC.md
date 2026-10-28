@@ -158,6 +158,11 @@ future validated features; they have no selectable methods.
   necessary; a reported range entirely below 1× cannot start acquisition.
   Capture is blocked during asynchronous zoom application and a short settling
   interval. Zoom does not establish camera-center stability or calibrated accuracy.
+  Zoom controls, the ratio label and the preview-edge height editor fade with
+  preview suspension and streaming recovery, including Settings, mode selection
+  and focus loss. Their 225 ms fades are slightly longer than the camera's 165 ms
+  fade; outgoing controls stop accepting input immediately. Height editing remains
+  available on completed results and actionable recovery screens.
 - Top capture followed by bottom capture within 15 s. **Aim at the top** and
   **Aim at the bottom** remain the stable primary instructions. Routine movement,
   settling, startup, readiness, missing/stale/unreliable sensor readings, small
