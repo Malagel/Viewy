@@ -319,18 +319,45 @@ also checks disposal/failure. Sensor registration tokens reject queued data and
 accuracy callbacks after stop, failed registration or retry.
 
 Capture requires OPEN plus STREAMING and current orientation readiness. Permission
-is rechecked on resume; denial and camera errors retain recovery controls. Startup
-timeout runs only while STARTED. CameraX binds only for eligible foreground work;
+is rechecked on resume; denial retains permission recovery controls. Camera readiness
+alone never requests recovery UI. `CameraRecovery` distinguishes quiet binding/retry
+waiting from a failure requiring user action. `MeasurementResources` owns one
+cancelable main-thread scheduled retry: at most three replacement bindings after
+an initial failure, delayed 500, 1000 and 2000 ms. The short exponential backoff
+allows temporary contention to clear without a tight loop. Exhaustion exposes the
+localized failure and manual Retry, which starts a fresh bounded cycle. Streaming
+success or a new eligible acquisition session resets the cycle. Initialization
+exceptions, temporary camera contention and watchdog expiration are retryable;
+permission/security failures, missing rear/consistent physical lenses, incompatible
+stream configuration and system-policy/fatal errors skip automatic retries. CameraX
+error codes follow its [state contract](https://developer.android.com/reference/androidx/camera/core/CameraState).
+No retry changes lens selection or pinning.
+
+Ineligibility cancels scheduled work immediately, resets the cycle and revokes
+preview ownership before release. Retry generations reject even already-queued
+callbacks after pause, completion or rapid overlay transitions. Only a due, current
+retry advances the preview epoch; stable recomposition never requests a new binding.
+Failure details remain diagnostic during silent recovery/suspension. The compact
+status dialog retains the snapshot that prompted it while suspending acquisition;
+its Retry closes the dialog so an eligible surface can start a fresh cycle.
+
+`PreviewWatchdog` uses monotonic deadlines: 12 seconds for initial OPEN plus
+STREAMING and 3 seconds for sustained readiness loss after streaming. Repeated
+unready notifications do not move the deadline; a brief transition back to ready
+cancels it. Readiness loss still blocks capture and invalidates incomplete pairs
+immediately through the existing resource rules. Intentional lifecycle shutdown
+cancels the watchdog rather than counting a failure; it runs only while STARTED.
+CameraX binds only for eligible foreground work;
 Activity pause and destruction close the adapter immediately and idempotently,
 without waiting for Compose disposal or motion. Cleanup removes observers,
-display listeners and startup callbacks and unbinds only the owned Preview.
+display listeners and watchdog callbacks and unbinds only the owned Preview.
 Orientation stop unregisters its listener and removes the freshness timer.
 
 A visible intentional suspension can copy one transient PreviewView bitmap, close
 the camera immediately, and fade that decorative image over 150 ms. No image is
 stored or exposed to accessibility. Failure to obtain the bitmap skips the fade;
 backgrounding/disposal does not wait for it. The live preview fades in only after
-OPEN plus STREAMING. Presentation never extends a hardware session for an animation.
+OPEN plus STREAMING, also over 150 ms. Presentation never extends a hardware session for an animation.
 
 Selection is held in the ViewModel separately from the workflow.
 `MeasurementSelection` permits a null active method and typed Closed/Modes/Methods
@@ -363,8 +390,8 @@ roll do not change that gravity-relative meaning. Gates cannot establish fixed
 camera position.
 
 Transient preview hints use a short delay and fades to avoid sensor-state flicker;
-this never delays capture gating. Permission/camera/orientation recovery remains
-persistent. Diagnostics is a read-only full-screen surface in the current host
+this never delays capture gating. Permission/orientation failures and camera
+failures requiring user action retain recovery controls. Diagnostics is a read-only full-screen surface in the current host
 window, including the exceptional workspace; the Activity draws an inaccessible
 backdrop while that workspace owns interaction. The shared overlay host preserves
 measurement bounds, suspends acquisition, hides covered accessibility and focus, and

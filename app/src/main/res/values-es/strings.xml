@@ -46,6 +46,8 @@
     <string name="reticle_description">Retícula central de puntería</string>
     <string name="camera_starting">Iniciando cámara trasera…</string>
     <string name="camera_timeout">La vista previa de la cámara no se inició. Reintenta la cámara.</string>
+    <string name="camera_interrupted">La vista previa de la cámara se detuvo. Reintenta la cámara.</string>
+    <string name="camera_system_unavailable">El acceso a la cámara no está disponible. Revisa los ajustes de cámara del sistema o reinicia el dispositivo.</string>
     <string name="camera_unavailable">La cámara no está disponible. Cierra otras aplicaciones que la usen y vuelve a intentarlo.</string>
     <string name="camera_display_changed">Cambió la pantalla. Reiniciando vista previa…</string>
     <string name="camera_start_failed">No se pudo iniciar la cámara trasera. Reintenta o revisa el acceso a la cámara en Ajustes.</string>

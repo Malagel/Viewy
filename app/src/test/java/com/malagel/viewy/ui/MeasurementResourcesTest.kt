@@ -22,6 +22,8 @@ class MeasurementResourcesTest {
         var starts = 0
         var stops = 0
         val releases = mutableListOf<Boolean>()
+        val scheduled = mutableListOf<Retry>()
+        var publications = 0
         var sensorToken = 0L
         var now = 2_000_000_000L
         var ui = MeasurementUiState(
@@ -35,7 +37,12 @@ class MeasurementResourcesTest {
             stops++
             registration.invalidate()
             workflow.update(null, null, false, now)
-        })
+        }, schedule = { delay, action ->
+            val retry = Retry(delay, action)
+            scheduled += retry
+            val cancel: () -> Unit = { retry.canceled = true }
+            cancel
+        }, onChanged = { publications++ })
 
         fun reconcile() {
             ui = ui.copy(measurement = workflow.state)
@@ -62,6 +69,8 @@ class MeasurementResourcesTest {
             now += 1_000_000_000L
         }
     }
+
+    private class Retry(val delay: Long, val action: () -> Unit, var canceled: Boolean = false)
 
     @Test fun repeatedOverlayCyclesInvalidateIncompletePairRetainHeightAndRequireFreshSessions() {
         val h = Harness()
@@ -197,6 +206,7 @@ class MeasurementResourcesTest {
         h.resources.previewChanged(token, camera.copy(ready = false, failed = true))
         assertEquals(1, h.stops)
         assertNull(h.workflow.state.top)
+        h.scheduled.single().action()
         val next = h.bind()
         assertFalse(h.resources.previewChanged(token, camera))
         h.resources.stopPreview(token)
@@ -211,6 +221,105 @@ class MeasurementResourcesTest {
         assertTrue(h.resources.previewChanged(next, camera))
         h.sample(0.5)
         assertTrue(h.workflow.state.canCapture)
+    }
+
+    @Test fun startupAndTransientUnreadinessDoNotScheduleRecoveryButFailuresExhaustThenRetryManually() {
+        val h = Harness()
+        h.reconcile()
+        var token = h.resources.startPreview { h.releases += it }!!
+        repeat(5) { h.resources.previewChanged(token, CameraPreviewState()) }
+        assertTrue(h.scheduled.isEmpty())
+        assertFalse(h.resources.cameraFailureVisible)
+        val failure = CameraPreviewState(failed = true)
+        for (delay in listOf(500L, 1_000L, 2_000L)) {
+            assertTrue(h.resources.previewChanged(token, failure))
+            assertFalse(h.resources.cameraFailureVisible)
+            assertFalse(h.resources.previewChanged(token, camera))
+            assertNull(h.resources.startPreview { fail("Bound before retry was due") })
+            val pending = h.scheduled.last()
+            assertEquals(delay, pending.delay)
+            pending.action()
+            val epoch = h.resources.previewEpoch
+            pending.action() // A duplicate queued callback cannot request another binding.
+            assertEquals(epoch, h.resources.previewEpoch)
+            token = h.resources.startPreview { h.releases += it }!!
+        }
+        h.resources.previewChanged(token, failure)
+        assertEquals(3, h.scheduled.size)
+        assertTrue(h.resources.cameraFailureVisible)
+        assertNull(h.resources.startPreview { fail("Bound after exhaustion") })
+        h.resources.retryCamera()
+        assertFalse(h.resources.cameraFailureVisible)
+        token = h.resources.startPreview { h.releases += it }!!
+        h.resources.previewChanged(token, failure)
+        assertEquals(500L, h.scheduled.last().delay)
+        h.scheduled.last().action()
+        h.bind() // Successful streaming clears the cycle.
+        h.resources.previewChanged(h.resources.startPreview {}!!, failure)
+        assertEquals(500L, h.scheduled.last().delay)
+        assertEquals(2.0, h.workflow.state.heightMeters!!, 0.0)
+    }
+
+    @Test fun allIneligibilityTransitionsCancelRetriesAndRejectEvenAlreadyQueuedCallbacks() {
+        val h = Harness()
+        val base = h.ui
+        val transitions = listOf(
+            base.copy(resumed = false),
+            base.copy(visibility = base.visibility.copy(covered = true)),
+            base.copy(visibility = base.visibility.copy(heightEditing = true)),
+            base.copy(visibility = base.visibility.copy(permissionGranted = false)),
+            base.copy(visibility = base.visibility.copy(windowFocused = false)),
+            base.copy(visibility = base.visibility.copy(surfaceVisible = false)),
+            base.copy(selection = base.selection.openModes()),
+            base.copy(diagnosticsOpen = true),
+            base.copy(tutorial = TutorialState(card = TutorialCard(1, method))),
+        )
+        repeat(3) {
+            transitions.forEach { hidden ->
+                h.ui = base
+                val token = h.bind()
+                h.capture(0.5)
+                h.resources.previewChanged(token, CameraPreviewState(failed = true))
+                assertNull(h.workflow.state.top)
+                val pending = h.scheduled.last()
+                h.ui = hidden
+                h.reconcile()
+                assertTrue(pending.canceled)
+                assertFalse(h.resources.cameraFailureVisible)
+                h.ui = base // Rapid return before Compose can dispose the old effect.
+                h.reconcile()
+                val epoch = h.resources.previewEpoch
+                pending.action()
+                assertEquals(epoch, h.resources.previewEpoch)
+                assertFalse(h.resources.previewChanged(token, camera))
+                assertEquals(2.0, h.workflow.state.heightMeters!!, 0.0)
+            }
+        }
+    }
+
+    @Test fun permanentFailuresDoNotScheduleAndCompletionCannotBeRevivedByOldRetry() {
+        val h = Harness()
+        var token = h.bind()
+        h.resources.previewChanged(token, CameraPreviewState(failed = true, retryable = false))
+        assertTrue(h.scheduled.isEmpty())
+        assertTrue(h.resources.cameraFailureVisible)
+        h.resources.retryCamera()
+        token = h.bind()
+        h.resources.previewChanged(token, CameraPreviewState(failed = true))
+        val pending = h.scheduled.last()
+        pending.action()
+        h.bind()
+        h.capture(0.5)
+        h.capture(0.0)
+        val result = h.workflow.state.result
+        assertNotNull(result)
+        val epoch = h.resources.previewEpoch
+        pending.action()
+        h.resources.retryCamera()
+        assertEquals(epoch, h.resources.previewEpoch)
+        assertNull(h.resources.startPreview { fail("Completed measurement rebound") })
+        assertSame(result, h.workflow.state.result)
+        assertFalse(h.resources.cameraFailureVisible)
     }
 
     @Test fun cleanupCallbacksAreAlreadyObsoleteAndFailedSensorRegistrationCannotContaminateFallback() {

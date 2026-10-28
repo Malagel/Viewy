@@ -93,6 +93,36 @@ class MeasurementPresentationTest {
         }
     }
 
+    @Test fun startupWaitingAndAutomaticRecoveryRemainQuietUntilUserActionIsRequired() {
+        val starting = ready.copy(camera = com.malagel.viewy.camera.CameraPreviewState(),
+            acquisition = AcquisitionState(running = false))
+        assertTrue(starting.acquisitionEligible)
+        assertFalse(starting.recoveryVisible)
+        assertFalse(starting.copy(camera = starting.camera.copy(messageRes = R.string.camera_waiting)).recoveryVisible)
+        val failed = starting.copy(camera = starting.camera.copy(failed = true))
+        assertFalse(failed.recoveryVisible) // Automatic recovery is silent.
+        assertTrue(failed.copy(cameraFailureVisible = true).recoveryVisible)
+        assertTrue(starting.copy(visibility = starting.visibility.copy(permissionGranted = false)).recoveryVisible)
+        assertFalse(starting.copy(selection = MeasurementSelection(),
+            visibility = starting.visibility.copy(permissionGranted = false)).recoveryVisible)
+        assertFalse(starting.copy(visibility = starting.visibility.copy(permissionGranted = false, windowFocused = false)).recoveryVisible)
+        assertTrue(ready.copy(acquisition = AcquisitionState(running = false)).recoveryVisible)
+    }
+
+    @Test fun suspendedFailureSnapshotsNeverShowRecoveryControlsOnTheMeasurementSurface() {
+        val failed = ready.copy(cameraFailureVisible = true)
+        assertTrue(failed.recoveryVisible)
+        listOf(
+            failed.copy(resumed = false),
+            failed.copy(visibility = failed.visibility.copy(covered = true)),
+            failed.copy(visibility = failed.visibility.copy(heightEditing = true)),
+            failed.copy(selection = selected.openModes()),
+            failed.copy(tutorial = com.malagel.viewy.tutorial.TutorialState(
+                card = com.malagel.viewy.tutorial.TutorialCard(1, selected.activeMethod!!))),
+            failed.copy(diagnosticsOpen = true),
+        ).forEach { assertFalse(it.recoveryVisible) }
+    }
+
     @Test fun hintsTrackMotionAndSettlingWithoutHidingCaptureFailures() {
         assertEquals(R.string.guidance_moving, contextualGuidance(ready.copy(measurement = ready.measurement.copy(latest = observation.copy(quality = quality.copy(status = CaptureStatus.MOVING))))))
         assertEquals(R.string.guidance_settling, contextualGuidance(ready.copy(measurement = ready.measurement.copy(latest = observation.copy(quality = quality.copy(status = CaptureStatus.SETTLING))))))

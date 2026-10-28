@@ -3,6 +3,8 @@ package com.malagel.viewy.ui
 import android.app.Application
 import android.content.Context
 import android.os.SystemClock
+import android.os.Handler
+import android.os.Looper
 import androidx.lifecycle.AndroidViewModel
 import com.malagel.viewy.camera.CameraPreviewState
 import com.malagel.viewy.domain.MeasurementMethod
@@ -29,7 +31,13 @@ data class MeasurementUiState(
     val visibility: MeasurementVisibility = MeasurementVisibility(),
     val resumed: Boolean = false,
     val previewEpoch: Long = 0,
+    val cameraFailureVisible: Boolean = false,
 ) {
+    val recoveryVisible: Boolean get() = requiresCamera && heightConfigured && !measurement.completed &&
+        (if (!visibility.permissionGranted) resumed && visibility.surfaceVisible && visibility.windowFocused &&
+            !visibility.covered && !visibility.heightEditing && !diagnosticsOpen && !selection.isOpen &&
+            !tutorial.selectorExiting && tutorial.card == null && tutorial.pendingMethod == null
+        else acquisitionEligible && (cameraFailureVisible || (camera.ready && !acquisition.running)))
     val canOpenSettings: Boolean get() = !diagnosticsOpen && !selection.isOpen && !tutorial.selectorExiting && tutorial.card == null && tutorial.pendingMethod == null
     val canOpenHelp: Boolean get() = selection.activeMethod != null && !selection.isOpen && !tutorial.selectorExiting && tutorial.card == null && tutorial.pendingMethod == null
     val requiresCamera: Boolean get() = selection.activeMethod?.requiresCamera == true
@@ -55,7 +63,14 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
         mutableState.value = mutableState.value.copy(measurement = workflow.state, acquisition = value)
     }
 
-    private val resources = MeasurementResources(workflow, acquisition::start, acquisition::stop)
+    private val recoveryHandler = Handler(Looper.getMainLooper())
+    private val resources = MeasurementResources(workflow, acquisition::start, acquisition::stop,
+        schedule = { delay, action ->
+            val callback = Runnable { action() }
+            recoveryHandler.postDelayed(callback, delay)
+            val cancel: () -> Unit = { recoveryHandler.removeCallbacks(callback) }
+            cancel
+        }, onChanged = ::publish)
 
     fun resume() { mutableState.value = mutableState.value.copy(resumed = true); reconcile() }
     fun pause() { mutableState.value = mutableState.value.copy(resumed = false); reconcile() }
@@ -73,6 +88,7 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun stopPreview(token: Long) { resources.stopPreview(token); publish() }
+    fun retryCamera() { resources.retryCamera(); publish() }
 
     private fun reconcile() {
         val state = mutableState.value
@@ -138,6 +154,7 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
 
     private fun publish() { mutableState.value = mutableState.value.copy(
         measurement = workflow.state, camera = resources.camera, previewEpoch = resources.previewEpoch,
+        cameraFailureVisible = resources.cameraFailureVisible,
     ) }
     override fun onCleared() {
         resources.reconcile(false, false, animateRelease = false)

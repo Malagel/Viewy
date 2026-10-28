@@ -37,7 +37,10 @@ suppression, rejection/exception and locale rollback; preview ownership across d
 inactive/height-gated camera and foreground acquisition eligibility, focused
 viewfinder visibility, repeated overlay cycles, incomplete-pair invalidation,
 completed-result preservation after shutdown, fresh-session restart, rapid
-suspend/resume ownership, obsolete camera/sensor callbacks and contextual guidance; localized height-label formatting, whole/fractional values, display
+suspend/resume ownership, obsolete camera/sensor callbacks and contextual guidance;
+silent startup/waiting versus actionable failures; three progressive retries,
+exhaustion, manual/new-session/success reset, cancellation and stale retry callbacks;
+monotonic startup/interruption deadlines without sleeps; localized height-label formatting, whole/fractional values, display
 precision and scientific notation; selection availability, inactive startup,
 automatic initial mode presentation, mode/method navigation, Back, disabled modes,
 activation, dismissal and reselection; tutorial first-use eligibility and stable-ID
@@ -56,9 +59,10 @@ fictional devices/configuration, not real wireless reliability.
 
 ## Recorded verification and its scope
 
-The resource-lifecycle implementation passed JVM tests and debug assembly in one
-bounded invocation. Debug lint was not rerun for this change. The previously
-recorded lint run reported no errors; warnings concern
+Silent camera startup and bounded recovery passed the JVM suite and debug Kotlin
+compilation with bounded, sequential Gradle execution. Debug assembly and lint
+were not rerun for this correction. The previously recorded lint run reported no
+errors; warnings concern
 dependency updates, backup guidance, the intentional portrait request and the
 API-33-only locale-config attribute (older versions use AppCompat). This used the
 installed JDK 17/API 37 SDK; a clean or release build was not verified. Inspection of
@@ -153,6 +157,39 @@ Keep records externally; the app has no history/export feature.
 | Language and recreation | First test a cold launch with Use device language saved: remove the task through Recents, reopen, visit Language, and select Español for the first time in that process. Confirm no black frame, window replacement or Activity recreation, and that the Language page remains open. Repeat after a developer-performed data reset; saved English → Español and saved Español cold launch are comparison cases. Then on API 23–32 and 33+, choose English, Español and Use device language repeatedly, both inactive and with a selected method. The language selector must update in place without Activity recreation, a black/blank frame or flashing the method/main Settings; Back must then return to main Settings. Repeat in the exceptional workspace. With device language English, switch between English and Use device language and confirm the radio choice updates when the effective display language stays the same. Reopen Settings after process restart. Check tutorials (including math explanations and spoken equations), mode navigation, permissions, guidance, height input, errors and accessibility. Change the app language through Android 13+ system settings and confirm the in-app selection follows. Device Spanish uses Spanish; an unsupported device language with no override falls back to English. Verify Spanish decimal commas and decimal feet independent of language. Using the in-app selector, change language with a top capture and a result: retain the method, height, settings destination and completed result while acquisition stays stopped; incomplete pairs were invalidated on Settings entry. Separately recreate for an unrelated configuration change: retain navigation and height, while a real hardware interruption still clears incomplete pairs and preserves completed results. Return/background with Settings open, rapid Back and large text must not restore invalid sessions or stack modals. |
 | Developer Options and full reset | On a disposable test installation, set Imperial, Spanish, diagnostics enabled and tutorial completion; grant camera access and create app-private test files/cache if a harness is available. Open Erase all app data, cancel/outside-dismiss/Back and confirm all data, language and permissions remain. Only an explicit Erase all data confirmation may request deletion; duplicate taps must be blocked. Confirm Android closes the process without relaunching or a success claim and leaves the app installed. Manually reopen: inactive mode sheet, Metric, diagnostics off, device language, tutorials eligible and camera permission requested only after valid height. Verify app-private files/cache are gone and permissions revoked in system settings. Repeat on pre-33 AppCompat storage and 33+ system-managed locales with a device language different from the override. Platform rejection/error behavior is covered by injected JVM fakes; do not invoke the real deletion API in automated tests. |
 | Layout and accessibility | Check the consistent dark palette under both system themes, large font/display sizes, TalkBack labels, small/split windows, platform-overridden orientations, height-dialog keyboard and navigation insets. On the normal screen, capture/navigation and the stage/result must stay visible without scrolling. Guidance should fade near the preview edge, never cover the reticle or persist for ordinary readiness; moving/settling/alignment changes should not flash. Verify persistent recovery actions and status dialogs in compact layouts. Exceptional windows/text scaling offer **Open viewfinder** with scrollable details and fixed controls. Check centered stage/≈ results in both units (Spanish: “≈ [value and unit] de distancia”), a blank reserved caption area before height entry and unchanged preview bounds as top/bottom instructions appear or switch (also with large text), closer symmetric Restart/Mode placement, the solid shutter disc, enlarged initial height action, the rounded borderless height editor and the raised control row. Check the larger circular gear retains its size and position, uses a subtly richer purple than other tonal buttons, looks enabled and opens Settings. Whole heights should display one decimal, fractional heights should retain meaningful digits up to the existing precision cap, and opening height editing should preserve the full stored input. Check the bold rounded Viewy header and reduced preview at normal/large text sizes. No separate result-retry action should appear. Diagnostics must not push Capture offscreen. |
+
+## Galaxy S22 camera startup and recovery checks
+
+These checks require developer validation; JVM policy tests do not establish
+CameraX callback timing, actual binding, hardware cleanup or rendered fades.
+
+- Cold-start an unfinished measurement with valid height and permission. Wait for
+  preview frames: no Starting/Waiting text, warning icon or camera Retry should
+  appear. Confirm a smooth streaming fade-in and no avoidable black flash.
+- Open and return from Settings and both tutorial pages; repeat rapidly, then
+  repeat with selection, diagnostics and height editing. Check fade-out, immediate
+  hardware release, silent reactivation and no stale error flashes or queued retry.
+- Interrupt the camera using another camera client or a controlled debug fault.
+  Confirm quiet bounded recovery, a fade-in on success, and a concise localized
+  error plus manual Retry only after the initial attempt and three retries fail.
+  Confirm manual Retry starts a new cycle. Brief stream transitions should not
+  repeatedly bind; sustained loss should recover after the three-second grace.
+- During a pending retry, open Settings/tutorial or background the Activity.
+  Leave it covered/backgrounded beyond the retry delay: acquisition must remain
+  stopped. Return and verify one fresh session. Repeat rapid foreground/background
+  and overlay transitions; verify no competing bindings or revived stale preview.
+- Revoke camera permission in Android settings and return. Confirm permission
+  controls, blocked captures and no automatic retry loop. Restore permission and
+  verify silent startup. Check unsupported pinned-preview behavior separately if
+  reproducible; recovery must never switch to an unsuitable lens.
+- Interrupt after a top capture: discard the incomplete pair and require fresh
+  observations while preserving height. Complete a measurement, open overlays,
+  background/return and wait: preserve the result with camera/sensors stopped and
+  no warnings/retries. Restart should silently resume with height retained.
+- Repeat failure/permission controls and preview transitions in English/Spanish,
+  compact windows, large text and TalkBack. In compact status dialogs, the error
+  must remain readable while acquisition is suspended; Retry returns to the
+  measurement surface and starts a fresh cycle.
 
 ## Outstanding reliability limits
 

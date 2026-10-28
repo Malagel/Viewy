@@ -137,7 +137,12 @@ future validated features; they have no selectable methods.
   Restart or saving height.
 - Rear-camera preview in a rounded rectangle with a thin, centered plus-shaped
   aiming reticle. Contextual guidance fades inside the preview; normal readiness
-  adds no warning. Hardware/permission failures retain recovery controls.
+  adds no warning. Startup, first-frame waiting, intentional suspension and return
+  from overlays stay silent, with no camera warning or Retry control. Recoverable
+  failures receive up to three automatic retries with short increasing delays;
+  only exhausted retries or conditions requiring user action show camera recovery
+  controls. Permission recovery remains available. Unexpected sustained preview
+  loss is recoverable; brief stream transitions do not trigger rebinding.
 - Top capture followed by bottom capture within 15 s, with guidance for fresh,
   stable aiming and horizontal alignment. The camera location must stay fixed
   and the endpoints must lie on one vertical line.

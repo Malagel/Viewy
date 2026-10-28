@@ -7,6 +7,7 @@ import android.hardware.camera2.CaptureRequest
 import android.hardware.display.DisplayManager
 import android.os.Build
 import android.os.Handler
+import android.os.SystemClock
 import android.os.Looper
 import androidx.annotation.StringRes
 import com.malagel.viewy.R
@@ -34,6 +35,7 @@ data class CameraPreviewState(
     val open: Boolean = false,
     val streaming: Boolean = false,
     val failed: Boolean = false,
+    val retryable: Boolean = true,
     val errorDetail: String? = null,
 )
 
@@ -55,8 +57,11 @@ class CameraPreview(
     private var open = false
     private var streaming = false
     private var failed = false
+    private val watchdog = PreviewWatchdog()
     private val timeout = Runnable {
-        if (!disposed && !description.ready) fail(R.string.camera_timeout, null)
+        if (!disposed && !failed && owner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED) &&
+            watchdog.expired(SystemClock.elapsedRealtime())
+        ) fail(if (watchdog.hasStreamed) R.string.camera_interrupted else R.string.camera_timeout, null)
     }
     private val streamObserver = Observer<PreviewView.StreamState> {
         streaming = it == PreviewView.StreamState.STREAMING
@@ -65,7 +70,16 @@ class CameraPreview(
     private val cameraObserver = Observer<CameraState> {
         open = it.type == CameraState.Type.OPEN
         if (it.error != null) {
-            fail(R.string.camera_unavailable, it.error?.code?.toString())
+            val code = it.error!!.code
+            val message = when (code) {
+                CameraState.ERROR_STREAM_CONFIG -> R.string.camera_configuration_failed
+                CameraState.ERROR_CAMERA_DISABLED, CameraState.ERROR_DO_NOT_DISTURB_MODE_ENABLED,
+                CameraState.ERROR_CAMERA_FATAL_ERROR -> R.string.camera_system_unavailable
+                else -> R.string.camera_unavailable
+            }
+            fail(message,
+                code.toString(), retryable = code == CameraState.ERROR_CAMERA_IN_USE ||
+                    code == CameraState.ERROR_MAX_CAMERAS_IN_USE || code == CameraState.ERROR_OTHER_RECOVERABLE_ERROR)
         } else publish()
     }
     private val displayListener = object : DisplayManager.DisplayListener {
@@ -97,11 +111,11 @@ class CameraPreview(
                     // Wait until attached: display rotation may be unavailable during composition.
                     view.post { if (!disposed && !failed) bind(provider!!) }
                 } catch (error: Exception) {
-                    fail(R.string.camera_start_failed, error.javaClass.simpleName)
+                    fail(R.string.camera_start_failed, error.javaClass.simpleName, retryable = cameraExceptionRetryable(error))
                 }
             }, ContextCompat.getMainExecutor(context))
         } catch (error: Exception) {
-            fail(R.string.camera_initialization_failed, error.javaClass.simpleName)
+            fail(R.string.camera_initialization_failed, error.javaClass.simpleName, retryable = cameraExceptionRetryable(error))
         }
     }
 
@@ -114,7 +128,7 @@ class CameraPreview(
         failed = false
         try {
             val rear = CameraSelector.DEFAULT_BACK_CAMERA.filter(cameraProvider.availableCameraInfos).firstOrNull()
-                ?: return fail(R.string.camera_no_rear, null)
+                ?: return fail(R.string.camera_no_rear, null, retryable = false)
             val logicalId = Camera2CameraInfo.from(rear).cameraId
             val manager = context.getSystemService(CameraManager::class.java)
             val logical = manager.getCameraCharacteristics(logicalId)
@@ -128,7 +142,7 @@ class CameraPreview(
                     c[CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE]?.let { it.width * it.height } ?: 0f
                 }
             if (physicalIds.isNotEmpty() && physical == null) {
-                return fail(R.string.camera_no_consistent_lens, null)
+                return fail(R.string.camera_no_consistent_lens, null, retryable = false)
             }
             val selectedId = physical?.first ?: logicalId
             val characteristics = physical?.second ?: logical
@@ -149,6 +163,7 @@ class CameraPreview(
             // focus-dependent intrinsics have not been established as a calibrated pixel model.
             description = CameraPreviewState(mapping = mapping, logicalCameraId = logicalId, physicalCameraId = physical?.first)
             onState(description)
+            scheduleStartupTimeout()
             val useCase = builder.build()
             preview = useCase
             useCase.setSurfaceProvider(view.surfaceProvider)
@@ -158,37 +173,44 @@ class CameraPreview(
             val camera = cameraProvider.bindToLifecycle(owner, selector, useCase)
             cameraInfo = camera.cameraInfo
             camera.cameraInfo.cameraState.observe(owner, cameraObserver)
-            scheduleStartupTimeout()
         } catch (error: Exception) {
-            fail(R.string.camera_configuration_failed, error.javaClass.simpleName)
+            fail(R.string.camera_configuration_failed, error.javaClass.simpleName,
+                retryable = cameraExceptionRetryable(error, configuring = true))
         }
     }
 
     private fun publish() {
         if (disposed || failed) return
         val ready = open && streaming
-        if (ready) handler.removeCallbacks(timeout)
+        scheduleWatchdog(ready)
         description = description.copy(ready = ready, open = open, streaming = streaming, messageRes = if (ready) R.string.camera_ready else R.string.camera_waiting)
         onState(description)
     }
 
-    private fun fail(@StringRes messageRes: Int, diagnostic: String?) {
-        if (disposed) return
+    private fun fail(@StringRes messageRes: Int, diagnostic: String?, retryable: Boolean = true) {
+        if (disposed || failed) return
         failed = true
         handler.removeCallbacks(timeout)
         cameraInfo?.cameraState?.removeObserver(cameraObserver)
         preview?.let { useCase -> runCatching { provider?.unbind(useCase) } }
-        description = description.copy(ready = false, open = false, streaming = false, failed = true, messageRes = messageRes, errorDetail = diagnostic)
+        description = description.copy(ready = false, open = false, streaming = false, failed = true, retryable = retryable, messageRes = messageRes, errorDetail = diagnostic)
         onState(description)
     }
 
     // Provider initialization can finish while STOPPED. CameraX waits for STARTED
     // before opening the camera; that intentional pause must not consume its timeout.
     private fun scheduleStartupTimeout() {
+        watchdog.reset(SystemClock.elapsedRealtime())
+        scheduleWatchdog(description.ready)
+    }
+
+    private fun scheduleWatchdog(ready: Boolean) {
         handler.removeCallbacks(timeout)
-        if (!disposed && !failed && !description.ready &&
-            owner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
-        ) handler.postDelayed(timeout, 12_000)
+        if (disposed || failed || !owner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) return
+        val now = SystemClock.elapsedRealtime()
+        watchdog.readiness(ready, now)?.let { deadline ->
+            handler.postDelayed(timeout, (deadline - now).coerceAtLeast(0L))
+        }
     }
 
     override fun onStop(owner: LifecycleOwner) {

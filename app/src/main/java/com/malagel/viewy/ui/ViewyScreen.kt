@@ -85,10 +85,10 @@ fun ViewyScreen(
     val owner = LocalLifecycleOwner.current
     var permission by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) }
     var requested by rememberSaveable { mutableStateOf(false) }
-    var cameraAttempt by remember { mutableIntStateOf(0) }
     var editHeight by rememberSaveable { mutableStateOf(false) }
     var showWorkspace by rememberSaveable { mutableStateOf(false) }
     var showStatus by rememberSaveable { mutableStateOf(false) }
+    var statusSnapshot by remember { mutableStateOf<MeasurementUiState?>(null) }
     val diagnosticsOpen = state.diagnosticsOpen && diagnosticsEnabled && !settingsOpen
     val overlayTarget = screenOverlay(settingsOpen, diagnosticsOpen)
     val overlayTransition = updateTransition(overlayTarget, label = "Full-screen destination")
@@ -180,10 +180,10 @@ fun ViewyScreen(
                                             textMeasurer.measure(it, hintStyle, constraints = Constraints(maxWidth = with(density) { (maxWidth - 52.dp).roundToPx().coerceAtLeast(1) })).size.height
                                         } ?: 0
                                     }
-                                    val recoveryNeeded = !measurement.completed && (!permission || !state.camera.ready || !state.acquisition.running)
+                                    val recoveryNeeded = state.recoveryVisible
                                     val useStatusDialog = !overflow && ((compact && recoveryNeeded) || hintHeight > with(density) { (maxHeight / 2 - 54.dp).toPx() })
                                     if (state.heightConfigured) {
-                                        LivePreview(model, state, cameraAttempt)
+                                        LivePreview(model, state)
                                         if (state.camera.ready && state.acquisition.running) Reticle(Modifier.size(40.dp))
                                     }
                                     if (!state.heightConfigured) {
@@ -197,14 +197,14 @@ fun ViewyScreen(
                                         if (measurement.completed) {
                                             // The result remains below the stopped viewfinder; Restart resumes acquisition.
                                         } else if (useStatusDialog) {
-                                            FilledTonalIconButton(onClick = { showStatus = true }, modifier = Modifier.align(Alignment.BottomStart).padding(4.dp)
+                                            FilledTonalIconButton(onClick = { statusSnapshot = state; showStatus = true }, modifier = Modifier.align(Alignment.BottomStart).padding(4.dp)
                                                 .semantics { contentDescription = previewStatusLabel }) {
-                                                Text(if (!permission || !state.camera.ready || !state.acquisition.running || hint != null) "!" else "i")
+                                                Text(if (recoveryNeeded || hint != null) "!" else "i")
                                             }
                                         } else if (recoveryNeeded) {
                                             Surface(Modifier.fillMaxWidth().align(Alignment.BottomCenter), color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.95f)) {
                                                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                    RecoveryControls(state, permission, requested, requestPermission, openSettings, { cameraAttempt++ }, model::restartOrientation)
+                                                    RecoveryControls(state, permission, requested, requestPermission, openSettings, model::retryCamera, model::restartOrientation)
                                                 }
                                             }
                                         } else {
@@ -301,7 +301,9 @@ fun ViewyScreen(
                     Text(stageText(measurement, unit))
                     if (!state.heightConfigured) TextButton(onClick = { showStatus = false; editHeight = true }) { Text(stringResource(R.string.enter_height)) }
                     else {
-                        RecoveryControls(state, permission, requested, requestPermission, openSettings, { cameraAttempt++ }, model::restartOrientation)
+                        // The dialog suspends hardware; retain the failure that prompted it.
+                        RecoveryControls(statusSnapshot ?: state, permission, requested, requestPermission, openSettings,
+                            { showStatus = false }, { showStatus = false })
                         candidate?.let { Text(stringResource(it)) }
                     }
                 }
@@ -317,16 +319,16 @@ private fun RecoveryControls(
     onPermission: () -> Unit, onSettings: () -> Unit, onCameraRetry: () -> Unit, onOrientationRetry: () -> Unit,
 ) {
     when {
-        !permission -> {
+        !permission && state.recoveryVisible -> {
             Text(stringResource(R.string.camera_permission_explanation))
             TextButton(onClick = onPermission) { Text(stringResource(if (requested) R.string.camera_permission_retry else R.string.camera_permission_allow)) }
             if (requested) TextButton(onClick = onSettings) { Text(stringResource(R.string.open_app_settings)) }
         }
-        !state.camera.ready -> {
+        state.cameraFailureVisible && state.acquisitionEligible -> {
             Text(stringResource(state.camera.messageRes))
             TextButton(onClick = onCameraRetry) { Text(stringResource(R.string.camera_retry)) }
         }
-        !state.acquisition.running -> {
+        state.acquisitionEligible && state.camera.ready && !state.acquisition.running -> {
             Text(stringResource(R.string.guidance_orientation))
             TextButton(onClick = onOrientationRetry) { Text(stringResource(R.string.orientation_retry)) }
         }
@@ -346,7 +348,7 @@ private fun MeasurementVisibilityEffect(model: MeasurementViewModel, permission:
 }
 
 @Composable
-private fun LivePreview(model: MeasurementViewModel, state: MeasurementUiState, attempt: Int) {
+private fun LivePreview(model: MeasurementViewModel, state: MeasurementUiState) {
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
     val view = remember(context) { PreviewView(context) }
@@ -370,15 +372,18 @@ private fun LivePreview(model: MeasurementViewModel, state: MeasurementUiState, 
         Image(bitmap.asImageBitmap(), contentDescription = null, contentScale = ContentScale.FillBounds,
             modifier = Modifier.fillMaxSize().graphicsLayer { alpha = frozenAlpha.value })
     }
-    DisposableEffect(view, owner, model, state.acquisitionEligible, state.previewEpoch, attempt) {
+    DisposableEffect(view, owner, model, state.acquisitionEligible, state.previewEpoch) {
         var preview: CameraPreview? = null
+        var released = false
         val token = if (state.acquisitionEligible) model.startPreview { animate ->
             // Snapshot only intentional visible suspensions. Never delay unbinding for motion.
             frozen = if (animate && currentAlpha > 0f) runCatching { view.bitmap }.getOrNull() else null
+            released = true
             preview?.close()
             preview = null
         } else null
         preview = token?.let { CameraPreview(context, owner, view) { camera -> model.previewChanged(it, camera) } }
+        if (released) { preview?.close(); preview = null }
         onDispose {
             preview?.close()
             if (token != null) model.stopPreview(token)
