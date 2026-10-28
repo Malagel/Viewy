@@ -347,6 +347,8 @@ private fun MeasurementVisibilityEffect(model: MeasurementViewModel, permission:
     }
 }
 
+private const val CAMERA_FADE_MILLIS = 165
+
 @Composable
 private fun LivePreview(model: MeasurementViewModel, state: MeasurementUiState) {
     val context = LocalContext.current
@@ -356,14 +358,14 @@ private fun LivePreview(model: MeasurementViewModel, state: MeasurementUiState) 
     val frozenAlpha = remember { Animatable(0f) }
     val liveAlpha by animateFloatAsState(
         if (state.acquisitionEligible && state.camera.ready) 1f else 0f,
-        tween(ScreenMotion.fadeMillis), label = "Streaming preview",
+        tween(CAMERA_FADE_MILLIS), label = "Streaming preview",
     )
     val currentAlpha by rememberUpdatedState(liveAlpha)
     val animateSnapshot = state.resumed && state.visibility.surfaceVisible
     LaunchedEffect(frozen, animateSnapshot) {
         if (frozen != null && animateSnapshot) {
             frozenAlpha.snapTo(currentAlpha)
-            frozenAlpha.animateTo(0f, tween(ScreenMotion.fadeMillis))
+            frozenAlpha.animateTo(0f, tween(CAMERA_FADE_MILLIS))
         }
         frozen = null
     }

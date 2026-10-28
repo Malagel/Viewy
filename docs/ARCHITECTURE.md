@@ -354,10 +354,10 @@ display listeners and watchdog callbacks and unbinds only the owned Preview.
 Orientation stop unregisters its listener and removes the freshness timer.
 
 A visible intentional suspension can copy one transient PreviewView bitmap, close
-the camera immediately, and fade that decorative image over 150 ms. No image is
+the camera immediately, and fade that decorative image over 165 ms. No image is
 stored or exposed to accessibility. Failure to obtain the bitmap skips the fade;
 backgrounding/disposal does not wait for it. The live preview fades in only after
-OPEN plus STREAMING, also over 150 ms. Presentation never extends a hardware session for an animation.
+OPEN plus STREAMING, also over 165 ms. Presentation never extends a hardware session for an animation.
 
 Selection is held in the ViewModel separately from the workflow.
 `MeasurementSelection` permits a null active method and typed Closed/Modes/Methods
