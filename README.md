@@ -36,9 +36,11 @@ outside another modal. Tap **Measurement units** to switch Metric/Imperial, or
 **Language** to select **English**, **Español**, or **Use device language** (default).
 Changes save automatically. Language and unit changes update the current screen
 in place, preserving compatible captures within normal session and expiry rules. **Developer Options** contains
-a persistent diagnostics preference (off by default; access is reserved for future
-implementation) and **Erase all app data**. Only confirming **Erase all data**
-requests Android to clear storage and permissions and close Viewy; the app remains
+a persistent **Enable diagnostics** preference (off by default) and **Erase all app data**.
+When enabled, hold **?** to open read-only method diagnostics; a normal tap always
+opens the tutorial. Diagnostics shows current readiness, camera/sensor information
+and endpoint geometry without starting hardware or changing a measurement.
+Only confirming **Erase all data** requests Android to clear storage and permissions and close Viewy; the app remains
 installed. Reopen it manually for fresh defaults and tutorials. The rounded
 Viewy wordmark uses bundled [Nunito Bold](https://github.com/google/fonts/blob/c7e2740188205a85323c7385547f6f59b4f2245a/ofl/nunito/Nunito-Bold.ttf)
 ([SIL Open Font License](app/src/main/assets/licenses/nunito_ofl.txt));

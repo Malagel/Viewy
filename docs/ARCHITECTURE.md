@@ -126,10 +126,11 @@ Source paths below are relative to `app/src/main/java/com/malagel/viewy/`:
 | `measurement/KnownHeightWorkflow.kt` | Immutable top/bottom/correction/result state, compatibility/alignment gates, retry and restart. |
 | `ui/MeasurementViewModel.kt` | Selection state, one shared foreground sensor adapter, workflow and immutable StateFlow snapshots. |
 | `settings/AppPreferences.kt` | Typed global units and diagnostics preferences in one application-context Preferences DataStore, independent of tutorials. |
-| `settings/SettingsViewModel.kt` and `ui/SettingsScreen.kt` | Observable load/write/error state and retained, temporary full-screen settings navigation. |
+| `settings/SettingsViewModel.kt` and `ui/SettingsScreen.kt` | Observable load/write/error state and retained, temporary settings navigation with animated child destinations. |
+| `ui/ScreenNavigationMotion.kt` | Shared host-window overlay motion, outgoing-destination retention and input/accessibility gates; never owns measurement or preference state. |
 | `settings/AppLanguage.kt` | Android/AppCompat locale selection without duplicate preference storage. |
 | `settings/AppDataReset.kt` and `settings/AndroidAppDataReset.kt` | Injectable, confirmation-gated reset policy and isolated Android data-clear/locale adapter. |
-| `ui/OrientationDiagnosticsState.kt`, `ui/OrientationDiagnosticsPanel.kt` and `ui/DiagnosticsDialog.kt` | Debug A/B captures, separate from measurement endpoints but sharing acquisition. |
+| `ui/HelpAction.kt`, `ui/DiagnosticsPresentation.kt` and `ui/DiagnosticsScreen.kt` | Preference-gated help routing and a pure, immutable, localized read-only projection of existing workflow/camera/acquisition snapshots. |
 
 Math and workflow logic are independent of Android/Compose. Sensor callbacks,
 workflow actions and periodic freshness updates are serialized on main. The
@@ -225,7 +226,7 @@ near vertical while elevation/ray remain available. No Euler averaging or
 pitch-only reconstruction is used.
 
 Reported lens pose is not independent calibration. Preview center need not equal
-the optical principal point. Intrinsics are diagnostic only: verified stream crop,
+the optical principal point. Intrinsics alone cannot calibrate it: verified stream crop,
 distortion/rectification, focus dependence and metadata correspondence are absent.
 A valid future pixel-to-device transform must establish all of these together;
 applying a static pinhole correction alone would imply unsupported precision.
@@ -238,8 +239,9 @@ Game Rotation Vector is preferred for short relative comparisons: it avoids
 magnetic corrections but permits heading drift. Rotation Vector is a startup
 fallback when game is absent or registration fails; it can respond to magnetic
 interference. There is no custom fusion or raw gyro integration. A running sensor
-never silently switches on stalls/unreliability. Explicit debug source selection
-or retry starts a new session and clears captures.
+never silently switches on stalls/unreliability. The viewfinder recovery retry
+starts a new preferred/fallback session and clears captures; diagnostics has no
+source selection or restart controls.
 
 The adapter checks registration and reports unavailable sources/failure. Sampling
 is a platform hint with no batching; short callbacks validate data, retained
@@ -328,7 +330,6 @@ and camera readiness. Releasing the preview clears its ready state and stops the
 sensor session. Pause, camera loss/reconfiguration, recreation or
 source/frame/mapping changes invalidate endpoints/results. Pause removes the sensor listener/freshness
 timer; ViewModel cleanup releases acquisition. No session survives process death.
-Debug A/B captures share this pipeline without sharing measurement endpoints.
 
 The workflow owns top/bottom/correction/result transitions, finite height,
 compatibility checks and retry. Saving height restarts. The workflow retains
@@ -341,8 +342,32 @@ camera position.
 
 Transient preview hints use a short delay and fades to avoid sensor-state flicker;
 this never delays capture gating. Permission/camera/orientation recovery remains
-persistent. Debug camera, endpoint and A/B diagnostics retain a scrollable dialog
-implementation, but no UI entry is exposed pending a future developer-access policy.
+persistent. Diagnostics is a read-only full-screen surface in the current host
+window, including the exceptional workspace; the Activity draws an inaccessible
+backdrop while that workspace owns interaction. The shared overlay host preserves
+preview bounds/composition/ownership, hides covered accessibility and focus, and
+blocks background touch through exit completion. Diagnostics Back closes only that surface. A single
+ViewModel boolean retains navigation across Activity recreation without DataStore
+persistence; real pause/rebinding still invalidates endpoints normally.
+
+The Settings snapshot is the sole authority for diagnostics access. The help
+control has one 48 dp `combinedClickable` gesture owner: tap routes to the existing
+tutorial, an enabled hold routes to diagnostics with haptics, and disabled holds
+are consumed. Explicit semantics expose the separate enabled long-click action.
+Opening is gated by active method and pending/visible tutorials or selection;
+Settings and other modal controls cannot launch another overlay while covered.
+Disabling the preference closes any retained diagnostics presentation.
+
+Camera snapshots expose logical/physical IDs, OPEN/STREAMING and typed failure
+state; mapping exposes whether usable pose metadata or the uncalibrated fallback
+was used. Sensor snapshots distinguish discovery, registration failure and
+running quality without interpreting raw debug strings. `DiagnosticsPresentation`
+projects existing state without a clock, polling, hardware calls or geometry
+estimation. It retains workflow notices, rejects invalid/incompatible residual
+endpoints, uses stored `DistanceDiagnostics`, and converts meters/radians only
+for locale-aware display. Sensitivities use distance units per degree. No A/B
+recording, debug sensor selection or diagnostics restart actions remain;
+`compareObservations` remains shared by production capture compatibility checks.
 
 There is no preview-exposure/sensor synchronization: neither tap time nor latest
 sensor timestamp identifies the displayed frame's exposure. Rendering, processing,
@@ -379,6 +404,26 @@ No settings navigation or measurement session is restored after process death.
 Configuration recreation retains both ViewModels, but Activity pause and preview
 rebinding still invalidate hardware captures normally.
 
+`ScreenOverlayHost` animates only the covering Settings/Diagnostics surface using
+Compose transitions: a 240 ms entrance and 180 ms exit combine fading with 24 dp
+vertical movement. Measurement stays outside animated content and never changes
+bounds or ownership. One transition coordinates the Activity and exceptional
+workspace hosts. Outgoing destinations remain composed until exit completes,
+including a reversed entrance; the Settings page remains visible after its logical
+destination closes. During motion, input guards consume touch and exclude moving
+or covered content from focus/accessibility; Back is consumed until a destination
+settles, preventing duplicate navigation or dismissal of the workspace underneath.
+
+Settings child pages use destination-keyed `AnimatedContent` with a 240 ms,
+32 dp horizontal slide and fade. Forward and Back use opposite directions,
+mirrored for layout direction; the opaque Settings surface and bounds stay fixed.
+Each animation entry renders its own destination and scroll state, with outgoing
+callbacks disabled. Motion is presentation-only: it neither delays nor writes
+ViewModel navigation, and sensor publications, preference edits and in-place
+locale updates do not change animation keys. Compose's duration scale handles
+reduced/disabled system animations. Recreated hosts initialize at the retained
+destination rather than replaying entrance; no animation state is persisted.
+
 The platform launch theme inherits dark `Theme.AppCompat.NoActionBar`; Compose
 keeps its existing Material 3 dark scheme and edge-to-edge setup. The locale config
 advertises English and Spanish to Android 13+ system settings.
@@ -390,14 +435,19 @@ the Activity's localized resources/Compose locale; the application-context senso
 adapter and pure math do not depend on locale. English default resources provide
 fallback for unsupported languages. See [Android per-app language support](https://developer.android.com/guide/topics/resources/app-languages).
 
-The Activity handles only language-related configuration changes in place:
-`locale`, `layoutDirection` and, on API 34+, `grammaticalGender`. Inherited
-AppCompat/Activity configuration dispatch updates Compose resources, layout
-direction and `LocalLocale` without replacing the window, Compose tree or preview.
-Strings are read through `stringResource`; numeric labels read `LocalLocale`, and
+The Activity handles `locale`, `layoutDirection`, `screenLayout` and, on API 34+,
+`grammaticalGender` configuration changes in place. The first override from device
+language can include `screenLayout` even when window bounds remain unchanged;
+handling locale alone would still allow Android to recreate the Activity and
+briefly expose its window background. Compose already adapts to layout/configuration
+updates. Inherited AppCompat/Activity configuration dispatch updates Compose
+resources, layout direction and `LocalLocale` without replacing the window,
+Compose tree or preview. Strings are read through `stringResource`; numeric labels
+read `LocalLocale`, and
 the language picker also observes `LocalConfiguration`. No language callback
-restarts acquisition or edits the workflow. Other configuration changes retain
-normal Activity recreation and session invalidation. See Android's
+restarts acquisition or edits the workflow. Orientation, screen-size,
+smallest-screen-size and density changes retain normal Activity recreation and
+session invalidation. See Android's
 [Compose configuration guidance](https://developer.android.com/guide/topics/resources/runtime-changes).
 
 `ResetController` accepts an injectable `AppDataReset` and permits requests only

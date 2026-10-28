@@ -64,6 +64,12 @@ future validated features; they have no selectable methods.
   Developer Options destination. Changes save automatically. Back from a child
   destination returns to Settings; Back from Settings restores the measurement
   surface. Modal settings, help and mode selection cannot be operated together.
+  Settings and diagnostics enter and leave with a short fade and subtle vertical
+  motion over the stationary measurement surface. Settings child destinations,
+  including Language and Developer Options, use horizontal fade/slide transitions
+  with the opposite direction on Back. Outgoing controls and the covered
+  measurement remain blocked until transitions finish. Motion follows the system
+  animation scale; restored destinations appear directly without replaying entry.
   Opening Settings preserves the selected method and camera composition; normal
   sensor interruption and capture-expiry rules continue to apply.
 - Units default to Metric (meters); Imperial uses decimal feet for heights and
@@ -79,9 +85,21 @@ future validated features; they have no selectable methods.
   The language selector, method, height and compatible captures/results stay in
   place, subject to ordinary hardware interruptions and capture expiry. Back
   returns to main Settings. Language and units are independent.
-- Developer Options persists **Enable diagnostics**, off by default, for future
-  developer access; it does not expose diagnostics or add long-press gestures.
-  **Erase all app data** requires explicit confirmation explaining irreversibility,
+- Developer Options persists **Enable diagnostics**, off by default. A normal **?**
+  tap always opens the method tutorial; an enabled long press opens a full-screen,
+  scrollable, read-only Diagnostics surface with haptic feedback and a separate
+  accessible action. Disabled holds do nothing. Diagnostics shows the active
+  method, measurement/capture readiness, camera identity and mapping, sensor source
+  and quality, and Known Object Height endpoint geometry, sensitivities and
+  unquantified uncertainty. Missing prerequisites are inactive, not hardware
+  failures; missing/invalid values remain unavailable. Angles use degrees and
+  lengths/sensitivities follow global units. Recent stability is not calibrated
+  accuracy, and derivatives are not measured errors. Back restores the stationary
+  measurement interface; diagnostics does not request permissions, initialize or
+  restart hardware, record observations, or edit/recompute measurements. Ordinary
+  lifecycle interruption and capture-expiry rules continue. Settings, selection,
+  tutorials and diagnostics cannot be operated together.
+- **Erase all app data** requires explicit confirmation explaining irreversibility,
   preferences/tutorial removal and app closure. Cancel changes nothing. Android
   performs the full storage clear and permission revocation without uninstalling.
   A rejected/failed request shows an error; an accepted request is not reported as
@@ -136,9 +154,8 @@ future validated features; they have no selectable methods.
   controls within system insets. The normal measurement screen does not scroll.
   Constrained layouts offer a status dialog; exceptionally small windows or text
   scaling open a scrollable viewfinder workspace with fixed capture/navigation.
-  Android may override portrait on large screens. Diagnostic acquisition and
-  presentation remain in source for future developer access; there is currently
-  no diagnostics entry in the interface. Long-press help actions are not implemented.
+  Android may override portrait on large screens. Diagnostics uses the same
+  stationary full-screen overlay approach in normal and exceptional workspaces.
 
 No photos, recording, measurement history, network access,
 analytics or ads are implemented. Hardware correctness and usability still need
