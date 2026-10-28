@@ -12,6 +12,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -73,7 +74,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 @Composable
 fun ViewyScreen(
     state: MeasurementUiState, model: MeasurementViewModel, unit: HeightUnit, onSettings: () -> Unit,
-    diagnosticsEnabled: Boolean, settingsOpen: Boolean, settingsContent: @Composable (backdropOnly: Boolean) -> Unit,
+    diagnosticsEnabled: Boolean, settingsOpen: Boolean, settingsContent: @Composable (backdropOnly: Boolean, interactive: Boolean) -> Unit,
 ) {
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
@@ -84,11 +85,16 @@ fun ViewyScreen(
     var showWorkspace by rememberSaveable { mutableStateOf(false) }
     var showStatus by rememberSaveable { mutableStateOf(false) }
     val diagnosticsOpen = state.diagnosticsOpen && diagnosticsEnabled && !settingsOpen
+    val overlayTarget = screenOverlay(settingsOpen, diagnosticsOpen)
+    val overlayTransition = updateTransition(overlayTarget, label = "Full-screen destination")
+    var retainedOverlay by remember { mutableStateOf(overlayTarget) }
+    SideEffect { if (overlayTarget != ScreenOverlay.NONE) retainedOverlay = overlayTarget }
+    val overlay = overlayPresentation(overlayTransition.currentState, overlayTransition.targetState, overlayTransition.isRunning, retainedOverlay)
     LaunchedEffect(diagnosticsEnabled, settingsOpen) {
         if (!diagnosticsEnabled || settingsOpen) model.dismissDiagnostics()
     }
     val openHelp: (Boolean) -> Unit = { longPress ->
-        if (!settingsOpen && !editHeight && !showStatus) model.help(longPress, diagnosticsEnabled)
+        if (!overlay.blocksMeasurement && !editHeight && !showStatus) model.help(longPress, diagnosticsEnabled)
     }
     LaunchedEffect(state.selection.activeMethod) {
         if (state.selection.activeMethod == null) {
@@ -106,7 +112,7 @@ fun ViewyScreen(
         onDispose { owner.lifecycle.removeObserver(observer) }
     }
     val openAppSettings = {
-        if (state.canOpenSettings) onSettings()
+        if (!overlay.blocksMeasurement && state.canOpenSettings) onSettings()
     }
     val measurement = state.measurement
     val textMeasurer = rememberTextMeasurer()
@@ -225,9 +231,12 @@ fun ViewyScreen(
                 val workspaceDialogOpen = exceptional && state.selection.activeMethod != null && showWorkspace
                 // Cover the Activity as well as the workspace window: the backdrop
                 // remains visible while Android tears down/recreates that dialog.
-                SettingsOverlay(settingsOpen || diagnosticsOpen, settings = {
-                    if (settingsOpen) settingsContent(workspaceDialogOpen)
-                    else DiagnosticsScreen(state, unit, permission, model::dismissDiagnostics, workspaceDialogOpen)
+                ScreenOverlayHost(overlayTransition, overlay, backdropOnly = workspaceDialogOpen, overlay = { destination, interactive ->
+                    when (destination) {
+                        ScreenOverlay.SETTINGS -> settingsContent(workspaceDialogOpen, interactive)
+                        ScreenOverlay.DIAGNOSTICS -> DiagnosticsScreen(state, unit, permission, model::dismissDiagnostics, workspaceDialogOpen, interactive)
+                        ScreenOverlay.NONE -> Unit
+                    }
                 }) {
                     if (state.selection.activeMethod == null) {
                         InactiveMeasurementScreen(compact, openAppSettings) { ModeControl(model::openModes) }
@@ -242,13 +251,16 @@ fun ViewyScreen(
                             }
                         }
                         if (showWorkspace) Dialog(
-                            onDismissRequest = { if (!settingsOpen && !diagnosticsOpen) showWorkspace = false },
-                            properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = !settingsOpen && !diagnosticsOpen),
+                            onDismissRequest = { if (!overlay.blocksMeasurement) showWorkspace = false },
+                            properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = !overlay.blocksMeasurement),
                         ) {
                             Surface(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout)).then(methodBackdrop)) {
-                                SettingsOverlay(settingsOpen || diagnosticsOpen, settings = {
-                                    if (settingsOpen) settingsContent(false)
-                                    else DiagnosticsScreen(state, unit, permission, model::dismissDiagnostics)
+                                ScreenOverlayHost(overlayTransition, overlay, backdropOnly = false, overlay = { destination, interactive ->
+                                    when (destination) {
+                                        ScreenOverlay.SETTINGS -> settingsContent(false, interactive)
+                                        ScreenOverlay.DIAGNOSTICS -> DiagnosticsScreen(state, unit, permission, model::dismissDiagnostics, interactive = interactive)
+                                        ScreenOverlay.NONE -> Unit
+                                    }
                                 }) { workspace(true) }
                             }
                         }

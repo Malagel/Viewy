@@ -23,9 +23,9 @@ import com.malagel.viewy.measurement.HeightUnit
 @Composable
 internal fun DiagnosticsScreen(
     state: MeasurementUiState, unit: HeightUnit, cameraPermission: Boolean,
-    onBack: () -> Unit, backdropOnly: Boolean = false,
+    onBack: () -> Unit, backdropOnly: Boolean = false, interactive: Boolean = true,
 ) {
-    BackHandler(enabled = !backdropOnly, onBack = onBack)
+    BackHandler(enabled = !backdropOnly && interactive, onBack = onBack)
     val title = stringResource(R.string.diag_title)
     val locale = LocalLocale.current.platformLocale
     val presentation = remember(state.selection.activeMethod, state.measurement, state.camera, state.acquisition, unit, locale, cameraPermission) {

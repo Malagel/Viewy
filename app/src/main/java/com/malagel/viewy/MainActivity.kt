@@ -45,7 +45,7 @@ class MainActivity : AppCompatActivity() {
                         ViewyScreen(state, measurement, loaded.units.heightUnit, settings::open,
                             diagnosticsEnabled = loaded.diagnosticsEnabled,
                             settingsOpen = preferences.destination != SettingsDestination.CLOSED,
-                            settingsContent = { backdropOnly -> SettingsScreen(preferences, settings, backdropOnly) },
+                            settingsContent = { backdropOnly, interactive -> SettingsScreen(preferences, settings, backdropOnly, interactive) },
                         )
                     }
                     else -> Surface(Modifier.fillMaxSize()) {
