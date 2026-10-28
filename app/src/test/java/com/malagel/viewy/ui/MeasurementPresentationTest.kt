@@ -16,81 +16,74 @@ class MeasurementPresentationTest {
     private val observation = OrientationObservation(ViewingDirection(1.0, 0.0, 0.0), 2_000_000_000L, "frame", OrientationSource.GAME_ROTATION_VECTOR, quality, "camera")
     private val selected = MeasurementSelection().browse(MeasurementMethod.KNOWN_OBJECT_HEIGHT.mode).activate(MeasurementMethod.KNOWN_OBJECT_HEIGHT)
     private val ready = MeasurementUiState(
-        selection = selected,
+        selection = selected, resumed = true,
+        visibility = MeasurementVisibility(surfaceVisible = true, windowFocused = true, permissionGranted = true),
         measurement = MeasurementState(heightMeters = 2.0, cameraReady = true, latest = observation),
         camera = com.malagel.viewy.camera.CameraPreviewState(ready = true),
         acquisition = AcquisitionState(running = true),
     )
 
-    @Test fun heightIsRequiredBeforeCameraUseAndRestartRetainsIt() {
+    @Test fun capabilityIsIndependentOfHeightForegroundAndCompletion() {
         val workflow = KnownHeightWorkflow()
-        assertFalse(MeasurementUiState(selection = selected, measurement = workflow.state).needsCamera)
+        assertTrue(MeasurementUiState(selection = selected).requiresCamera)
+        assertFalse(ready.copy(measurement = workflow.state).acquisitionEligible)
         workflow.setHeight(2.0)
-        assertTrue(MeasurementUiState(selection = selected, measurement = workflow.state).needsCamera)
+        assertTrue(ready.copy(measurement = workflow.state).acquisitionEligible)
         workflow.restart()
-        assertTrue(MeasurementUiState(selection = selected, measurement = workflow.state).needsCamera)
+        assertTrue(ready.copy(measurement = workflow.state).acquisitionEligible)
+        assertEquals(2.0, workflow.state.heightMeters!!, 0.0)
     }
 
-    @Test fun inactiveSelectionCannotUseCameraOrSensorsEvenWithResidualWorkflowAndCameraState() {
-        for (selection in listOf(MeasurementSelection(), MeasurementSelection().dismiss())) {
-            val inactive = ready.copy(selection = selection)
-            assertFalse(inactive.needsCamera)
-            assertFalse(inactive.needsOrientation(resumed = true))
-        }
+    @Test fun inactiveOrCoveredMeasurementCannotAcquireEvenWithResidualReadyHardware() {
+        val hidden = listOf(
+            ready.copy(selection = MeasurementSelection()), ready.copy(selection = MeasurementSelection().dismiss()),
+            ready.copy(selection = selected.openModes()),
+            ready.copy(tutorial = com.malagel.viewy.tutorial.TutorialState(selectorExiting = true)),
+            ready.copy(tutorial = com.malagel.viewy.tutorial.TutorialState(pendingMethod = selected.activeMethod)),
+            ready.copy(diagnosticsOpen = true), ready.copy(resumed = false),
+            ready.copy(visibility = ready.visibility.copy(surfaceVisible = false)),
+            ready.copy(visibility = ready.visibility.copy(windowFocused = false)),
+            ready.copy(visibility = ready.visibility.copy(permissionGranted = false)),
+            ready.copy(visibility = ready.visibility.copy(covered = true)),
+            ready.copy(visibility = ready.visibility.copy(heightEditing = true)),
+        )
+        assertTrue(ready.acquisitionEligible)
+        hidden.forEach { assertFalse(it.toString(), it.acquisitionEligible) }
+        // Camera readiness gates orientation in the resource owner, not preview startup eligibility.
+        assertTrue(ready.copy(camera = ready.camera.copy(ready = false)).acquisitionEligible)
     }
 
-    @Test fun browsingAndReselectionDoNotChangeWorkflowOrResourceEligibility() {
+    @Test fun browsingAndReselectionSuspendUntilSheetRemoval() {
         val method = MeasurementMethod.KNOWN_OBJECT_HEIGHT
         val browsing = selected.openModes().browse(method.mode)
-        for (navigation in listOf(selected.openModes(), browsing, browsing.back(), browsing.dismiss(), browsing.activate(method))) {
-            val state = ready.copy(selection = navigation)
-            assertSame(ready.measurement, state.measurement)
-            assertSame(ready.camera, state.camera)
-            assertSame(ready.acquisition, state.acquisition)
-            assertTrue(state.needsCamera)
-            assertTrue(state.needsOrientation(resumed = true))
+        for (navigation in listOf(selected.openModes(), browsing, browsing.back())) {
+            assertFalse(ready.copy(selection = navigation).acquisitionEligible)
         }
+        assertTrue(ready.copy(selection = browsing.dismiss()).acquisitionEligible)
+        assertTrue(ready.copy(selection = browsing.activate(method)).acquisitionEligible)
     }
 
-    @Test fun orientationRequiresHeightResumedActivityAndReadyCamera() {
-        assertTrue(ready.needsOrientation(resumed = true))
-        assertFalse(ready.needsOrientation(resumed = false))
-        assertFalse(ready.copy(camera = ready.camera.copy(ready = false)).needsOrientation(resumed = true))
-        assertFalse(ready.copy(measurement = ready.measurement.copy(heightMeters = null)).needsOrientation(resumed = true))
-    }
-
-    @Test fun tutorialActionsPreserveMeasurementAndResourceStateThroughBothPagesAndReopening() {
+    @Test fun tutorialPagesAndReopeningSuspendUntilDismissal() {
         val method = MeasurementMethod.KNOWN_OBJECT_HEIGHT
         val tutorials = TutorialCoordinator(object : TutorialSeenStore {
             override fun hasSeen(methodId: String) = true
             override fun markSeen(methodId: String) = Unit
         }, methodTutorials.keys)
-        val browsing = MeasurementSelection().browse(method.mode)
-        tutorials.selectionChanged(browsing)
+        tutorials.selectionChanged(MeasurementSelection().browse(method.mode))
         tutorials.selectionChanged(selected, method)
+        assertFalse(ready.copy(tutorial = tutorials.state).acquisitionEligible)
         tutorials.selectorHidden(tutorials.state.navigationToken)
-
-        fun assertPreserved() {
-            val state = ready.copy(tutorial = tutorials.state)
-            assertSame(ready.measurement, state.measurement)
-            assertSame(ready.measurement.latest, state.measurement.latest)
-            assertSame(ready.camera, state.camera)
-            assertSame(ready.acquisition, state.acquisition)
-            assertSame(ready.selection, state.selection)
-            assertTrue(state.needsCamera)
-            assertTrue(state.needsOrientation(resumed = true))
+        repeat(3) {
+            assertTrue(ready.copy(tutorial = tutorials.state).acquisitionEligible)
+            tutorials.openManually()
+            val id = tutorials.state.card!!.id
+            for (page in TutorialPage.entries) {
+                tutorials.changePage(id, page)
+                assertFalse(ready.copy(tutorial = tutorials.state).acquisitionEligible)
+            }
+            tutorials.dismiss(id)
         }
-        tutorials.openManually()
-        assertPreserved()
-        val id = tutorials.state.card!!.id
-        tutorials.changePage(id, TutorialPage.DETAILS)
-        assertPreserved()
-        tutorials.changePage(id, TutorialPage.BASIC)
-        assertPreserved()
-        tutorials.dismiss(id)
-        assertPreserved()
-        tutorials.openManually()
-        assertPreserved()
+        assertTrue(ready.copy(tutorial = tutorials.state).acquisitionEligible)
     }
 
     @Test fun normalReadinessHasNoWarningAndResolvedLiveNoticesDisappear() {

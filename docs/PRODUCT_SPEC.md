@@ -27,8 +27,8 @@ future validated features; they have no selectable methods.
   an outside tap dismisses the sheet. Every reopening begins at modes. Entries
   work by tapping and scroll when needed. There is no pager.
 - Selecting Known Object Height closes the sheet and shows its existing workflow.
-  Browsing, dismissing or reselecting it preserves inputs, captures and results,
-  subject to existing interruption and capture-expiry rules. The measurement
+  Browsing suspends acquisition and invalidates any incomplete endpoint pair.
+  Dismissing or reselecting preserves the entered height and completed result. The measurement
   surface stays stationary, blurs gradually on Android 12+ and dims while the
   sheet opens; older versions use dimming. The sheet stays sharp.
 - Each implemented method has a contextual **?** control immediately left of the
@@ -40,8 +40,8 @@ future validated features; they have no selectable methods.
   practical content.
   Switching content starts at the top. Outside tap, Android Back and **Close**
   dismiss the entire card from either page; every reopening starts with basic
-  content. Opening or dismissing help does not reset inputs, captures, results or
-  acquisition; ordinary interruption and capture-expiry rules still apply.
+  content. Help suspends camera and orientation acquisition. Entered height and completed
+  results remain available; an incomplete endpoint pair is discarded.
 - The first activation of each method automatically opens its tutorial after the
   selector has finished closing. Only tutorial dismissal records completion,
   locally by stable method ID across launches and process death. Termination
@@ -70,8 +70,9 @@ future validated features; they have no selectable methods.
   with the opposite direction on Back. Outgoing controls and the covered
   measurement remain blocked until transitions finish. Motion follows the system
   animation scale; restored destinations appear directly without replaying entry.
-  Opening Settings preserves the selected method and camera composition; normal
-  sensor interruption and capture-expiry rules continue to apply.
+  Opening Settings preserves the selected method, height and completed result,
+  suspends acquisition and discards an incomplete endpoint pair. Acquisition
+  resumes only after the covering surface finishes closing.
 - Units default to Metric (meters); Imperial uses decimal feet for heights and
   distances. Tapping the units row switches immediately, including existing
   results. Height entry follows this preference without an independent selector.
@@ -82,8 +83,8 @@ future validated features; they have no selectable methods.
   language settings and the in-app picker share the same override on Android 13+;
   AppCompat supports older versions. Language changes update text and number
   formatting in place, without restarting the Activity or blanking the screen.
-  The language selector, method, height and compatible captures/results stay in
-  place, subject to ordinary hardware interruptions and capture expiry. Back
+  The language selector, method, height and completed results stay in
+  place; acquisition remains suspended throughout Settings. Back
   returns to main Settings. Language and units are independent.
 - Developer Options persists **Enable diagnostics**, off by default. A normal **?**
   tap always opens the method tutorial; an enabled long press opens a full-screen,
@@ -96,8 +97,9 @@ future validated features; they have no selectable methods.
   lengths/sensitivities follow global units. Recent stability is not calibrated
   accuracy, and derivatives are not measured errors. Back restores the stationary
   measurement interface; diagnostics does not request permissions, initialize or
-  restart hardware, record observations, or edit/recompute measurements. Ordinary
-  lifecycle interruption and capture-expiry rules continue. Settings, selection,
+  restart hardware, record observations, or edit/recompute measurements. Opening it
+  suspends acquisition and discards an incomplete endpoint pair while preserving
+  entered height and completed results. Settings, selection,
   tutorials and diagnostics cannot be operated together.
 - **Erase all app data** requires explicit confirmation explaining irreversibility,
   preferences/tutorial removal and app closure. Cancel changes nothing. Android
@@ -125,6 +127,14 @@ future validated features; they have no selectable methods.
   one second near the bottom inset and keeps that fallback position. Save, Cancel,
   outside tap and Back fade the card out before closing it. Its contents handle
   keyboard space without moving the measurement screen.
+- Camera and orientation acquisition run only with valid height, permission and
+  an unfinished measurement in the focused, resumed viewfinder. Settings, diagnostics,
+  tutorials (including pending first-use help), mode/method selection, height editing
+  and status dialogs suspend acquisition. A collapsed exceptional workspace does
+  not acquire. Intentional visible suspension briefly fades the last preview image
+  after releasing hardware; streaming fades back in on recovery. Activity inactivity
+  releases resources immediately. Completed results keep acquisition stopped until
+  Restart or saving height.
 - Rear-camera preview in a rounded rectangle with a thin, centered plus-shaped
   aiming reticle. Contextual guidance fades inside the preview; normal readiness
   adds no warning. Hardware/permission failures retain recovery controls.
@@ -142,8 +152,10 @@ future validated features; they have no selectable methods.
 - Explicit unquantified uncertainty for nominal captures. There is no validated
   angular-error input or automatic uncertainty range.
 - Restart and reset when saving height. The result has no separate retry control.
-  Interruptions or incompatible camera/sensor sessions clear captures
-  and results; measurements are not persisted across process death.
+  An incomplete pair is cleared by acquisition interruptions or incompatible
+  camera/sensor sessions. Completed results retain their captured geometry after
+  shutdown, overlays, backgrounding and Activity recreation until Restart or
+  saving height; measurements are not persisted across process death.
 - Camera permission explanation, retry/settings access, and visible camera or
   orientation unavailability with captures blocked.
 - Material 3 baseline dark colors across the app, launch window and system bars,

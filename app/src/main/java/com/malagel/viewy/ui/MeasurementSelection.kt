@@ -58,7 +58,7 @@ internal fun ModeControl(onOpen: () -> Unit) {
     }
 }
 
-/** One modal window. Navigation changes only its content; the camera stays in the content slot. */
+/** One modal window. Measurement bounds stay fixed while selection suspends acquisition. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun MeasurementSelector(

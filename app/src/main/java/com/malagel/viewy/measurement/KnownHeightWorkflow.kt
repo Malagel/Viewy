@@ -46,6 +46,7 @@ data class MeasurementState(
     val frameId: String? = null,
     val notice: MeasurementNotice? = null,
 ) {
+    val completed: Boolean get() = result != null
     val alignment: Alignment? get() = top?.let { a -> latest?.let { alignment(a.direction, it.direction) } }
     val canCapture: Boolean get() = cameraReady && heightMeters != null && stage != MeasurementStage.RESULT &&
         latest?.quality?.status == CaptureStatus.READY &&
@@ -66,13 +67,13 @@ class KnownHeightWorkflow(private val policy: AcquisitionPolicy = AcquisitionPol
     }
 
     fun cameraReady(ready: Boolean) {
-        if (!ready && state.cameraReady) restart(MeasurementNotice.CAMERA_INTERRUPTED)
-        state = state.copy(cameraReady = ready)
+        if (!ready && state.cameraReady && !state.completed) restart(MeasurementNotice.CAMERA_INTERRUPTED)
+        state = if (ready) state.copy(cameraReady = true) else state.copy(cameraReady = false, latest = null, frameId = null)
     }
 
     fun update(observation: OrientationObservation?, frameId: String?, running: Boolean, nowNanos: Long) {
         val first = state.top
-        if (first != null && (!running || frameId != first.referenceFrameId ||
+        if (!state.completed && first != null && (!running || frameId != first.referenceFrameId ||
                 (observation != null && (observation.source != first.source || observation.cameraMappingId != first.cameraMappingId)))) {
             restart(MeasurementNotice.SESSION_CHANGED)
         } else if (first != null && state.result == null && nowNanos - first.timestampNanos > policy.maximumPairGapNanos) {
@@ -82,7 +83,7 @@ class KnownHeightWorkflow(private val policy: AcquisitionPolicy = AcquisitionPol
     }
 
     fun restart(message: MeasurementNotice? = null) {
-        state = state.copy(stage = MeasurementStage.TOP, top = null, bottom = null, result = null, notice = message)
+        state = state.copy(stage = MeasurementStage.TOP, top = null, bottom = null, result = null, latest = null, frameId = null, notice = message)
         lastTapNanos = null
     }
 

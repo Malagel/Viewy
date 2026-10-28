@@ -91,7 +91,7 @@ internal fun NavigationInputGuard(blocked: Boolean, modifier: Modifier = Modifie
     }
 }
 
-/** Animate only the covering surface: the measurement/camera stays mounted at identical bounds. */
+/** Animate the covering surface over fixed measurement bounds; coverage suspends acquisition. */
 @Composable
 internal fun ScreenOverlayHost(
     transition: Transition<ScreenOverlay>, presentation: OverlayPresentation, backdropOnly: Boolean,

@@ -58,4 +58,21 @@ class PreviewSessionTest {
         assertTrue(session.update(next, ready))
         assertTrue(session.state.ready)
     }
+
+    @Test fun suspendedDescriptionRetainsDiagnosticsButCannotReviveReadiness() {
+        val session = PreviewSession()
+        val token = session.start()
+        session.update(token, ready.copy(failed = true, errorDetail = "failure"))
+        session.invalidate(preserveDescription = true)
+        assertFalse(session.state.ready)
+        assertFalse(session.state.open)
+        assertFalse(session.state.streaming)
+        assertSame(ready.mapping, session.state.mapping)
+        assertEquals("failure", session.state.errorDetail)
+        assertFalse(session.update(token, ready))
+        assertFalse(session.stop(token))
+        session.start()
+        assertFalse(session.state.failed)
+        assertNull(session.state.mapping)
+    }
 }

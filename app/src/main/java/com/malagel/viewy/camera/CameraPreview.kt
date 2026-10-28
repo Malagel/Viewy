@@ -72,6 +72,7 @@ class CameraPreview(
         override fun onDisplayAdded(displayId: Int) = Unit
         override fun onDisplayRemoved(displayId: Int) = Unit
         override fun onDisplayChanged(displayId: Int) {
+            if (disposed || failed) return
             if (view.display?.displayId == displayId && preview?.targetRotation != view.display?.rotation) {
                 // Even a 180° change may not recreate the Activity. Rebind and invalidate the pair.
                 description = description.copy(ready = false, messageRes = R.string.camera_display_changed)
@@ -200,7 +201,13 @@ class CameraPreview(
         scheduleStartupTimeout()
     }
 
+    // Foreground loss must not wait for Compose disposal or a presentation animation.
+    override fun onPause(owner: LifecycleOwner) = close()
+
+    override fun onDestroy(owner: LifecycleOwner) = close()
+
     fun close() {
+        if (disposed) return
         disposed = true
         handler.removeCallbacks(timeout)
         displayManager.unregisterDisplayListener(displayListener)

@@ -58,8 +58,8 @@ can still dispose a dialog immediately; pending animation work is cancelled.
 Selection uses one Material 3 modal bottom sheet above the existing measurement
 surface, including the exceptional workspace dialog. Sheet offset drives Compose
 blur in place; Material's animated scrim dims the background, including below API
-31 where blur is unsupported. Preview ownership/composition and sensor sessions
-remain intact. A fixed, window-bounded sheet content area keeps the outer panel
+31 where blur is unsupported. Measurement bounds remain intact while selection
+suspends camera and sensor sessions, including during sheet exit. A fixed, window-bounded sheet content area keeps the outer panel
 stationary while mode/method lists slide horizontally; each list scrolls for
 large text and compact windows. The sheet owns system insets and its Back handler:
 methods return to modes, modes dismiss, and outside taps dismiss at either level.
@@ -73,8 +73,8 @@ the detailed page also has Go back at the opposite end of that fixed control row
 Basic and detailed pages share the same card bounds and modal window. Outside
 card taps, dialog Back and Close all dispatch a whole-card dismissal. Page-keyed
 scroll state resets on content changes, while sensor-state publication leaves it
-alone. The measurement surface remains composed in place, with no help-driven
-hardware reconciliation or workflow actions.
+alone. The measurement surface remains composed in place; pending/visible help
+suspends acquisition through the shared resource policy.
 
 Tutorial content distinguishes resource-backed prose from display equations.
 A small, pure TeX-style notation parser feeds native Compose fraction and
@@ -90,7 +90,7 @@ token rejects obsolete sheet callbacks; card IDs reject obsolete page/dismissal
 callbacks. Selection schedules eligible first-use help, then the selector hides
 its sheet and removes its modal window. A post-composition acknowledgement is
 sent only with a closed selection and unmounted sheet. Only a matching token may
-present the pending tutorial. A recreated closed selector can acknowledge without
+present the pending tutorial or clear the selector-exit acquisition gate. A recreated closed selector can acknowledge without
 animating a nonexistent sheet; repeated acknowledgements cannot duplicate or
 reopen a card. Navigation cancels pending/visible help without marking it seen.
 No timer coordinates the overlays.
@@ -113,6 +113,7 @@ Source paths below are relative to `app/src/main/java/com/malagel/viewy/`:
 | `orientation/AndroidOrientationAcquisition.kt` | Sensor discovery/registration, callback isolation, freshness publication and cleanup. |
 | `camera/CameraDirectionMapping.kt` | Pure policy mapping the selected optical axis into native device axes. |
 | `camera/CameraPreview.kt` | CameraX Preview selection/pinning, metadata, stream/errors and unbinding. |
+| `ui/MeasurementResources.kt`, `orientation/OrientationRegistration.kt` | Shared resource reconciliation, synchronous preview release and sensor registration ownership. |
 | `camera/PreviewSession.kt` | Ownership tokens reject callbacks/disposal from obsolete previews and clear readiness on release. |
 | `measurement/HeightInput.kt` | Decimal validation and meters/feet conversion without presentation rounding. |
 | `measurement/MeasurementSelection.kt` | Pure selection transitions, active method and independent mode/method browsing state. |
@@ -294,42 +295,63 @@ stabilization and OIS are requested off; autofocus/exposure remain at defaults.
 Requests do not prove hardware behavior. There is no image analysis, photo capture,
 recording, focus lock, automatic endpoint detection or camera extension.
 
-Capture requires OPEN plus STREAMING and resumed Activity. Permission is rechecked
-on resume; denial and camera errors expose recovery. Startup timeout runs only
-while STARTED so background initialization does not spuriously fail. Compose owns
-the preview through DisposableEffect; CameraX owns lifecycle start/stop. Disposal
-removes observers/display listeners and unbinds only this Preview. Async provider
-completion cannot revive a disposed or failed preview; retry creates a new owner.
-ViewModel ownership tokens also reject obsolete preview callbacks and disposal.
+Method hardware requirements, acquisition eligibility and completed measurement
+state are separate contracts. `MeasurementUiState.acquisitionEligible` requires
+an active camera method, saved height, permission, resumed Activity, a visible and
+focused viewfinder window, no completed result, and no covering navigation/editor.
+Settings/diagnostics remain covering through exit animation; selection remains
+covering until the tutorial coordinator accepts its tokened sheet-removal
+acknowledgement. Pending first-use help also blocks startup. Height editing and
+status dialogs suspend acquisition; a collapsed exceptional workspace is inactive.
+The actual workspace window supplies focus, so an open exceptional dialog can
+acquire even though its Activity window has lost focus.
 
-Selection is held in the ViewModel separately from the measurement workflow.
-`MeasurementSelection` explicitly permits a null active method and uses typed
-Closed/Modes/Methods destinations. A new ViewModel starts inactive at Modes;
-selection never reads or writes SharedPreferences, so legacy method selections
-have no effect. Tutorial completion
-uses a separate preference file and cannot activate a method.
-The Activity's existing ViewModel retention preserves active method and navigation
-across configuration recreation and background return. Process death creates a
-new inactive selection. Workflow interruption rules still invalidate captures on
-pause or preview rebinding; retaining navigation does not retain hardware sessions.
+`MeasurementResources` is the main-thread owner of preview tokens, platform release
+callbacks and orientation mapping reconciliation. The ViewModel applies the same
+eligibility policy to preview startup, callbacks and capture. Suspension revokes
+preview ownership before closing CameraX, stopping orientation and publishing
+unready state. Last-known camera metadata/failure details remain diagnostic
+snapshots, with OPEN/STREAMING/readiness cleared; a new binding clears them. A preview epoch forces replacement even if an overlay opens and
+closes between compositions. Stable effect keys avoid rebinding on ordinary
+sensor publications or recomposition. Disposal/retry callbacks from an older
+owner cannot stop or revive its replacement; asynchronous CameraX provider work
+also checks disposal/failure. Sensor registration tokens reject queued data and
+accuracy callbacks after stop, failed registration or retry.
 
-Preview composition is keyed by active method. Browsing does not change that key,
-remove the preview or reconcile hardware. Reselecting the same method only closes
-the sheet. A different method clears captures, stops acquisition and revokes
-preview ownership before reconciliation; queued old preview callbacks/disposal
-cannot affect the next owner. Disposal releases the previous camera, and resource
-requirements gate the next preview/sensor session. Unavailable modes have no
-method identities or activation path. Camera and sensor eligibility both require
-an active method; inactive presentation never composes permission controls or a
-preview, even when saved dialog UI state exists after process recreation.
+Capture requires OPEN plus STREAMING and current orientation readiness. Permission
+is rechecked on resume; denial and camera errors retain recovery controls. Startup
+timeout runs only while STARTED. CameraX binds only for eligible foreground work;
+Activity pause and destruction close the adapter immediately and idempotently,
+without waiting for Compose disposal or motion. Cleanup removes observers,
+display listeners and startup callbacks and unbinds only the owned Preview.
+Orientation stop unregisters its listener and removes the freshness timer.
 
-Known Object Height requires a saved valid height before composing a preview or
-exposing camera-permission actions. The ViewModel independently gates its single
-sensor adapter on that requirement, an orientation-using method, resumed Activity
-and camera readiness. Releasing the preview clears its ready state and stops the
-sensor session. Pause, camera loss/reconfiguration, recreation or
-source/frame/mapping changes invalidate endpoints/results. Pause removes the sensor listener/freshness
-timer; ViewModel cleanup releases acquisition. No session survives process death.
+A visible intentional suspension can copy one transient PreviewView bitmap, close
+the camera immediately, and fade that decorative image over 150 ms. No image is
+stored or exposed to accessibility. Failure to obtain the bitmap skips the fade;
+backgrounding/disposal does not wait for it. The live preview fades in only after
+OPEN plus STREAMING. Presentation never extends a hardware session for an animation.
+
+Selection is held in the ViewModel separately from the workflow.
+`MeasurementSelection` permits a null active method and typed Closed/Modes/Methods
+destinations. A new ViewModel starts inactive at Modes; legacy persisted selection
+is ignored. Tutorial completion is stored separately and cannot activate a method.
+Activity recreation and background return retain navigation, height and completed
+results in memory; process death starts inactive. Browsing or reselecting the same
+method retains height/results while interrupting incomplete pairs. A different
+method explicitly restarts the workflow and revokes prior resource ownership.
+Unavailable modes have no activation path.
+
+Known Object Height requires a positive finite saved height before offering camera
+permission recovery. Orientation additionally requires the method's orientation
+capability and a ready camera mapping. Every interruption clears live orientation,
+its frame and an incomplete pair; source/frame/mapping changes and pair expiry
+still invalidate incomplete captures. Completed top/bottom observations and the
+stored estimate are immutable measurement evidence, independent of current
+hardware readiness. Camera loss, sensor shutdown and later frame changes never
+clear them. Acquisition stays stopped behind the result; Restart or saving height
+clears it and allows a fresh eligible session while preserving the entered height.
+No hardware session or measurement survives process death.
 
 The workflow owns top/bottom/correction/result transitions, finite height,
 compatibility checks and retry. Saving height restarts. The workflow retains
@@ -345,10 +367,10 @@ this never delays capture gating. Permission/camera/orientation recovery remains
 persistent. Diagnostics is a read-only full-screen surface in the current host
 window, including the exceptional workspace; the Activity draws an inaccessible
 backdrop while that workspace owns interaction. The shared overlay host preserves
-preview bounds/composition/ownership, hides covered accessibility and focus, and
+measurement bounds, suspends acquisition, hides covered accessibility and focus, and
 blocks background touch through exit completion. Diagnostics Back closes only that surface. A single
 ViewModel boolean retains navigation across Activity recreation without DataStore
-persistence; real pause/rebinding still invalidates endpoints normally.
+persistence; incomplete endpoints are invalidated on suspension.
 
 The Settings snapshot is the sole authority for diagnostics access. The help
 control has one 48 dp `combinedClickable` gesture owner: tap routes to the existing
@@ -394,20 +416,20 @@ Activity or an already open exceptional workspace), so the first recreated frame
 includes Settings without waiting for another dialog window to attach. An open
 exceptional workspace also keeps a matching Settings backdrop in the Activity,
 without duplicate accessibility, Back handling or reset dialogs, to cover the
-workspace window's teardown/reattachment. The underlying measurement composition,
-lifecycle owner and CameraX binding stay mounted. Covered controls are excluded from touch, focus and accessibility;
+workspace window's teardown/reattachment. The underlying measurement composition
+and lifecycle owner stay mounted while acquisition is suspended. Covered controls are excluded from touch, focus and accessibility;
 settings opening is gated while selection or pending/visible tutorial help owns
 interaction. Language selection applies the Android locale without navigating,
 including when the selected override has the same effective language as the device.
 Back from either child returns to main settings, then closes settings.
 No settings navigation or measurement session is restored after process death.
 Configuration recreation retains both ViewModels, but Activity pause and preview
-rebinding still invalidate hardware captures normally.
+rebinding still invalidate incomplete captures.
 
 `ScreenOverlayHost` animates only the covering Settings/Diagnostics surface using
 Compose transitions: a 240 ms entrance and 180 ms exit combine fading with 24 dp
 vertical movement. Measurement stays outside animated content and never changes
-bounds or ownership. One transition coordinates the Activity and exceptional
+bounds; resource eligibility follows coverage through exit completion. One transition coordinates the Activity and exceptional
 workspace hosts. Outgoing destinations remain composed until exit completes,
 including a reversed entrance; the Settings page remains visible after its logical
 destination closes. During motion, input guards consume touch and exclude moving

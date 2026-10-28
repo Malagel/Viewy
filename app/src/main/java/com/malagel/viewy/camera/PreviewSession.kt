@@ -9,10 +9,13 @@ internal class PreviewSession {
     var state = CameraPreviewState()
         private set
 
-    /** Revoke ownership before a different method can bind, including queued callbacks. */
-    fun invalidate() {
+    /** Revoke ownership before suspension or a different method, including queued callbacks. */
+    fun invalidate(preserveDescription: Boolean = false) {
         active = null
-        state = CameraPreviewState()
+        state = if (preserveDescription) state.copy(
+            ready = false, open = false, streaming = false,
+            messageRes = if (state.failed) state.messageRes else R.string.camera_stopped,
+        ) else CameraPreviewState(messageRes = R.string.camera_stopped)
     }
 
     fun start(): Long {

@@ -63,7 +63,8 @@ private fun interruptionResource(interruption: Interruption) = when (interruptio
 /** Uses the same prerequisite distinction as acquisition; no hardware discovery is requested here. */
 @StringRes
 internal fun orientationReadiness(state: MeasurementUiState): Int = when {
-    !state.needsCamera -> R.string.diag_inactive_height
+    (!state.requiresCamera || !state.heightConfigured) -> R.string.diag_inactive_height
+    state.measurement.completed || !state.acquisitionEligible -> R.string.diag_stopped
     !state.camera.ready -> R.string.diag_waiting_camera
     state.acquisition.failure == AcquisitionFailure.UNAVAILABLE -> R.string.diag_sensor_unavailable
     state.acquisition.failure == AcquisitionFailure.REGISTRATION_FAILED -> R.string.diag_registration_failed
@@ -75,9 +76,10 @@ internal fun orientationReadiness(state: MeasurementUiState): Int = when {
 internal fun captureBlockReason(state: MeasurementUiState, cameraPermission: Boolean): Int {
     val m = state.measurement
     return when {
-        !state.needsCamera -> R.string.diag_inactive_height
+        (!state.requiresCamera || !state.heightConfigured) -> R.string.diag_inactive_height
         m.stage == MeasurementStage.RESULT -> R.string.diag_result_ready
         !cameraPermission -> R.string.camera_permission_explanation
+        !state.acquisitionEligible -> R.string.diag_stopped
         !state.camera.ready -> state.camera.messageRes
         !state.acquisition.running -> orientationReadiness(state)
         m.latest?.quality?.status != CaptureStatus.READY -> captureStatusResource(m.latest?.quality?.status)
@@ -96,9 +98,9 @@ internal fun validDiagnosticEndpoint(observation: OrientationObservation?, state
     d.x.isFinite() && d.y.isFinite() && d.z.isFinite() && hypot(hypot(d.x, d.y), d.z).let { norm -> norm.isFinite() && norm > 0 } &&
         it.timestampNanos > 0 && it.quality.status == CaptureStatus.READY &&
         it.quality.ageNanos?.let { age -> age in 0..AcquisitionPolicy().maximumAgeNanos } == true &&
-        it.referenceFrameId == state.measurement.frameId &&
-        (state.acquisition.activeSource == null || it.source == state.acquisition.activeSource) &&
-        (state.camera.mapping == null || it.cameraMappingId == state.camera.mapping.id)
+        (state.measurement.completed || (it.referenceFrameId == state.measurement.frameId &&
+            (state.acquisition.activeSource == null || it.source == state.acquisition.activeSource) &&
+            (state.camera.mapping == null || it.cameraMappingId == state.camera.mapping.id)))
 }
 
 /** Pure projection of the already-published snapshot. No clocks, geometry estimates or session calls. */
@@ -110,7 +112,7 @@ internal fun diagnosticsPresentation(state: MeasurementUiState, unit: HeightUnit
     val m = state.measurement
     val camera = state.camera
     val a = state.acquisition
-    val active = state.needsCamera
+    val active = state.requiresCamera && state.heightConfigured
     val quality = a.quality.takeIf { active && a.running }
     val latest = a.observation.takeIf { active && a.running }
     val measurement = DiagnosticSection(R.string.diag_measurement_status, listOf(
@@ -127,7 +129,7 @@ internal fun diagnosticsPresentation(state: MeasurementUiState, unit: HeightUnit
             else -> camera.messageRes
         }),
         status(R.string.diag_orientation, orientationReadiness(state)),
-        row(R.string.diag_capture_eligible, flag(m.canCapture && active && cameraPermission && camera.ready && a.running)),
+        row(R.string.diag_capture_eligible, flag(m.canCapture && state.acquisitionEligible && cameraPermission && camera.ready && a.running)),
         status(R.string.diag_capture_reason, captureBlockReason(state, cameraPermission)),
         row(R.string.diag_notice, m.notice?.let { f.text(noticeResource(it)) } ?: f.text(R.string.diag_none)),
     ))

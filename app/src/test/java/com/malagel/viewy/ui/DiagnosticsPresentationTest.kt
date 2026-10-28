@@ -20,7 +20,8 @@ class DiagnosticsPresentationTest {
     private val top = OrientationObservation(ViewingDirection(1.0, 0.0, 1.0), 1_000_000_000, "frame", OrientationSource.GAME_ROTATION_VECTOR, quality, mapping.id)
     private val bottom = top.copy(direction = ViewingDirection(1.0, 0.0, 0.0), timestampNanos = 2_000_000_000)
     private val ready = MeasurementUiState(
-        selection = selected,
+        selection = selected, resumed = true,
+        visibility = MeasurementVisibility(surfaceVisible = true, windowFocused = true, permissionGranted = true),
         measurement = MeasurementState(heightMeters = 2.0, cameraReady = true, latest = top, frameId = "frame"),
         camera = CameraPreviewState(ready = true, messageRes = R.string.camera_ready, mapping = mapping, logicalCameraId = "0", open = true, streaming = true),
         acquisition = AcquisitionState(discoveryCompleted = true, availableSources = setOf(top.source), activeSource = top.source,
@@ -51,7 +52,7 @@ class DiagnosticsPresentationTest {
         assertTrue(open.withDiagnostics(false).canOpenSettings)
     }
 
-    @Test fun retainedNavigationAndOpeningClosingOnlyChangePresentationState() {
+    @Test fun retainedDiagnosticsNavigationStopsEligibilityWithoutMutatingSnapshots() {
         val workflow = KnownHeightWorkflow()
         workflow.setHeight(2.0)
         workflow.cameraReady(true)
@@ -68,16 +69,17 @@ class DiagnosticsPresentationTest {
             assertSame(before.acquisition, state.acquisition)
             assertSame(before.tutorial, state.tutorial)
             assertSame(workflow.state, state.measurement)
-            assertTrue(state.needsCamera)
-            assertTrue(state.needsOrientation(true))
+            assertTrue(state.requiresCamera)
+            assertEquals(!state.diagnosticsOpen, state.acquisitionEligible)
             present(state)
             assertSame(before.measurement, state.measurement)
         }
         assertEquals(before, closed)
-        // Ordinary expiry continues while covered, without diagnostics intervention.
-        workflow.update(bottom, "frame", true, top.timestampNanos + 16_000_000_000)
+        // Resource reconciliation invalidates the incomplete pair immediately.
+        workflow.cameraReady(false)
+        workflow.update(null, null, false, top.timestampNanos + 1)
         assertNull(workflow.state.top)
-        assertEquals(MeasurementNotice.CAPTURE_EXPIRED, workflow.state.notice)
+        assertEquals(MeasurementNotice.CAMERA_INTERRUPTED, workflow.state.notice)
     }
 
     @Test fun diagnosticsDoesNotCompleteOrChangeFirstUseTutorials() {
@@ -212,5 +214,29 @@ class DiagnosticsPresentationTest {
         assertEquals(R.string.diag_axis_fallback, value(present(), R.string.diag_mapping_basis).resource)
         val pose = CameraDirectionMapping.forRearCamera("rear", 1, floatArrayOf(0f, 1f, 0f, 0f))
         assertEquals(R.string.diag_lens_pose, value(present(ready.copy(camera = ready.camera.copy(mapping = pose))), R.string.diag_mapping_basis).resource)
+    }
+
+    @Test fun stoppedCompletedResultUsesCapturedPairWithoutALiveReferenceFrame() {
+        val workflow = KnownHeightWorkflow()
+        workflow.setHeight(2.0)
+        workflow.cameraReady(true)
+        workflow.update(top, "frame", true, top.timestampNanos)
+        workflow.capture(CaptureResult.Captured(top), top.timestampNanos)
+        workflow.update(bottom, "frame", true, bottom.timestampNanos)
+        workflow.capture(CaptureResult.Captured(bottom), bottom.timestampNanos)
+        val estimate = workflow.state.result!!
+        workflow.cameraReady(false)
+        workflow.update(null, null, false, bottom.timestampNanos + 100_000_000_000)
+        val stopped = ready.copy(measurement = workflow.state, camera = ready.camera.copy(ready = false),
+            acquisition = AcquisitionState(), diagnosticsOpen = true)
+        assertNull(stopped.measurement.frameId)
+        val p = present(stopped)
+        assertEquals(R.string.diag_recorded, value(p, R.string.diag_top_capture).resource)
+        assertEquals(R.string.diag_recorded, value(p, R.string.diag_bottom_capture).resource)
+        assertEquals(estimate.horizontalDistanceMeters,
+            value(p, R.string.diag_horizontal_distance).arguments[0].toDouble(), 1e-6)
+        assertEquals(R.string.diag_result_ready, captureBlockReason(stopped, true))
+        assertEquals(R.string.diag_stopped, orientationReadiness(stopped))
+        assertFalse(stopped.acquisitionEligible)
     }
 }

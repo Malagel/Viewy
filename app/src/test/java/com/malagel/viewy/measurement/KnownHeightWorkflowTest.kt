@@ -83,17 +83,38 @@ class KnownHeightWorkflowTest {
         w.capture(CaptureResult.Captured(observation(30.0)), base)
         assertNull(w.state.top)
     }
-    @Test fun cameraLossClearsPairAndResultAndCanRecover() {
+    @Test fun cameraLossClearsIncompletePairAndCanRecover() {
         val w = workflow()
         top(w)
-        bottom(w)
         w.cameraReady(false)
         assertNull(w.state.result)
         assertNull(w.state.top)
         assertFalse(w.state.canCapture)
         w.cameraReady(true)
+        w.update(observation(30.0), "frame", true, base)
         top(w)
         assertNotNull(w.state.top)
+    }
+    @Test fun completedPairSurvivesCameraAndSensorShutdownAndChangedFramesUntilRestart() {
+        val w = workflow()
+        top(w)
+        bottom(w)
+        val completed = w.state
+        repeat(3) {
+            w.cameraReady(false)
+            w.update(null, null, false, base + 100_000_000_000L)
+            w.update(observation(10.0).copy(referenceFrameId = "new", cameraMappingId = "new"), "new", true, base)
+            assertSame(completed.result, w.state.result)
+            assertSame(completed.top, w.state.top)
+            assertSame(completed.bottom, w.state.bottom)
+            assertEquals(MeasurementStage.RESULT, w.state.stage)
+            assertFalse(w.state.canCapture)
+        }
+        w.restart()
+        assertFalse(w.state.completed)
+        assertNull(w.state.latest)
+        assertNull(w.state.frameId)
+        assertEquals(2.0, w.state.heightMeters!!, 0.0)
     }
     @Test fun pausedOrChangedReferenceInvalidatesFirstEndpoint() {
         for ((running, frame) in listOf(false to "frame", true to "new-frame", false to null)) {

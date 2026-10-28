@@ -5,7 +5,6 @@ import android.content.Context
 import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import com.malagel.viewy.camera.CameraPreviewState
-import com.malagel.viewy.camera.PreviewSession
 import com.malagel.viewy.domain.MeasurementMethod
 import com.malagel.viewy.domain.MeasurementMode
 import com.malagel.viewy.measurement.MeasurementSelection
@@ -27,12 +26,19 @@ data class MeasurementUiState(
     val acquisition: AcquisitionState = AcquisitionState(),
     val diagnosticsOpen: Boolean = false,
     val tutorial: TutorialState = TutorialState(),
+    val visibility: MeasurementVisibility = MeasurementVisibility(),
+    val resumed: Boolean = false,
+    val previewEpoch: Long = 0,
 ) {
-    val canOpenSettings: Boolean get() = !diagnosticsOpen && !selection.isOpen && tutorial.card == null && tutorial.pendingMethod == null
-    val canOpenHelp: Boolean get() = selection.activeMethod != null && !selection.isOpen && tutorial.card == null && tutorial.pendingMethod == null
-    val needsCamera: Boolean get() = selection.activeMethod?.requiresCamera == true && measurement.heightMeters != null
-    fun needsOrientation(resumed: Boolean): Boolean = resumed && needsCamera && camera.ready &&
-        selection.activeMethod?.requiresOrientation == true
+    val canOpenSettings: Boolean get() = !diagnosticsOpen && !selection.isOpen && !tutorial.selectorExiting && tutorial.card == null && tutorial.pendingMethod == null
+    val canOpenHelp: Boolean get() = selection.activeMethod != null && !selection.isOpen && !tutorial.selectorExiting && tutorial.card == null && tutorial.pendingMethod == null
+    val requiresCamera: Boolean get() = selection.activeMethod?.requiresCamera == true
+    val requiresOrientation: Boolean get() = selection.activeMethod?.requiresOrientation == true
+    val heightConfigured: Boolean get() = measurement.heightMeters != null
+    val acquisitionEligible: Boolean get() = requiresCamera && heightConfigured && !measurement.completed &&
+        resumed && visibility.surfaceVisible && visibility.windowFocused && visibility.permissionGranted &&
+        !visibility.covered && !visibility.heightEditing && !diagnosticsOpen && !selection.isOpen &&
+        !tutorial.selectorExiting && tutorial.card == null && tutorial.pendingMethod == null
 }
 
 /** Owns ONE foreground acquisition; diagnostics only observes its snapshots. Everything runs on main. */
@@ -44,52 +50,41 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
     )
     private val mutableState = MutableStateFlow(MeasurementUiState())
     val state = mutableState.asStateFlow()
-    private val previewSession = PreviewSession()
-    private var resumed = false
-    private var activeMapping: String? = null
     private val acquisition = AndroidOrientationAcquisition(application) { value ->
         workflow.update(value.observation, value.referenceFrameId, value.running, SystemClock.elapsedRealtimeNanos())
         mutableState.value = mutableState.value.copy(measurement = workflow.state, acquisition = value)
     }
 
-    fun resume() { resumed = true; reconcile() }
-    fun pause() { resumed = false; reconcile() }
+    private val resources = MeasurementResources(workflow, acquisition::start, acquisition::stop)
 
-    fun startPreview(): Long? {
-        if (!mutableState.value.needsCamera) return null
-        val token = previewSession.start()
-        mutableState.value = mutableState.value.copy(camera = previewSession.state)
+    fun resume() { mutableState.value = mutableState.value.copy(resumed = true); reconcile() }
+    fun pause() { mutableState.value = mutableState.value.copy(resumed = false); reconcile() }
+
+    fun visibilityChanged(visibility: MeasurementVisibility) {
+        if (visibility == mutableState.value.visibility) return
+        mutableState.value = mutableState.value.copy(visibility = visibility)
         reconcile()
-        return token
     }
+
+    fun startPreview(release: (Boolean) -> Unit): Long? = resources.startPreview(release).also { publish() }
 
     fun previewChanged(token: Long, camera: CameraPreviewState) {
-        if (!mutableState.value.needsCamera || !previewSession.update(token, camera)) return
-        mutableState.value = mutableState.value.copy(camera = previewSession.state)
-        reconcile()
+        if (resources.previewChanged(token, camera)) publish()
     }
 
-    fun stopPreview(token: Long) {
-        if (!previewSession.stop(token)) return
-        mutableState.value = mutableState.value.copy(camera = previewSession.state)
-        reconcile()
-    }
+    fun stopPreview(token: Long) { resources.stopPreview(token); publish() }
 
     private fun reconcile() {
-        val camera = mutableState.value.camera
-        val mapping = camera.mapping
-        val desired = if (mutableState.value.needsOrientation(resumed)) mapping else null
-        workflow.cameraReady(desired != null)
-        if (desired?.id != activeMapping) {
-            activeMapping = desired?.id
-            if (desired == null) acquisition.stop() else acquisition.start(mapping = desired)
-        }
+        val state = mutableState.value
+        resources.reconcile(state.acquisitionEligible, state.requiresOrientation,
+            animateRelease = state.resumed && state.visibility.surfaceVisible && state.visibility.windowFocused)
         publish()
     }
 
     private fun updateSelection(next: MeasurementSelection, activated: MeasurementMethod? = null) {
         tutorials.selectionChanged(next, activated)
         mutableState.value = mutableState.value.copy(selection = next, tutorial = tutorials.state)
+        reconcile()
     }
 
     fun openModes() { if (mutableState.value.canOpenSettings) updateSelection(mutableState.value.selection.openModes()) }
@@ -101,14 +96,14 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
     fun help(longPress: Boolean, diagnosticsEnabled: Boolean) {
         when (helpAction(mutableState.value, longPress, diagnosticsEnabled)) {
             HelpAction.TUTORIAL -> { tutorials.openManually(); publishTutorial() }
-            HelpAction.DIAGNOSTICS -> { mutableState.value = mutableState.value.withDiagnostics(open = true, enabled = diagnosticsEnabled) }
+            HelpAction.DIAGNOSTICS -> { mutableState.value = mutableState.value.withDiagnostics(open = true, enabled = diagnosticsEnabled); reconcile() }
             HelpAction.NONE -> Unit
         }
     }
-    fun dismissDiagnostics() { mutableState.value = mutableState.value.withDiagnostics(open = false) }
+    fun dismissDiagnostics() { mutableState.value = mutableState.value.withDiagnostics(open = false); reconcile() }
     fun dismissTutorial(cardId: Long) { tutorials.dismiss(cardId); publishTutorial() }
     fun changeTutorialPage(cardId: Long, page: TutorialPage) { tutorials.changePage(cardId, page); publishTutorial() }
-    private fun publishTutorial() { mutableState.value = mutableState.value.copy(tutorial = tutorials.state) }
+    private fun publishTutorial() { mutableState.value = mutableState.value.copy(tutorial = tutorials.state); reconcile() }
 
     fun selectMethod(method: MeasurementMethod) {
         if (mutableState.value.diagnosticsOpen) return
@@ -117,32 +112,35 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
         if (next.activeMethod != previous.activeMethod) {
             // A different workflow must never inherit captures or a hardware session.
             workflow.restart()
-            activeMapping = null
-            acquisition.stop()
-            previewSession.invalidate()
-            mutableState.value = mutableState.value.copy(camera = previewSession.state)
+            resources.reconcile(false, false, animateRelease = false)
         }
         updateSelection(next, activated = method)
-        if (next.activeMethod != previous.activeMethod) reconcile()
     }
 
     fun setHeight(meters: Double) { workflow.setHeight(meters); publish(); reconcile() }
-    fun restart() { workflow.restart(); publish() }
-    fun recaptureBottom() { workflow.recaptureBottom(); publish() }
+    fun restart() { workflow.restart(); publish(); reconcile() }
+    fun recaptureBottom() { workflow.recaptureBottom(); publish(); reconcile() }
     fun capture() {
         // Freshness is recomputed NOW, not trusted from the last 100 ms UI snapshot.
+        if (!mutableState.value.acquisitionEligible) return
         val captured = acquisition.capture()
         workflow.capture(captured, SystemClock.elapsedRealtimeNanos())
         publish()
-    }
-
-    fun restartOrientation() {
-        workflow.restart(MeasurementNotice.SENSOR_RESTARTED)
-        activeMapping = null
-        acquisition.stop()
         reconcile()
     }
 
-    private fun publish() { mutableState.value = mutableState.value.copy(measurement = workflow.state) }
-    override fun onCleared() = acquisition.stop()
+    fun restartOrientation() {
+        if (!mutableState.value.acquisitionEligible) return
+        workflow.restart(MeasurementNotice.SENSOR_RESTARTED)
+        resources.restartOrientation()
+        reconcile()
+    }
+
+    private fun publish() { mutableState.value = mutableState.value.copy(
+        measurement = workflow.state, camera = resources.camera, previewEpoch = resources.previewEpoch,
+    ) }
+    override fun onCleared() {
+        resources.reconcile(false, false, animateRelease = false)
+        acquisition.stop()
+    }
 }

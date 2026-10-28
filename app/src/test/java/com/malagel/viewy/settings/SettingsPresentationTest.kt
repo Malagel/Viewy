@@ -108,14 +108,15 @@ class SettingsPresentationTest {
                 assertSame(before.result, screen.measurement.result)
                 assertSame(top, screen.measurement.top)
                 assertSame(bottom, screen.measurement.bottom)
-                assertTrue(screen.needsCamera)
+                assertTrue(screen.requiresCamera)
+                assertFalse(screen.acquisitionEligible)
             }
         }
-        // Real recreation interrupts hardware; navigation alone has no workflow action.
+        // Resource interruption preserves the completed immutable measurement.
         workflow.cameraReady(false)
         assertEquals(before.heightMeters, workflow.state.heightMeters)
-        assertNull(workflow.state.top)
-        assertNull(workflow.state.result)
+        assertSame(before.top, workflow.state.top)
+        assertSame(before.result, workflow.state.result)
         assertEquals(MeasurementUnits.METRIC, MeasurementUnits.IMPERIAL.switched())
         assertEquals(MeasurementUnits.IMPERIAL, MeasurementUnits.METRIC.switched())
     }

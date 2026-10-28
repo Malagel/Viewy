@@ -35,7 +35,7 @@ class AndroidOrientationAcquisition(context: Context, private val onState: (Acqu
     private var listener: SensorEventListener? = null
     private var session: OrientationSession? = null
     private var state = AcquisitionState()
-    private var generation = 0L
+    private val registration = OrientationRegistration()
     private val refresh = object : Runnable {
         override fun run() {
             publish()
@@ -57,10 +57,10 @@ class AndroidOrientationAcquisition(context: Context, private val onState: (Acqu
             val newSession = if (mapping == null) OrientationSession(source) else OrientationSession(
                 source, deviceDirection = mapping.deviceDirection, cameraMappingId = mapping.id,
             )
-            val token = generation
+            val token = registration.begin()
             val newListener = object : SensorEventListener {
                 override fun onSensorChanged(event: SensorEvent) {
-                    if (token != generation || event.sensor != sensor) return
+                    if (!registration.accepts(token) || event.sensor != sensor) return
                     if (Build.VERSION.SDK_INT >= 33 && event.firstEventAfterDiscontinuity) {
                         newSession.interrupt(Interruption.PLATFORM_DISCONTINUITY)
                     }
@@ -68,7 +68,7 @@ class AndroidOrientationAcquisition(context: Context, private val onState: (Acqu
                     newSession.add(event.values, event.timestamp, SystemClock.elapsedRealtimeNanos())
                 }
                 override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {
-                    if (token == generation) newSession.updateAccuracy(accuracy)
+                    if (registration.accepts(token)) newSession.updateAccuracy(accuracy)
                 }
             }
             val registered = try {
@@ -88,7 +88,7 @@ class AndroidOrientationAcquisition(context: Context, private val onState: (Acqu
                 return
             }
             manager?.unregisterListener(newListener)
-            generation++
+            registration.invalidate()
             registrationFailed = true
         }
         state = state.copy(failure = if (registrationFailed) AcquisitionFailure.REGISTRATION_FAILED else AcquisitionFailure.UNAVAILABLE)
@@ -97,7 +97,7 @@ class AndroidOrientationAcquisition(context: Context, private val onState: (Acqu
 
     fun stop() {
         check(Looper.myLooper() == Looper.getMainLooper())
-        generation++ // Discard callbacks already queued by an old registration.
+        registration.invalidate() // Discard callbacks already queued by an old registration.
         listener?.let { manager?.unregisterListener(it) }
         listener = null
         handler.removeCallbacks(refresh)

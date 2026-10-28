@@ -15,6 +15,7 @@ data class TutorialCard(val id: Long, val method: MeasurementMethod, val page: T
 
 data class TutorialState(
     val navigationToken: Long = 0,
+    val selectorExiting: Boolean = false,
     val pendingMethod: MeasurementMethod? = null,
     val card: TutorialCard? = null,
 )
@@ -37,7 +38,7 @@ class TutorialCoordinator(
         selection = next
         hiddenToken = null
         // Navigation cancels a pending/visible tutorial without recording a dismissal.
-        state = TutorialState(navigationToken = state.navigationToken + 1)
+        state = TutorialState(navigationToken = state.navigationToken + 1, selectorExiting = !next.isOpen)
         if (validActivation && activated in supportedMethods && !seen.hasSeen(activated.id)) {
             state = state.copy(pendingMethod = activated)
         }
@@ -47,6 +48,7 @@ class TutorialCoordinator(
     fun selectorHidden(token: Long) {
         if (token != state.navigationToken || selection.isOpen) return
         hiddenToken = token
+        state = state.copy(selectorExiting = false)
         state.pendingMethod?.takeIf { it == selection.activeMethod }?.let(::show)
     }
 

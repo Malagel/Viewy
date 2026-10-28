@@ -1,5 +1,6 @@
 package com.malagel.viewy.ui
 
+import android.graphics.Bitmap
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -9,6 +10,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
@@ -16,6 +18,7 @@ import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -34,6 +37,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.StrokeCap
@@ -111,8 +116,18 @@ fun ViewyScreen(
         owner.lifecycle.addObserver(observer)
         onDispose { owner.lifecycle.removeObserver(observer) }
     }
+    DisposableEffect(model) {
+        onDispose { model.visibilityChanged(MeasurementVisibility()) }
+    }
     val openAppSettings = {
-        if (!overlay.blocksMeasurement && state.canOpenSettings) onSettings()
+        if (!overlay.blocksMeasurement && state.canOpenSettings) {
+            model.visibilityChanged(state.visibility.copy(covered = true))
+            onSettings()
+        }
+    }
+    val openHeight = {
+        model.visibilityChanged(state.visibility.copy(heightEditing = true))
+        editHeight = true
     }
     val measurement = state.measurement
     val textMeasurer = rememberTextMeasurer()
@@ -140,6 +155,8 @@ fun ViewyScreen(
             BoxWithConstraints(Modifier.fillMaxSize().padding(insets), contentAlignment = Alignment.TopCenter) {
                 val compact = maxHeight < 500.dp || LocalDensity.current.fontScale > 1.5f || maxWidth < 320.dp
                 val workspace: @Composable (Boolean) -> Unit = { overflow ->
+                    MeasurementVisibilityEffect(model, permission, overlay.blocksMeasurement || showStatus, editHeight)
+
                     Column(
                         Modifier.widthIn(max = 600.dp).fillMaxSize().padding(start = if (compact) 12.dp else 20.dp, end = if (compact) 12.dp else 20.dp, top = 8.dp, bottom = if (compact) 16.dp else 32.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -153,7 +170,7 @@ fun ViewyScreen(
                             key(state.selection.activeMethod) {
                                 BoxWithConstraints(
                                     Modifier.fillMaxWidth().then(if (overflow) Modifier.height(320.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)) else Modifier.weight(1f)).clip(RoundedCornerShape(28.dp))
-                                        .background(if (state.needsCamera) Color.Black else MaterialTheme.colorScheme.secondaryContainer),
+                                        .background(if (state.heightConfigured) Color.Black else MaterialTheme.colorScheme.secondaryContainer),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     val hintText = hint?.let { stringResource(it) }
@@ -163,21 +180,23 @@ fun ViewyScreen(
                                             textMeasurer.measure(it, hintStyle, constraints = Constraints(maxWidth = with(density) { (maxWidth - 52.dp).roundToPx().coerceAtLeast(1) })).size.height
                                         } ?: 0
                                     }
-                                    val recoveryNeeded = !permission || !state.camera.ready || !state.acquisition.running
+                                    val recoveryNeeded = !measurement.completed && (!permission || !state.camera.ready || !state.acquisition.running)
                                     val useStatusDialog = !overflow && ((compact && recoveryNeeded) || hintHeight > with(density) { (maxHeight / 2 - 54.dp).toPx() })
-                                    if (state.needsCamera && permission) {
-                                        key(cameraAttempt) { LivePreview(model) }
+                                    if (state.heightConfigured) {
+                                        LivePreview(model, state, cameraAttempt)
                                         if (state.camera.ready && state.acquisition.running) Reticle(Modifier.size(40.dp))
                                     }
-                                    if (!state.needsCamera) {
+                                    if (!state.heightConfigured) {
                                         Button(
-                                            onClick = { editHeight = true },
+                                            onClick = openHeight,
                                             modifier = Modifier.padding(20.dp).widthIn(min = 240.dp, max = 320.dp).heightIn(min = 64.dp),
                                             contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
                                         ) { Text(stringResource(R.string.enter_height), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center) }
                                     } else {
                                         // Long recovery text has a scrollable dialog in constrained windows.
-                                        if (useStatusDialog) {
+                                        if (measurement.completed) {
+                                            // The result remains below the stopped viewfinder; Restart resumes acquisition.
+                                        } else if (useStatusDialog) {
                                             FilledTonalIconButton(onClick = { showStatus = true }, modifier = Modifier.align(Alignment.BottomStart).padding(4.dp)
                                                 .semantics { contentDescription = previewStatusLabel }) {
                                                 Text(if (!permission || !state.camera.ready || !state.acquisition.running || hint != null) "!" else "i")
@@ -202,10 +221,10 @@ fun ViewyScreen(
                                         }
                                         val heightLabel = stringResource(R.string.height_edit, heightLabelText(unit.fromMeters(measurement.heightMeters!!), LocalLocale.current.platformLocale), unit.label)
                                         if (compact) {
-                                            LabeledIconButton(R.string.object_height, "↕", { editHeight = true }, Modifier.align(Alignment.TopEnd), heightLabel)
+                                            LabeledIconButton(R.string.object_height, "↕", openHeight, Modifier.align(Alignment.TopEnd), heightLabel)
                                         } else {
                                             FilledTonalButton(
-                                                onClick = { editHeight = true }, shape = CircleShape,
+                                                onClick = openHeight, shape = CircleShape,
                                                 modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
                                                 colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f)),
                                             ) { Text(heightLabel) }
@@ -239,8 +258,10 @@ fun ViewyScreen(
                     }
                 }) {
                     if (state.selection.activeMethod == null) {
+                        SideEffect { model.visibilityChanged(MeasurementVisibility()) }
                         InactiveMeasurementScreen(compact, openAppSettings) { ModeControl(model::openModes) }
                     } else if (exceptional) {
+                        if (!showWorkspace) SideEffect { model.visibilityChanged(MeasurementVisibility()) }
                         Column(Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                             ViewyHeader(compact, false, true, { openHelp(false) }, {}, openAppSettings, diagnosticsEnabled, { openHelp(true) })
                             TextButton(onClick = { showWorkspace = true }, modifier = Modifier.weight(1f)) {
@@ -278,7 +299,7 @@ fun ViewyScreen(
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(stringResource(R.string.measurement_method_subtitle))
                     Text(stageText(measurement, unit))
-                    if (!state.needsCamera) TextButton(onClick = { showStatus = false; editHeight = true }) { Text(stringResource(R.string.enter_height)) }
+                    if (!state.heightConfigured) TextButton(onClick = { showStatus = false; editHeight = true }) { Text(stringResource(R.string.enter_height)) }
                     else {
                         RecoveryControls(state, permission, requested, requestPermission, openSettings, { cameraAttempt++ }, model::restartOrientation)
                         candidate?.let { Text(stringResource(it)) }
@@ -312,15 +333,52 @@ private fun RecoveryControls(
     }
 }
 
+/** Report the window containing the actual viewfinder, including the exceptional dialog. */
 @Composable
-private fun LivePreview(model: MeasurementViewModel) {
+private fun MeasurementVisibilityEffect(model: MeasurementViewModel, permission: Boolean, covered: Boolean, editing: Boolean) {
+    val focused = LocalWindowInfo.current.isWindowFocused
+    SideEffect {
+        model.visibilityChanged(MeasurementVisibility(
+            surfaceVisible = true, windowFocused = focused, covered = covered,
+            heightEditing = editing, permissionGranted = permission,
+        ))
+    }
+}
+
+@Composable
+private fun LivePreview(model: MeasurementViewModel, state: MeasurementUiState, attempt: Int) {
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
     val view = remember(context) { PreviewView(context) }
-    AndroidView(factory = { view }, modifier = Modifier.fillMaxSize())
-    DisposableEffect(view, owner, model) {
-        val token = model.startPreview()
-        val preview = token?.let { CameraPreview(context, owner, view) { camera -> model.previewChanged(it, camera) } }
+    var frozen by remember { mutableStateOf<Bitmap?>(null) }
+    val frozenAlpha = remember { Animatable(0f) }
+    val liveAlpha by animateFloatAsState(
+        if (state.acquisitionEligible && state.camera.ready) 1f else 0f,
+        tween(ScreenMotion.fadeMillis), label = "Streaming preview",
+    )
+    val currentAlpha by rememberUpdatedState(liveAlpha)
+    val animateSnapshot = state.resumed && state.visibility.surfaceVisible
+    LaunchedEffect(frozen, animateSnapshot) {
+        if (frozen != null && animateSnapshot) {
+            frozenAlpha.snapTo(currentAlpha)
+            frozenAlpha.animateTo(0f, tween(ScreenMotion.fadeMillis))
+        }
+        frozen = null
+    }
+    AndroidView(factory = { view }, modifier = Modifier.fillMaxSize().graphicsLayer { alpha = liveAlpha })
+    frozen?.let { bitmap ->
+        Image(bitmap.asImageBitmap(), contentDescription = null, contentScale = ContentScale.FillBounds,
+            modifier = Modifier.fillMaxSize().graphicsLayer { alpha = frozenAlpha.value })
+    }
+    DisposableEffect(view, owner, model, state.acquisitionEligible, state.previewEpoch, attempt) {
+        var preview: CameraPreview? = null
+        val token = if (state.acquisitionEligible) model.startPreview { animate ->
+            // Snapshot only intentional visible suspensions. Never delay unbinding for motion.
+            frozen = if (animate && currentAlpha > 0f) runCatching { view.bitmap }.getOrNull() else null
+            preview?.close()
+            preview = null
+        } else null
+        preview = token?.let { CameraPreview(context, owner, view) { camera -> model.previewChanged(it, camera) } }
         onDispose {
             preview?.close()
             if (token != null) model.stopPreview(token)

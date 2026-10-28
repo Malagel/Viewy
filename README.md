@@ -24,7 +24,8 @@ two aiming directions. Application ID: `com.malagel.viewy`.
    of the top capture. Remain still briefly after each capture.
 4. Read the centered approximate horizontal distance below the preview. Use the
    circular **Restart** arrow at bottom left to try again. The preview-edge height
-   control edits height; saving starts a new measurement.
+   control edits height; saving starts a new measurement. Camera and orientation
+   acquisition stop behind a completed result.
 
 The app uses Material 3's baseline dark palette. The normal portrait screen keeps
 capture/navigation visible without scrolling; the input dialog handles the
@@ -34,12 +35,14 @@ opens a scrollable workspace in exceptionally constrained layouts. Help stays
 scrollable in its centered card. The top-right gear opens Settings at any time
 outside another modal. Tap **Measurement units** to switch Metric/Imperial, or
 **Language** to select **English**, **Español**, or **Use device language** (default).
-Changes save automatically. Language and unit changes update the current screen
-in place, preserving compatible captures within normal session and expiry rules. **Developer Options** contains
+Changes save automatically. Settings, diagnostics, tutorials, selection and height
+editing suspend camera/sensor work and discard incomplete endpoint pairs. Entered
+height and completed results remain available, including after backgrounding.
+Language and unit changes update the current screen in place. **Developer Options** contains
 a persistent **Enable diagnostics** preference (off by default) and **Erase all app data**.
 When enabled, hold **?** to open read-only method diagnostics; a normal tap always
 opens the tutorial. Diagnostics shows current readiness, camera/sensor information
-and endpoint geometry without starting hardware or changing a measurement.
+and completed endpoint geometry while acquisition remains stopped.
 Only confirming **Erase all data** requests Android to clear storage and permissions and close Viewy; the app remains
 installed. Reopen it manually for fresh defaults and tutorials. The rounded
 Viewy wordmark uses bundled [Nunito Bold](https://github.com/google/fonts/blob/c7e2740188205a85323c7385547f6f59b4f2245a/ofl/nunito/Nunito-Bold.ttf)

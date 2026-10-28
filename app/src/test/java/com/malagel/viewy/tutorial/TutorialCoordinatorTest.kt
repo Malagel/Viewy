@@ -98,7 +98,11 @@ class TutorialCoordinatorTest {
         coordinator.selectorHidden(oldToken)
         assertNull(coordinator.state.card)
         navigate(selection.dismiss())
+        assertTrue(coordinator.state.selectorExiting)
+        coordinator.selectorHidden(oldToken)
+        assertTrue(coordinator.state.selectorExiting)
         hidden()
+        assertFalse(coordinator.state.selectorExiting)
         assertNull(coordinator.state.card) // Browsing dismissal must not reopen help.
         assertTrue(seen.ids.isEmpty())
         activate()
