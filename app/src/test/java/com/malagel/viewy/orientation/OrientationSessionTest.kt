@@ -3,7 +3,9 @@ package com.malagel.viewy.orientation
 import com.malagel.viewy.domain.ViewingDirection
 import kotlin.math.PI
 import kotlin.math.cos
+import kotlin.math.hypot
 import kotlin.math.sin
+import kotlin.math.sqrt
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -201,5 +203,110 @@ class OrientationSessionTest {
         val quality = s.quality(base+12*tick)
         assertEquals(CaptureStatus.READY,quality.status)
         assertTrue(Math.toDegrees(quality.maximumVariationRadians!!) < 0.11)
+    }
+
+    @Test fun qualityStatisticsExactlyMatchOriginalListCalculationAcrossRollingWindows() {
+        val policy = AcquisitionPolicy(abruptRotationRadians = PI + 1.0)
+        val sequences = listOf(
+            listOf(identity),
+            List(90) { i -> rotationX(PI / 2 + sin(i * 0.7) * 0.004) },
+            List(90) { i ->
+                val pitch = 0.7 + i * 0.03
+                val yaw = i * 0.04
+                floatArrayOf(
+                    (sin(pitch / 2) * cos(yaw / 2)).toFloat(),
+                    (sin(pitch / 2) * sin(yaw / 2)).toFloat(),
+                    (cos(pitch / 2) * sin(yaw / 2)).toFloat(),
+                    (cos(pitch / 2) * cos(yaw / 2)).toFloat(),
+                )
+            },
+            // Exactly opposite rays have no usable spherical mean.
+            listOf(identity, floatArrayOf(1f, 0f, 0f, 0f)),
+        )
+        for (sequence in sequences) {
+            val s = OrientationSession(OrientationSource.GAME_ROTATION_VECTOR, policy)
+            val retained = ArrayDeque<Pair<Long, ViewingDirection>>()
+            assertNull(s.quality(base).rmsVariationRadians)
+            assertNull(s.quality(base).maximumVariationRadians)
+            for ((index, values) in sequence.withIndex()) {
+                val time = base + index * tick
+                s.add(values, time, time)
+                retained.addLast(time to OrientationRotation.fromRotationVector(values)!!.rotate(RearCameraAxis.assumedDeviceDirection))
+                while (retained.size > 64 || time - retained.first().first > policy.windowNanos) retained.removeFirst()
+                val rays = retained.map { it.second }
+                // Reference the original list-based evaluation, including its summation order.
+                val sum = ViewingDirection(rays.sumOf { it.x }, rays.sumOf { it.y }, rays.sumOf { it.z })
+                val norm = hypot(hypot(sum.x, sum.y), sum.z)
+                val mean = if (norm > 1e-9) ViewingDirection(sum.x / norm, sum.y / norm, sum.z / norm) else null
+                val angles = mean?.let { m -> rays.map { angularSeparation(it, m) } }.orEmpty()
+                val rms = angles.takeIf { it.isNotEmpty() }?.let { sqrt(it.sumOf { a -> a * a } / it.size) }
+                val actual = s.quality(time + 1)
+                assertEquals(rays.size, actual.sampleCount)
+                assertEquals(time - retained.first().first, actual.spanNanos)
+                assertEquals(1L, actual.ageNanos)
+                assertEquals(rms?.toRawBits(), actual.rmsVariationRadians?.toRawBits())
+                assertEquals(angles.maxOrNull()?.toRawBits(), actual.maximumVariationRadians?.toRawBits())
+            }
+        }
+    }
+
+    @Test fun latestAndCapturePreserveEveryQualityStatusAndRejectionReason() {
+        fun check(s: OrientationSession, now: Long, status: CaptureStatus) {
+            val quality = s.quality(now)
+            assertEquals(status, quality.status)
+            val latest = s.latest(now)
+            if (latest != null) assertEquals(quality, latest.quality)
+            if (status == CaptureStatus.READY) {
+                assertEquals(CaptureResult.Captured(latest!!), s.capture(now))
+            } else {
+                assertEquals(CaptureResult.Rejected(status), s.capture(now))
+            }
+        }
+        val s = session()
+        check(s, base, CaptureStatus.WAITING)
+        s.add(identity, base, base)
+        check(s, base, CaptureStatus.SETTLING)
+        val end = fill(s, base + tick)
+        check(s, end + 250_000_000L, CaptureStatus.READY)
+        check(s, end + 250_000_001L, CaptureStatus.STALE)
+        check(s, end - 1, CaptureStatus.STALE)
+        val moving = session()
+        repeat(13) { i ->
+            val time = base + i * tick
+            moving.add(rotationX(if (i % 2 == 0) 0.03 else -0.03), time, time)
+        }
+        check(moving, base + 12 * tick, CaptureStatus.MOVING)
+        val unreliable = session()
+        unreliable.updateAccuracy(0)
+        val unreliableEnd = fill(unreliable)
+        check(unreliable, unreliableEnd, CaptureStatus.UNRELIABLE)
+        check(unreliable, unreliableEnd + 250_000_001L, CaptureStatus.STALE)
+    }
+
+    @Test fun captureUsesCurrentFreshnessAndLatestActualRayWithCustomMetadata() {
+        val deviceDirection = ViewingDirection(0.0, 1.0, 0.0)
+        val s = OrientationSession(
+            OrientationSource.ROTATION_VECTOR, deviceDirection = deviceDirection, cameraMappingId = "selected-camera",
+        )
+        s.updateAccuracy(3)
+        repeat(13) { i ->
+            val time = base + i * tick
+            s.add(rotationX(i * 0.0001), time, time)
+        }
+        val end = base + 12 * tick
+        val frame = s.referenceFrameId
+        val published = s.latest(end)!!
+        val now = end + 123_456_789L
+        val observation = capture(s, now)
+        assertEquals(end, observation.timestampNanos)
+        assertEquals(OrientationRotation.fromRotationVector(rotationX(0.0012))!!.rotate(deviceDirection), observation.direction)
+        assertEquals(frame, observation.referenceFrameId)
+        assertEquals(OrientationSource.ROTATION_VECTOR, observation.source)
+        assertEquals("selected-camera", observation.cameraMappingId)
+        assertEquals(s.quality(now), observation.quality)
+        assertEquals(published.quality.copy(ageNanos = now - end), observation.quality)
+        assertEquals(CaptureResult.Rejected(CaptureStatus.STALE), s.capture(end + 250_000_001L))
+        assertEquals(frame, s.referenceFrameId)
+        assertEquals(Interruption.STARTED, s.lastInterruption)
     }
 }

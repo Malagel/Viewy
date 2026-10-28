@@ -113,8 +113,9 @@ class AndroidOrientationAcquisition(context: Context, private val onState: (Acqu
 
     private fun publish() {
         val now = SystemClock.elapsedRealtimeNanos()
+        val observation = session?.latest(now)
         state = state.copy(
-            observation = session?.latest(now), quality = session?.quality(now),
+            observation = observation, quality = observation?.quality ?: session?.quality(now),
             referenceFrameId = session?.referenceFrameId, interruption = session?.lastInterruption,
         )
         onState(state)

@@ -162,9 +162,18 @@ class OrientationSession(
         val sum = ViewingDirection(samples.sumOf { it.direction.x }, samples.sumOf { it.direction.y }, samples.sumOf { it.direction.z })
         val norm = hypot(hypot(sum.x, sum.y), sum.z)
         val mean = if (norm > 1e-9) ViewingDirection(sum.x/norm, sum.y/norm, sum.z/norm) else null
-        val angles = mean?.let { m -> samples.map { angularSeparation(it.direction, m) } }.orEmpty()
-        val rms = angles.takeIf { it.isNotEmpty() }?.let { sqrt(it.sumOf { a -> a*a } / it.size) }
-        val maximum = angles.maxOrNull()
+        var squaredAngleSum = 0.0
+        var maximumAngle = Double.NEGATIVE_INFINITY
+        if (mean != null) {
+            for (sample in samples) {
+                val angle = angularSeparation(sample.direction, mean)
+                // Keep the same sample order and arithmetic as the list-based statistics.
+                squaredAngleSum += angle * angle
+                maximumAngle = maxOf(maximumAngle, angle)
+            }
+        }
+        val rms = if (mean == null) null else sqrt(squaredAngleSum / samples.size)
+        val maximum = if (mean == null) null else maximumAngle
         val status = when {
             latest == null -> CaptureStatus.WAITING
             age == null || age < 0 || age > policy.maximumAgeNanos -> CaptureStatus.STALE
@@ -177,13 +186,17 @@ class OrientationSession(
     }
 
     fun latest(nowNanos: Long): OrientationObservation? = samples.lastOrNull()?.let {
-        OrientationObservation(it.direction, it.time, referenceFrameId, source, quality(nowNanos), cameraMappingId)
+        observation(it, quality(nowNanos))
     }
+
+    private fun observation(sample: Sample, quality: OrientationQuality) = OrientationObservation(
+        sample.direction, sample.time, referenceFrameId, source, quality, cameraMappingId,
+    )
 
     /** Capture the latest actual ray, not an averaged synthetic orientation or a button timestamp. */
     fun capture(nowNanos: Long): CaptureResult {
         val quality = quality(nowNanos)
-        return if (quality.status == CaptureStatus.READY) CaptureResult.Captured(latest(nowNanos)!!)
+        return if (quality.status == CaptureStatus.READY) CaptureResult.Captured(observation(samples.last(), quality))
         else CaptureResult.Rejected(quality.status)
     }
 }
