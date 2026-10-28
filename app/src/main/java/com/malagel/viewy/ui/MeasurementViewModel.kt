@@ -25,16 +25,17 @@ data class MeasurementUiState(
     val measurement: MeasurementState = MeasurementState(),
     val camera: CameraPreviewState = CameraPreviewState(),
     val acquisition: AcquisitionState = AcquisitionState(),
-    val diagnostics: OrientationDiagnosticsState = OrientationDiagnosticsState(),
+    val diagnosticsOpen: Boolean = false,
     val tutorial: TutorialState = TutorialState(),
 ) {
-    val canOpenSettings: Boolean get() = !selection.isOpen && tutorial.card == null && tutorial.pendingMethod == null
+    val canOpenSettings: Boolean get() = !diagnosticsOpen && !selection.isOpen && tutorial.card == null && tutorial.pendingMethod == null
+    val canOpenHelp: Boolean get() = selection.activeMethod != null && !selection.isOpen && tutorial.card == null && tutorial.pendingMethod == null
     val needsCamera: Boolean get() = selection.activeMethod?.requiresCamera == true && measurement.heightMeters != null
     fun needsOrientation(resumed: Boolean): Boolean = resumed && needsCamera && camera.ready &&
         selection.activeMethod?.requiresOrientation == true
 }
 
-/** Shares ONE foreground acquisition with measurement and debug tools. Everything runs on main. */
+/** Owns ONE foreground acquisition; diagnostics only observes its snapshots. Everything runs on main. */
 class MeasurementViewModel(application: Application) : AndroidViewModel(application) {
     private val workflow = KnownHeightWorkflow()
     private val tutorials = TutorialCoordinator(
@@ -46,14 +47,9 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
     private val previewSession = PreviewSession()
     private var resumed = false
     private var activeMapping: String? = null
-    private var requestedSource: OrientationSource? = null
     private val acquisition = AndroidOrientationAcquisition(application) { value ->
         workflow.update(value.observation, value.referenceFrameId, value.running, SystemClock.elapsedRealtimeNanos())
-        val previous = mutableState.value.diagnostics
-        val diagnostics = if (previous.acquisition.referenceFrameId != value.referenceFrameId) {
-            OrientationDiagnosticsState(acquisition = value, captureMessage = "Session changed; A/B cleared")
-        } else previous.copy(acquisition = value)
-        mutableState.value = mutableState.value.copy(measurement = workflow.state, acquisition = value, diagnostics = diagnostics)
+        mutableState.value = mutableState.value.copy(measurement = workflow.state, acquisition = value)
     }
 
     fun resume() { resumed = true; reconcile() }
@@ -86,7 +82,7 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
         workflow.cameraReady(desired != null)
         if (desired?.id != activeMapping) {
             activeMapping = desired?.id
-            if (desired == null) acquisition.stop() else acquisition.start(requestedSource, desired)
+            if (desired == null) acquisition.stop() else acquisition.start(mapping = desired)
         }
         publish()
     }
@@ -96,18 +92,26 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
         mutableState.value = mutableState.value.copy(selection = next, tutorial = tutorials.state)
     }
 
-    fun openModes() = updateSelection(mutableState.value.selection.openModes())
+    fun openModes() { if (mutableState.value.canOpenSettings) updateSelection(mutableState.value.selection.openModes()) }
     fun backSelection() = updateSelection(mutableState.value.selection.back())
     fun dismissSelection() = updateSelection(mutableState.value.selection.dismiss())
     fun browseMode(mode: MeasurementMode) = updateSelection(mutableState.value.selection.browse(mode))
 
     fun selectionHidden(token: Long) { tutorials.selectorHidden(token); publishTutorial() }
-    fun openTutorial() { tutorials.openManually(); publishTutorial() }
+    fun help(longPress: Boolean, diagnosticsEnabled: Boolean) {
+        when (helpAction(mutableState.value, longPress, diagnosticsEnabled)) {
+            HelpAction.TUTORIAL -> { tutorials.openManually(); publishTutorial() }
+            HelpAction.DIAGNOSTICS -> { mutableState.value = mutableState.value.withDiagnostics(open = true, enabled = diagnosticsEnabled) }
+            HelpAction.NONE -> Unit
+        }
+    }
+    fun dismissDiagnostics() { mutableState.value = mutableState.value.withDiagnostics(open = false) }
     fun dismissTutorial(cardId: Long) { tutorials.dismiss(cardId); publishTutorial() }
     fun changeTutorialPage(cardId: Long, page: TutorialPage) { tutorials.changePage(cardId, page); publishTutorial() }
     private fun publishTutorial() { mutableState.value = mutableState.value.copy(tutorial = tutorials.state) }
 
     fun selectMethod(method: MeasurementMethod) {
+        if (mutableState.value.diagnosticsOpen) return
         val previous = mutableState.value.selection
         val next = previous.activate(method)
         if (next.activeMethod != previous.activeMethod) {
@@ -132,29 +136,11 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
         publish()
     }
 
-    fun restartSource(source: OrientationSource?) {
-        requestedSource = source
+    fun restartOrientation() {
         workflow.restart(MeasurementNotice.SENSOR_RESTARTED)
         activeMapping = null
         acquisition.stop()
         reconcile()
-    }
-
-    fun clearDiagnostics() {
-        mutableState.value = mutableState.value.copy(diagnostics = OrientationDiagnosticsState(acquisition = mutableState.value.acquisition))
-    }
-
-    fun captureDiagnostic(first: Boolean) {
-        val previous = mutableState.value.diagnostics
-        val next = when (val capture = acquisition.capture()) {
-            is CaptureResult.Rejected -> previous.copy(captureMessage = "Capture rejected: ${capture.status}")
-            is CaptureResult.Captured -> if (first) previous.copy(
-                first = capture.observation, second = null, comparison = null, captureMessage = "A recorded",
-            ) else previous.first?.let {
-                previous.copy(second = capture.observation, comparison = compareObservations(it, capture.observation), captureMessage = "B recorded")
-            } ?: previous.copy(captureMessage = "Record A first")
-        }
-        mutableState.value = mutableState.value.copy(diagnostics = next)
     }
 
     private fun publish() { mutableState.value = mutableState.value.copy(measurement = workflow.state) }

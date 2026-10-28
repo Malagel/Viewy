@@ -32,7 +32,7 @@ internal fun contextualGuidance(state: MeasurementUiState): Int? {
 }
 
 @StringRes
-private fun noticeResource(notice: MeasurementNotice): Int = when (notice) {
+internal fun noticeResource(notice: MeasurementNotice): Int = when (notice) {
     MeasurementNotice.CAMERA_INTERRUPTED -> R.string.notice_camera_interrupted
     MeasurementNotice.SESSION_CHANGED -> R.string.notice_session_changed
     MeasurementNotice.CAPTURE_EXPIRED -> R.string.notice_expired

@@ -8,7 +8,7 @@ import com.malagel.viewy.orientation.RearCameraAxis
 data class CameraDirectionMapping(
     val id: String,
     val deviceDirection: ViewingDirection,
-    val evidence: String,
+    val usesLensPose: Boolean = false,
 ) {
     companion object {
         /**
@@ -25,11 +25,10 @@ data class CameraDirectionMapping(
             // A rear-facing optical axis must point into the rear device hemisphere.
             if (axis != null && axis.z < 0.0) return CameraDirectionMapping(
                 "$cameraIdentity:pose-$poseReference:${pose!!.joinToString()}", axis,
-                "Reported lens pose in Android sensor axes; preview center remains approximate",
+                usesLensPose = true,
             )
             return CameraDirectionMapping(
                 "$cameraIdentity:${RearCameraAxis.mappingId}", RearCameraAxis.assumedDeviceDirection,
-                "Device −Z fallback: missing, unsuitable or inconsistent lens pose; preview center approximate",
             )
         }
     }

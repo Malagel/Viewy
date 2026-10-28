@@ -43,6 +43,7 @@ class MainActivity : AppCompatActivity() {
                     }
                     loaded != null -> {
                         ViewyScreen(state, measurement, loaded.units.heightUnit, settings::open,
+                            diagnosticsEnabled = loaded.diagnosticsEnabled,
                             settingsOpen = preferences.destination != SettingsDestination.CLOSED,
                             settingsContent = { backdropOnly -> SettingsScreen(preferences, settings, backdropOnly) },
                         )

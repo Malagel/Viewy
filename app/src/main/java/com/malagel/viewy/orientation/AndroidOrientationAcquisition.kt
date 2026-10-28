@@ -11,13 +11,17 @@ import android.os.Looper
 import android.os.SystemClock
 import com.malagel.viewy.camera.CameraDirectionMapping
 
+enum class AcquisitionFailure { UNAVAILABLE, REGISTRATION_FAILED }
+
 /** Immutable snapshots. Sensor callbacks and publication are confined to the main looper. */
 data class AcquisitionState(
+    val discoveryCompleted: Boolean = false,
+    val failure: AcquisitionFailure? = null,
     val availableSources: Set<OrientationSource> = emptySet(),
     val activeSource: OrientationSource? = null,
     val sensorName: String? = null,
     val running: Boolean = false,
-    val message: String = "Stopped",
+    val startupFallbackUsed: Boolean = false,
     val referenceFrameId: String? = null,
     val interruption: Interruption? = null,
     val observation: OrientationObservation? = null,
@@ -40,16 +44,15 @@ class AndroidOrientationAcquisition(context: Context, private val onState: (Acqu
     }
 
     /** Fallback is attempted only before a registration/session starts. Explicit restarts reset it. */
-    fun start(requestedSource: OrientationSource? = null, mapping: CameraDirectionMapping? = null) {
+    fun start(mapping: CameraDirectionMapping? = null) {
         check(Looper.myLooper() == Looper.getMainLooper())
         stop()
         val sensors = OrientationSource.entries.mapNotNull { source ->
             manager?.getDefaultSensor(source.androidType())?.let { source to it }
         }.toMap()
-        state = AcquisitionState(availableSources = sensors.keys.toSet())
-        val candidates = if (requestedSource == null) OrientationSource.entries else listOf(requestedSource)
-        val failed = mutableListOf<String>()
-        for (source in candidates) {
+        state = AcquisitionState(discoveryCompleted = true, availableSources = sensors.keys.toSet())
+        var registrationFailed = false
+        for (source in OrientationSource.entries) {
             val sensor = sensors[source] ?: continue
             val newSession = if (mapping == null) OrientationSession(source) else OrientationSession(
                 source, deviceDirection = mapping.deviceDirection, cameraMappingId = mapping.id,
@@ -71,8 +74,7 @@ class AndroidOrientationAcquisition(context: Context, private val onState: (Acqu
             val registered = try {
                 // 25 Hz requested; actual rate is a platform hint. No batched/stale delivery requested.
                 manager?.registerListener(newListener, sensor, 40_000, 0, handler) == true
-            } catch (error: RuntimeException) {
-                failed += "${source.name}: ${error.javaClass.simpleName}"
+            } catch (_: RuntimeException) {
                 false
             }
             if (registered) {
@@ -80,16 +82,16 @@ class AndroidOrientationAcquisition(context: Context, private val onState: (Acqu
                 listener = newListener
                 state = state.copy(
                     activeSource = source, sensorName = sensor.name, running = true,
-                    message = if (failed.isEmpty()) "Listening" else "Listening; startup fallback after ${failed.joinToString()}",
+                    startupFallbackUsed = registrationFailed,
                 )
                 handler.post(refresh)
                 return
             }
             manager?.unregisterListener(newListener)
             generation++
-            failed += "${source.name}: registration failed"
+            registrationFailed = true
         }
-        state = state.copy(message = if (failed.isEmpty()) "Requested orientation sensors unavailable" else failed.joinToString())
+        state = state.copy(failure = if (registrationFailed) AcquisitionFailure.REGISTRATION_FAILED else AcquisitionFailure.UNAVAILABLE)
         publish()
     }
 
@@ -100,8 +102,9 @@ class AndroidOrientationAcquisition(context: Context, private val onState: (Acqu
         listener = null
         handler.removeCallbacks(refresh)
         session?.interrupt(Interruption.STOPPED)
+        val interruption = session?.lastInterruption ?: state.interruption
         session = null
-        state = state.copy(running = false, message = "Stopped", observation = null, quality = null, referenceFrameId = null)
+        state = state.copy(running = false, failure = null, interruption = interruption, observation = null, quality = null, referenceFrameId = null)
         onState(state)
     }
 

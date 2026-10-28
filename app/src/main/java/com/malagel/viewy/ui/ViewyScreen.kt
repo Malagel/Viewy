@@ -73,7 +73,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 @Composable
 fun ViewyScreen(
     state: MeasurementUiState, model: MeasurementViewModel, unit: HeightUnit, onSettings: () -> Unit,
-    settingsOpen: Boolean, settingsContent: @Composable (backdropOnly: Boolean) -> Unit,
+    diagnosticsEnabled: Boolean, settingsOpen: Boolean, settingsContent: @Composable (backdropOnly: Boolean) -> Unit,
 ) {
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
@@ -83,6 +83,13 @@ fun ViewyScreen(
     var editHeight by rememberSaveable { mutableStateOf(false) }
     var showWorkspace by rememberSaveable { mutableStateOf(false) }
     var showStatus by rememberSaveable { mutableStateOf(false) }
+    val diagnosticsOpen = state.diagnosticsOpen && diagnosticsEnabled && !settingsOpen
+    LaunchedEffect(diagnosticsEnabled, settingsOpen) {
+        if (!diagnosticsEnabled || settingsOpen) model.dismissDiagnostics()
+    }
+    val openHelp: (Boolean) -> Unit = { longPress ->
+        if (!settingsOpen && !editHeight && !showStatus) model.help(longPress, diagnosticsEnabled)
+    }
     LaunchedEffect(state.selection.activeMethod) {
         if (state.selection.activeMethod == null) {
             editHeight = false
@@ -136,7 +143,7 @@ fun ViewyScreen(
                             Modifier.weight(1f).then(if (overflow) Modifier.verticalScroll(rememberScrollState()) else Modifier),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            ViewyHeader(compact, overflow, true, model::openTutorial, { showWorkspace = false }, openAppSettings)
+                            ViewyHeader(compact, overflow, true, { openHelp(false) }, { showWorkspace = false }, openAppSettings, diagnosticsEnabled, { openHelp(true) })
                             key(state.selection.activeMethod) {
                                 BoxWithConstraints(
                                     Modifier.fillMaxWidth().then(if (overflow) Modifier.height(320.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)) else Modifier.weight(1f)).clip(RoundedCornerShape(28.dp))
@@ -172,7 +179,7 @@ fun ViewyScreen(
                                         } else if (recoveryNeeded) {
                                             Surface(Modifier.fillMaxWidth().align(Alignment.BottomCenter), color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.95f)) {
                                                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                    RecoveryControls(state, permission, requested, requestPermission, openSettings, { cameraAttempt++ }, { model.restartSource(null) })
+                                                    RecoveryControls(state, permission, requested, requestPermission, openSettings, { cameraAttempt++ }, model::restartOrientation)
                                                 }
                                             }
                                         } else {
@@ -218,12 +225,15 @@ fun ViewyScreen(
                 val workspaceDialogOpen = exceptional && state.selection.activeMethod != null && showWorkspace
                 // Cover the Activity as well as the workspace window: the backdrop
                 // remains visible while Android tears down/recreates that dialog.
-                SettingsOverlay(settingsOpen, settings = { settingsContent(workspaceDialogOpen) }) {
+                SettingsOverlay(settingsOpen || diagnosticsOpen, settings = {
+                    if (settingsOpen) settingsContent(workspaceDialogOpen)
+                    else DiagnosticsScreen(state, unit, permission, model::dismissDiagnostics, workspaceDialogOpen)
+                }) {
                     if (state.selection.activeMethod == null) {
                         InactiveMeasurementScreen(compact, openAppSettings) { ModeControl(model::openModes) }
                     } else if (exceptional) {
                         Column(Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            ViewyHeader(compact, false, true, model::openTutorial, {}, openAppSettings)
+                            ViewyHeader(compact, false, true, { openHelp(false) }, {}, openAppSettings, diagnosticsEnabled, { openHelp(true) })
                             TextButton(onClick = { showWorkspace = true }, modifier = Modifier.weight(1f)) {
                                 Text(stringResource(R.string.open_viewfinder))
                             }
@@ -232,11 +242,14 @@ fun ViewyScreen(
                             }
                         }
                         if (showWorkspace) Dialog(
-                            onDismissRequest = { if (!settingsOpen) showWorkspace = false },
-                            properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = !settingsOpen),
+                            onDismissRequest = { if (!settingsOpen && !diagnosticsOpen) showWorkspace = false },
+                            properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = !settingsOpen && !diagnosticsOpen),
                         ) {
                             Surface(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout)).then(methodBackdrop)) {
-                                SettingsOverlay(settingsOpen, settings = { settingsContent(false) }) { workspace(true) }
+                                SettingsOverlay(settingsOpen || diagnosticsOpen, settings = {
+                                    if (settingsOpen) settingsContent(false)
+                                    else DiagnosticsScreen(state, unit, permission, model::dismissDiagnostics)
+                                }) { workspace(true) }
                             }
                         }
                     } else workspace(false)
@@ -255,7 +268,7 @@ fun ViewyScreen(
                     Text(stageText(measurement, unit))
                     if (!state.needsCamera) TextButton(onClick = { showStatus = false; editHeight = true }) { Text(stringResource(R.string.enter_height)) }
                     else {
-                        RecoveryControls(state, permission, requested, requestPermission, openSettings, { cameraAttempt++ }, { model.restartSource(null) })
+                        RecoveryControls(state, permission, requested, requestPermission, openSettings, { cameraAttempt++ }, model::restartOrientation)
                         candidate?.let { Text(stringResource(it)) }
                     }
                 }

@@ -40,7 +40,7 @@ class CameraDirectionMappingTest {
         assertEquals(0.0, optical.x, 1e-7)
         assertEquals(0.0, optical.y, 1e-7)
         assertEquals(1.0, optical.z, 1e-7)
-        assertTrue(mapping.evidence.contains("Reported"))
+        assertTrue(mapping.usesLensPose)
     }
     @Test fun unsuitableReferencesAndMalformedPoseFallBackWithoutInventedCorrection() {
         val rearPose = floatArrayOf(0f, 1f, 0f, 0f)
@@ -48,6 +48,7 @@ class CameraDirectionMappingTest {
             1 to null, 1 to floatArrayOf(0f, 0f), 0 to floatArrayOf(Float.NaN, 0f, 0f, 1f),
             1 to floatArrayOf(0f, 0f, 0f, 2f), 1 to floatArrayOf(0f, 0f, 0f, 1f))) {
             val m = CameraDirectionMapping.forRearCamera("rear", reference, pose)
+            assertFalse(m.usesLensPose)
             assertEquals(RearCameraAxis.assumedDeviceDirection, m.deviceDirection)
             assertTrue(m.id.contains(RearCameraAxis.mappingId))
         }

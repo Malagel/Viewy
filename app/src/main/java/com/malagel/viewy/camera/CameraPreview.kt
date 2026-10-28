@@ -29,7 +29,12 @@ data class CameraPreviewState(
     val ready: Boolean = false,
     @StringRes val messageRes: Int = R.string.camera_starting,
     val mapping: CameraDirectionMapping? = null,
-    val diagnostic: String = "",
+    val logicalCameraId: String? = null,
+    val physicalCameraId: String? = null,
+    val open: Boolean = false,
+    val streaming: Boolean = false,
+    val failed: Boolean = false,
+    val errorDetail: String? = null,
 )
 
 /** Preview only. One explicit rear camera/physical output, no images, zoom gestures or storage. */
@@ -51,7 +56,7 @@ class CameraPreview(
     private var streaming = false
     private var failed = false
     private val timeout = Runnable {
-        if (!disposed && !description.ready) fail(R.string.camera_timeout, "Preview startup timeout")
+        if (!disposed && !description.ready) fail(R.string.camera_timeout, null)
     }
     private val streamObserver = Observer<PreviewView.StreamState> {
         streaming = it == PreviewView.StreamState.STREAMING
@@ -60,7 +65,7 @@ class CameraPreview(
     private val cameraObserver = Observer<CameraState> {
         open = it.type == CameraState.Type.OPEN
         if (it.error != null) {
-            fail(R.string.camera_unavailable, "Camera error ${it.error?.code}")
+            fail(R.string.camera_unavailable, it.error?.code?.toString())
         } else publish()
     }
     private val displayListener = object : DisplayManager.DisplayListener {
@@ -108,7 +113,7 @@ class CameraPreview(
         failed = false
         try {
             val rear = CameraSelector.DEFAULT_BACK_CAMERA.filter(cameraProvider.availableCameraInfos).firstOrNull()
-                ?: return fail(R.string.camera_no_rear, "No rear camera")
+                ?: return fail(R.string.camera_no_rear, null)
             val logicalId = Camera2CameraInfo.from(rear).cameraId
             val manager = context.getSystemService(CameraManager::class.java)
             val logical = manager.getCameraCharacteristics(logicalId)
@@ -122,7 +127,7 @@ class CameraPreview(
                     c[CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE]?.let { it.width * it.height } ?: 0f
                 }
             if (physicalIds.isNotEmpty() && physical == null) {
-                return fail(R.string.camera_no_consistent_lens, "Cannot inspect physical rear cameras")
+                return fail(R.string.camera_no_consistent_lens, null)
             }
             val selectedId = physical?.first ?: logicalId
             val characteristics = physical?.second ?: logical
@@ -141,12 +146,7 @@ class CameraPreview(
             interop.setCaptureRequestOption(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE, CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_OFF)
             // No unsupported principal-point correction: preview processing/crop/distortion and
             // focus-dependent intrinsics have not been established as a calibrated pixel model.
-            description = CameraPreviewState(mapping = mapping, diagnostic =
-                "Camera $logicalId · physical $selectedId · fixed output, default zoom\n" +
-                    "Pose reference: $reference · pose: ${characteristics[CameraCharacteristics.LENS_POSE_ROTATION]?.joinToString()}\n" +
-                    "Image rotation: ${characteristics[CameraCharacteristics.SENSOR_ORIENTATION]}° (not optical pose)\n" +
-                    "Intrinsics: ${characteristics[CameraCharacteristics.LENS_INTRINSIC_CALIBRATION]?.joinToString() ?: "absent"}\n" +
-                    "${mapping.evidence}\nCentered fill crop; EIS/OIS requested OFF; continuous default autofocus")
+            description = CameraPreviewState(mapping = mapping, logicalCameraId = logicalId, physicalCameraId = physical?.first)
             onState(description)
             val useCase = builder.build()
             preview = useCase
@@ -167,17 +167,17 @@ class CameraPreview(
         if (disposed || failed) return
         val ready = open && streaming
         if (ready) handler.removeCallbacks(timeout)
-        description = description.copy(ready = ready, messageRes = if (ready) R.string.camera_ready else R.string.camera_waiting)
+        description = description.copy(ready = ready, open = open, streaming = streaming, messageRes = if (ready) R.string.camera_ready else R.string.camera_waiting)
         onState(description)
     }
 
-    private fun fail(@StringRes messageRes: Int, diagnostic: String) {
+    private fun fail(@StringRes messageRes: Int, diagnostic: String?) {
         if (disposed) return
         failed = true
         handler.removeCallbacks(timeout)
         cameraInfo?.cameraState?.removeObserver(cameraObserver)
         preview?.let { useCase -> runCatching { provider?.unbind(useCase) } }
-        description = description.copy(ready = false, messageRes = messageRes, diagnostic = "${description.diagnostic}\n$diagnostic")
+        description = description.copy(ready = false, open = false, streaming = false, failed = true, messageRes = messageRes, errorDetail = diagnostic)
         onState(description)
     }
 
