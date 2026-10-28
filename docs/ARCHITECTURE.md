@@ -124,6 +124,7 @@ Source paths below are relative to `app/src/main/java/com/malagel/viewy/`:
 | `ui/TutorialMathNotation.kt` and `ui/TutorialEquation.kt` | Pure authored-notation parsing and native mathematical layout with localized spoken descriptions. |
 | `ui/HeightLabelText.kt` | Locale-aware compact height labels with the existing six-significant-digit cap, trimmed zero padding and at least one decimal; stored inputs are untouched. |
 | `ui/MeasurementGuidance.kt` | One-time workflow error presentation and expiry, plus the current near-vertical restriction. |
+| `ui/AlignmentGuidance.kt` and `ui/AlignmentChevrons.kt` | Deterministic alignment presentation filtering and decorative Compose chevrons; independent of capture validation. |
 | `measurement/KnownHeightWorkflow.kt` | Immutable top/bottom/correction/result state, compatibility/alignment gates, retry and restart. |
 | `ui/MeasurementViewModel.kt` | Selection state, one shared foreground sensor adapter, workflow and immutable StateFlow snapshots. |
 | `settings/AppPreferences.kt` | Typed global units and diagnostics preferences in one application-context Preferences DataStore, independent of tutorials. |
@@ -449,11 +450,36 @@ stored reasons remain available to diagnostics after presentation expires.
 Workflow failure events and the current near-vertical restriction produce text;
 movement, settling, freshness, readiness and left/right alignment updates are silent.
 The near-vertical message has priority while the existing angle restriction applies,
-with immediate appearance and clearing and no display timeout. There is no movement
+with immediate appearance and clearing and no display timeout. Text has no movement
 tracking, condition hysteresis, debounce or live-hint cooldown. Corrections last
 five seconds, extended by Android's recommended text timeout on API 29+;
 hardware recovery hides them and retains persistent actions. Presentation never
 changes capture eligibility or sensor quality assessment.
+
+`AlignmentGuidance` separately consumes existing snapshots and monotonic sensor
+time. It uses the workflow's physical correction classification directly, requiring
+180 ms of a changed classification before replacing the visible cue. Capture
+continues to use the immediate 0.45° gate. Only an accepted directional
+cue followed by accepted alignment produces a recovery identity; repeated aligned
+publications retain that identity. A new top or invalid/covered acquisition clears
+transition history immediately, including pending recovery. Current observations
+must be fresh within the existing age and pair limits and share the top's frame,
+source and camera mapping with active acquisition. Fresh MOVING and SETTLING data
+can guide without satisfying capture stability; unavailable, unreliable and
+near-vertical data cannot guide.
+
+The centered 40 dp reticle uses fuller round-capped white strokes with a black
+outline; inset endpoints keep its bounds and aiming point fixed.
+`AlignmentChevrons` draws rounded white strokes outside the reticle, with a
+fine black outline for camera-scene contrast. Direction changes crossfade over
+140 ms; a Compose infinite transition nudges outward by 8 dp over 700 ms and
+smoothly returns. Recovery stops movement and fades both strokes together over
+450 ms, once per identity. The renderer owns fade completion, so ordinary sensor
+updates cannot restart it and system duration scaling is honored. Disabled system
+motion leaves static directional strokes. Hiding disposes the renderer and cancels
+animations immediately. No new sensor subscriptions, presentation timers or camera
+transformations are involved. Decorative strokes have no accessibility targets;
+Capture's state description carries the current correction without a live region.
 
 Suspension clears displayed errors. Only a new reset that
 lost a pending capture can wait for eligible acquisition to resume; an old notice

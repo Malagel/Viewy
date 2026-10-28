@@ -17,7 +17,7 @@ enum class MeasurementNotice {
 
 /** Uncalibrated usability gates; none is an angular error bound. */
 object MeasurementPolicy {
-    val alignmentToleranceRadians = Math.toRadians(2.0)
+    val alignmentToleranceRadians = Math.toRadians(0.45)
     val minimumSeparationRadians = Math.toRadians(0.5)
     val minimumHorizontalNorm = kotlin.math.cos(Math.toRadians(85.0))
     const val duplicateTapNanos = 600_000_000L

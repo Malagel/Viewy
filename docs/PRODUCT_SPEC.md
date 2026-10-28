@@ -136,7 +136,8 @@ future validated features; they have no selectable methods.
   releases resources immediately. Completed results keep acquisition stopped until
   Restart or saving height.
 - Rear-camera preview in a rounded rectangle with a thin, centered plus-shaped
-  aiming reticle. Workflow failures and near-vertical restrictions receive preview-edge messages; normal aiming
+  aiming reticle with rounded white strokes and a black outline. Workflow failures
+  and near-vertical restrictions receive preview-edge messages; normal aiming
   stays silent. Startup, first-frame waiting, intentional suspension and return
   from overlays stay silent, with no camera warning or Retry control. Recoverable
   failures receive up to three automatic retries with short increasing delays;
@@ -172,8 +173,21 @@ future validated features; they have no selectable methods.
   Sensor quality, freshness, near-vertical and alignment gates
   still block invalid captures immediately. Hardware failures retain recovery
   actions. The camera location must stay fixed and the endpoints must lie on one
-  vertical line; the 2° horizontal alignment gate remains enforced, without a
-  visual alignment overlay.
+  vertical line; the horizontal alignment gate permits up to 0.45°
+  deviation from the captured top's bearing.
+- After top capture, small rounded white chevrons with black outlines flank the central
+  reticle when horizontal correction is needed. The indicated physical left/right
+  correction gently nudges outward. Recovering alignment briefly shows both
+  chevrons, fading together; initial alignment and repeated aligned readings do
+  not replay confirmation. A short presentation-only transition filter avoids
+  flashing around the threshold without delaying capture validation. Guidance
+  requires fresh, reliable observations in the captured top's camera/sensor
+  session; it can guide during movement or settling without allowing capture.
+  Near-vertical aim, invalid/stale readings, suspension, restart and completion
+  immediately hide and reset it. System animation scaling applies; disabled motion
+  leaves static directional cues. Chevrons add no text or accessibility focus
+  targets; Capture semantics retain the correction direction without a live
+  announcement on each reading.
 - New rejected captures and lost pending captures receive concise, event-driven
   corrections. Each failure is shown once for a readable interval, extended by
   Android accessibility timeout preferences where supported; sensor updates do

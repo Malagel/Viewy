@@ -57,6 +57,11 @@ quality/readiness reasons, invalid/stale/incompatible endpoint suppression, stor
 geometry, degree-based sensitivities and Metric/Imperial diagnostic conversion.
 Navigation motion tests cover destination retention, input gates through exit or
 canceled entry, settings forward/Back direction and settled restored destinations.
+Alignment presentation tests cover direction/wraparound, filtered correction and
+one-time recovery identities, threshold chatter without changing capture gates,
+fresh moving/settling readings, invalid/stale observations, session compatibility,
+new top/restart, completion and suspension/resumption. Animation rendering and
+physical correction usefulness remain manual checks.
 Source and tests define the individual cases. Mocked deployment tests verify script decisions using
 fictional devices/configuration, not real wireless reliability.
 
@@ -114,6 +119,13 @@ change. With Known Object Height configured:
    rendering remain manual checks.
 
 ## Recorded verification and its scope
+
+Alignment chevrons, their presentation-only transition filter and the 0.45° capture
+alignment gate passed the JVM suite (including workflow/capture eligibility checks), debug assembly
+and lint using the bounded invocation above with JDK 17 and API 37. Lint found
+no errors; warnings concern existing manifest and dependency declarations.
+No device, emulator or instrumentation validation was performed. Direction,
+animation rendering and handheld usefulness require the guidance checks below.
 
 CameraX zoom controls with a 1× floor and uncapped supported maximum, the
 persistent ratio label, 1× startup/reset policy, preview-control visibility gates
@@ -232,8 +244,22 @@ check both English and Spanish, normal/compact layouts, large text, TalkBack and
 reduced/disabled motion:
 
 - Move, pan continuously, settle and wait for readiness: only the stable top/bottom
-  instruction should remain, with no automatic hints at any duration. Alignment
-  changes must not produce left/right messages.
+  instruction should remain as text. Alignment changes must not produce left/right
+  messages. Before top capture there must be no chevrons. After top capture, pan
+  physically left and verify a right-pointing cue, then pan right and verify a
+  left-pointing cue. Check the gentle outward nudge and smooth direction changes
+  during both slow and rapid movement; abrupt motion may invalidate the pair under
+  existing session rules. Recover alignment: both chevrons must briefly appear
+  and fade together once, leaving only the reticle. Initial aligned top capture
+  and sustained aligned readings must not replay success.
+- Oscillate around the 0.45° alignment boundary: brief changes must not flash cues
+  or success, while Capture still follows the actual alignment/stability gates.
+  Repeat at 1× and high supported zoom (set before top capture); chevrons must
+  remain clear of the aiming point and must not move or resize the preview. Check
+  white interiors and black outlines on bright/dark scenes, the crosshair's rounder
+  tips and unchanged center/bounds, reduced/disabled system motion (static direction
+  when disabled), and TalkBack: no separate chevron focus targets or repeated
+  sensor announcements; Capture must expose the correction direction.
 - Aim near straight up/down, then leave the restricted range: **Cannot align at
   this angle.** / **No se puede alinear en este ángulo.** must appear immediately,
   remain visible throughout the restriction and clear immediately on leaving it.
@@ -244,6 +270,12 @@ reduced/disabled motion:
   mode selection and height editing: no interruption correction. Repeat after top:
   discard the pair and show one capture-cleared correction on return. Genuine
   camera loss should explain camera interruption. Neither should affect a result.
+  Repeat while a directional cue and while the success fade are visible, including
+  focus loss, Restart and a new top: hide/cancel immediately, with no stale
+  confirmation on return. Near-vertical, stale/unreliable data and completed
+  measurements must hide chevrons; returning to aligned data alone must not replay
+  success. Physical rendering, frame pacing and hardware interruptions remain
+  unverified by JVM tests.
 - Trigger reversed/too-close/unusable endpoint rejections in a controlled harness:
   corrections must appear once and expire without reappearing on later readings.
   A fresh rejection may show the same reason again. Restart, successful stage

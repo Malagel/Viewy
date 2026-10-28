@@ -145,8 +145,8 @@ fun ViewyScreen(
     }
     val hint = state.guidance
     val captureRestriction = when (measurement.alignment) {
-        com.malagel.viewy.measurement.Alignment.TURN_LEFT,
-        com.malagel.viewy.measurement.Alignment.TURN_RIGHT -> stringResource(R.string.notice_align)
+        com.malagel.viewy.measurement.Alignment.TURN_LEFT -> stringResource(R.string.diag_left)
+        com.malagel.viewy.measurement.Alignment.TURN_RIGHT -> stringResource(R.string.diag_right)
         else -> null
     }
     MeasurementSelector(
@@ -193,7 +193,10 @@ fun ViewyScreen(
                                             ZoomControls(if (state.previewVisible) state else retainedZoomState,
                                                 model::requestZoom, Modifier.padding(8.dp))
                                         }
-                                        if (state.camera.ready && state.acquisition.running) Reticle(Modifier.size(40.dp))
+                                        PreviewControlFade(state.previewVisible && state.acquisition.running, Modifier.align(Alignment.Center)) {
+                                            Reticle(Modifier.size(40.dp))
+                                        }
+                                        AlignmentChevrons(state.alignmentCue)
                                     }
                                     if (!state.heightConfigured) {
                                         Button(
@@ -678,10 +681,16 @@ private fun HeightDialog(state: MeasurementState, unit: HeightUnit, onDismiss: (
 private fun Reticle(modifier: Modifier = Modifier) {
     val label = stringResource(R.string.reticle_description)
     Canvas(modifier.semantics { contentDescription = label }) {
-        // A fine dark outline keeps the thin plus visible on bright scenes.
-        listOf(Color.Black to 2.dp.toPx(), Color.White to 1.dp.toPx()).forEach { (color, stroke) ->
-            drawLine(color, Offset(center.x, 0f), Offset(center.x, size.height), stroke, StrokeCap.Round)
-            drawLine(color, Offset(0f, center.y), Offset(size.width, center.y), stroke, StrokeCap.Round)
+        // Slightly fuller arms keep their outer footprint and leave space around the aiming dot.
+        val tipInset = 0.125.dp.toPx()
+        val gap = 5.5.dp.toPx()
+        listOf(Color.Black to 2.25.dp.toPx(), Color.White to 1.25.dp.toPx()).forEach { (color, stroke) ->
+            drawLine(color, Offset(center.x, tipInset), Offset(center.x, center.y - gap), stroke, StrokeCap.Round)
+            drawLine(color, Offset(center.x, center.y + gap), Offset(center.x, size.height - tipInset), stroke, StrokeCap.Round)
+            drawLine(color, Offset(tipInset, center.y), Offset(center.x - gap, center.y), stroke, StrokeCap.Round)
+            drawLine(color, Offset(center.x + gap, center.y), Offset(size.width - tipInset, center.y), stroke, StrokeCap.Round)
         }
+        drawCircle(Color.Black, radius = 1.75.dp.toPx(), center = center)
+        drawCircle(Color.White, radius = 1.dp.toPx(), center = center)
     }
 }

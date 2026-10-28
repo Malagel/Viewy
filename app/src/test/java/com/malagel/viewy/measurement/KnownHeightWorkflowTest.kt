@@ -216,7 +216,7 @@ class KnownHeightWorkflowTest {
         assertEquals(3.5, w.state.heightMeters!!, 0.0)
     }
     @Test fun alignmentUsesShortArcAndCorrectPhysicalTurnSign() {
-        assertEquals(Alignment.ALIGNED, alignment(ray(30.0, 179.5), ray(0.0, -179.5)))
+        assertEquals(Alignment.ALIGNED, alignment(ray(30.0, 179.9), ray(0.0, -179.9)))
         assertEquals(Alignment.TURN_RIGHT, alignment(ray(30.0, 179.0), ray(0.0, -177.0)))
         assertEquals(Alignment.TURN_LEFT, alignment(ray(30.0, -179.0), ray(0.0, 177.0)))
         assertEquals(Alignment.NEAR_VERTICAL, alignment(ray(89.0), ray(0.0)))
@@ -224,7 +224,7 @@ class KnownHeightWorkflowTest {
     }
     @Test fun alignmentIsIndependentOfElevationOrderingOrUsableDistanceGeometry() {
         for ((topElevation, bottomElevation) in listOf(30.0 to 0.0, 0.0 to 30.0, 0.0 to 0.0)) {
-            assertEquals(Alignment.ALIGNED, alignment(ray(topElevation, 179.5), ray(bottomElevation, -179.5)))
+            assertEquals(Alignment.ALIGNED, alignment(ray(topElevation, 179.9), ray(bottomElevation, -179.9)))
             assertEquals(Alignment.TURN_RIGHT, alignment(ray(topElevation, 179.0), ray(bottomElevation, -177.0)))
             assertEquals(Alignment.TURN_LEFT, alignment(ray(topElevation, -179.0), ray(bottomElevation, 177.0)))
         }
@@ -238,6 +238,22 @@ class KnownHeightWorkflowTest {
         assertNull(w.state.result)
         bottom(w, time = base+2_000_000_000L)
         assertNotNull(w.state.result)
+    }
+    @Test fun alignmentCaptureGateUsesPointFourFiveDegreesInBothDirections() {
+        for ((deviation, allowed) in listOf(0.44 to true, -0.44 to true, 0.46 to false, -0.46 to false)) {
+            val w = workflow()
+            top(w)
+            val time = base + 1_000_000_000L
+            val current = observation(0.0, time, bearing = 90.0 + deviation)
+            w.update(current, "frame", true, time)
+            assertEquals("Capture eligibility at $deviation degrees", allowed, w.state.canCapture)
+            w.capture(CaptureResult.Captured(current), time)
+            assertEquals("Capture result at $deviation degrees", allowed, w.state.completed)
+            if (!allowed) {
+                assertEquals(MeasurementStage.CORRECTION, w.state.stage)
+                assertEquals(MeasurementNotice.ALIGN_WITH_TOP, w.state.notice)
+            }
+        }
     }
     @Test fun nearVerticalFirstCaptureIsRejected() {
         val w = workflow()

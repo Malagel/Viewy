@@ -35,6 +35,7 @@ data class MeasurementUiState(
     val previewEpoch: Long = 0,
     val cameraFailureVisible: Boolean = false,
     val guidance: Int? = null,
+    val alignmentCue: AlignmentCueState = AlignmentCueState(),
 ) {
     val canCapture: Boolean get() = measurement.canCapture && camera.zoom.settled
     val recoveryVisible: Boolean get() = requiresCamera && heightConfigured && !measurement.completed &&
@@ -58,6 +59,7 @@ data class MeasurementUiState(
 /** Owns ONE foreground acquisition; diagnostics only observes its snapshots. Everything runs on main. */
 class MeasurementViewModel(application: Application) : AndroidViewModel(application) {
     private val workflow = KnownHeightWorkflow()
+    private val alignmentGuidance = AlignmentGuidance()
     private val guidance = MeasurementGuidance {
         if (Build.VERSION.SDK_INT >= 29) application.getSystemService(AccessibilityManager::class.java)
             ?.getRecommendedTimeoutMillis(5_000, AccessibilityManager.FLAG_CONTENT_TEXT)?.toLong() ?: 5_000L
@@ -72,7 +74,7 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
     private val acquisition = AndroidOrientationAcquisition(application) { value ->
         workflow.update(value.observation, value.referenceFrameId, value.running, SystemClock.elapsedRealtimeNanos())
         val next = mutableState.value.copy(measurement = workflow.state, acquisition = value)
-        mutableState.value = next.copy(guidance = guidance.update(next, SystemClock.elapsedRealtime()))
+        publishGuidance(next)
     }
 
     private val recoveryHandler = Handler(Looper.getMainLooper())
@@ -174,7 +176,15 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
             measurement = workflow.state, camera = resources.camera, previewEpoch = resources.previewEpoch,
             cameraFailureVisible = resources.cameraFailureVisible,
         )
-        mutableState.value = next.copy(guidance = guidance.update(next, SystemClock.elapsedRealtime()))
+        publishGuidance(next)
+    }
+
+    private fun publishGuidance(next: MeasurementUiState) {
+        val now = SystemClock.elapsedRealtimeNanos()
+        mutableState.value = next.copy(
+            guidance = guidance.update(next, now / 1_000_000L),
+            alignmentCue = alignmentGuidance.update(next, now),
+        )
     }
     override fun onCleared() {
         resources.reconcile(false, false, animateRelease = false)
