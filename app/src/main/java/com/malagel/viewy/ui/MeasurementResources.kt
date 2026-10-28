@@ -117,7 +117,7 @@ internal class MeasurementResources(
 
     private fun reconcileOrientation() {
         val desired = camera.mapping.takeIf { eligible && orientationRequired && camera.ready }
-        workflow.cameraReady(desired != null)
+        workflow.cameraReady(desired != null, intentionalSuspension = !eligible)
         if (desired?.id != activeMapping) {
             activeMapping = desired?.id
             if (desired == null) stopOrientation() else startOrientation(desired)

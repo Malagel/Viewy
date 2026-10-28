@@ -37,7 +37,10 @@ suppression, rejection/exception and locale rollback; preview ownership across d
 inactive/height-gated camera and foreground acquisition eligibility, focused
 viewfinder visibility, repeated overlay cycles, incomplete-pair invalidation,
 completed-result preservation after shutdown, fresh-session restart, rapid
-suspend/resume ownership, obsolete camera/sensor callbacks and contextual guidance;
+suspend/resume ownership, obsolete camera/sensor callbacks and workflow errors;
+silence across live sensor-quality statuses and left/right alignment, persistent
+near-vertical restriction text with immediate clearing and capture gates preserved; one-time correction identities and expiry, clearing across
+restart/stages/suspension, silent no-capture shutdown and the exact 15-second boundary;
 silent startup/waiting versus actionable failures; three progressive retries,
 exhaustion, manual/new-session/success reset, cancellation and stale retry callbacks;
 monotonic startup/interruption deadlines without sleeps; localized height-label formatting, whole/fractional values, display
@@ -59,17 +62,18 @@ fictional devices/configuration, not real wireless reliability.
 
 ## Recorded verification and its scope
 
-Silent camera startup and bounded recovery passed the JVM suite and debug Kotlin
-compilation with bounded, sequential Gradle execution. Debug assembly and lint
-were not rerun for this correction. The previously recorded lint run reported no
-errors; warnings concern
-dependency updates, backup guidance, the intentional portrait request and the
-API-33-only locale-config attribute (older versions use AppCompat). This used the
-installed JDK 17/API 37 SDK; a clean or release build was not verified. Inspection of
-the merged debug manifest found CAMERA plus an app-private signature permission,
-with no Internet, network-state, microphone, location or storage permissions.
-Deployment-script mocked unit tests and Bash syntax checks were also previously
-reported passing; they do not verify a physical connection.
+Quiet aiming and event-driven workflow errors, including progress-aware
+interruption handling, passed the JVM suite, debug assembly and lint with bounded,
+sequential Gradle execution.
+Lint reported no errors; warnings concern dependency updates, backup guidance,
+the intentional portrait request, the API-33-only locale-config attribute (older
+versions use AppCompat), and an existing discouraged platform API. This used the
+installed JDK 17/API 37 SDK; a clean or release build was not verified.
+The previously recorded merged-manifest inspection found CAMERA plus an
+app-private signature permission, with no Internet, network-state, microphone,
+location or storage permissions. Deployment-script mocked unit tests and Bash
+syntax checks were also previously reported passing; they do not verify a
+physical connection.
 
 Deployment-script results are retained reports. Instrumentation tests are not
 implemented. Tutorial persistence tests use a preference-API fake to verify keys
@@ -138,7 +142,7 @@ Keep records externally; the app has no history/export feature.
 | Optical-center behavior | Rotate around a known fixed sight line and record target movement at the reticle. Repeat with focus/light changes. Movement combines fixture, axis, principal-point, distortion and processing effects; it does not isolate their causes. |
 | Stationary sensor directions | Fix screen-up, screen-down, upright and tilted. Check fresh times, settling then READY, and actual variation. Under fallback mapping rear-down is −90° elevation and rear-up +90°; bearing may be unavailable. Do not interpret low variation as angular accuracy. |
 | Pitch, roll and display | Tilt rear aim up/down: elevation should rise/fall. Roll about a fixed sight direction; ray should remain approximately constant after settling. Rotate while portrait is requested; where the platform overrides it, repeat both landscapes and 180° rotation. Check image rotation and physical signs; recreation/rebinding must clear captures. Natural-landscape/foldable devices need separate checks. |
-| Bearing and alignment | Slowly yaw left/right, then return to the top endpoint's vertical line. Check guidance sign and capture gating, including crossing ±180° (small wrapped difference, not 360°). Roll must not reverse physical guidance. Interpret bearing using atan2(Y,X), not compass azimuth. |
+| Bearing and alignment | Slowly yaw left/right, then return to the top endpoint's vertical line. Check silent aiming and capture gating, including crossing ±180° (small wrapped difference, not 360°). Roll must not change the alignment gate. Interpret bearing using atan2(Y,X), not compass azimuth. |
 | Endpoint geometry and controls | Use a measured plumb height; fix camera position and capture top then bottom. Try reversed/same endpoints, very small separation, near-vertical aim and duplicate taps: expect correction/blocking. Test Restart, height editing and unit changes; results should have no separate bottom-recapture action. Diagnostics should show the production top/bottom elevations and stored geometry; unavailable endpoints must remain pending or unavailable. |
 | Handheld readiness | Repeat supported/unsupported handheld captures with ordinary aiming, tremor and taps. Observe moving/settling/ready and blocked attempts. Near straight up/down, elevation/ray should remain finite and bearing should be suppressed; production can block before the numerical pole. Provisional gates are not calibrated acceptance thresholds. |
 | Interruptions and resources | Capture top, then Home/lock/unlock, display rotation, camera retry, normal camera privacy/access interruption and orientation recovery retry. Check incomplete pairs clear, entered height remains, fresh preview/settling restores readiness and stale captures cannot finish. Repeat after a completed result: its value and captured diagnostics must remain available and acquisition must stay stopped until Restart or saving height. Repeat pause/resume and inspect for listener/lifecycle errors. Wait past 15 s before bottom and check restart guidance. |
@@ -156,7 +160,38 @@ Keep records externally; the app has no history/export feature.
 | Settings and units | Open Settings inactive (after dismissing selection), before height entry, with live preview, after top capture and after a result. Confirm the full-screen dark surface, Back hierarchy through Developer Options/language selection, suspended camera/sensor work and no overlapping help/selector interaction. Repeat from the exceptional workspace dialog. Toggle units repeatedly: all height/result labels and the next height entry use meters or decimal feet; saved physical height and completed results survive; an incomplete pair was invalidated on Settings entry. No height-unit chips remain. Check point/comma input and unchanged display precision. Restart the process to verify saved units/diagnostics and inactive startup. Check slow initial preference loading does not flash incorrect units. |
 | Language and recreation | First test a cold launch with Use device language saved: remove the task through Recents, reopen, visit Language, and select Español for the first time in that process. Confirm no black frame, window replacement or Activity recreation, and that the Language page remains open. Repeat after a developer-performed data reset; saved English → Español and saved Español cold launch are comparison cases. Then on API 23–32 and 33+, choose English, Español and Use device language repeatedly, both inactive and with a selected method. The language selector must update in place without Activity recreation, a black/blank frame or flashing the method/main Settings; Back must then return to main Settings. Repeat in the exceptional workspace. With device language English, switch between English and Use device language and confirm the radio choice updates when the effective display language stays the same. Reopen Settings after process restart. Check tutorials (including math explanations and spoken equations), mode navigation, permissions, guidance, height input, errors and accessibility. Change the app language through Android 13+ system settings and confirm the in-app selection follows. Device Spanish uses Spanish; an unsupported device language with no override falls back to English. Verify Spanish decimal commas and decimal feet independent of language. Using the in-app selector, change language with a top capture and a result: retain the method, height, settings destination and completed result while acquisition stays stopped; incomplete pairs were invalidated on Settings entry. Separately recreate for an unrelated configuration change: retain navigation and height, while a real hardware interruption still clears incomplete pairs and preserves completed results. Return/background with Settings open, rapid Back and large text must not restore invalid sessions or stack modals. |
 | Developer Options and full reset | On a disposable test installation, set Imperial, Spanish, diagnostics enabled and tutorial completion; grant camera access and create app-private test files/cache if a harness is available. Open Erase all app data, cancel/outside-dismiss/Back and confirm all data, language and permissions remain. Only an explicit Erase all data confirmation may request deletion; duplicate taps must be blocked. Confirm Android closes the process without relaunching or a success claim and leaves the app installed. Manually reopen: inactive mode sheet, Metric, diagnostics off, device language, tutorials eligible and camera permission requested only after valid height. Verify app-private files/cache are gone and permissions revoked in system settings. Repeat on pre-33 AppCompat storage and 33+ system-managed locales with a device language different from the override. Platform rejection/error behavior is covered by injected JVM fakes; do not invoke the real deletion API in automated tests. |
-| Layout and accessibility | Check the consistent dark palette under both system themes, large font/display sizes, TalkBack labels, small/split windows, platform-overridden orientations, height-dialog keyboard and navigation insets. On the normal screen, capture/navigation and the stage/result must stay visible without scrolling. Guidance should fade near the preview edge, never cover the reticle or persist for ordinary readiness; moving/settling/alignment changes should not flash. Verify persistent recovery actions and status dialogs in compact layouts. Exceptional windows/text scaling offer **Open viewfinder** with scrollable details and fixed controls. Check centered stage/≈ results in both units (Spanish: “≈ [value and unit] de distancia”), a blank reserved caption area before height entry and unchanged preview bounds as top/bottom instructions appear or switch (also with large text), closer symmetric Restart/Mode placement, the solid shutter disc, enlarged initial height action, the rounded borderless height editor and the raised control row. Check the larger circular gear retains its size and position, uses a subtly richer purple than other tonal buttons, looks enabled and opens Settings. Whole heights should display one decimal, fractional heights should retain meaningful digits up to the existing precision cap, and opening height editing should preserve the full stored input. Check the bold rounded Viewy header and reduced preview at normal/large text sizes. No separate result-retry action should appear. Diagnostics must not push Capture offscreen. |
+| Layout and accessibility | Check the consistent dark palette under both system themes, large font/display sizes, TalkBack labels, small/split windows, platform-overridden orientations, height-dialog keyboard and navigation insets. On the normal screen, capture/navigation and the stage/result must stay visible without scrolling. Workflow errors should remain readable near the preview edge without moving controls or covering the reticle; moving/settling/alignment changes must remain silent. Verify persistent recovery actions and status dialogs in compact layouts. Exceptional windows/text scaling offer **Open viewfinder** with scrollable details and fixed controls. Check centered stage/≈ results in both units (Spanish: “≈ [value and unit] de distancia”), a blank reserved caption area before height entry and unchanged preview bounds as top/bottom instructions appear or switch (also with large text), closer symmetric Restart/Mode placement, the solid shutter disc, enlarged initial height action, the rounded borderless height editor and the raised control row. Check the larger circular gear retains its size and position, uses a subtly richer purple than other tonal buttons, looks enabled and opens Settings. Whole heights should display one decimal, fractional heights should retain meaningful digits up to the existing precision cap, and opening height editing should preserve the full stored input. Check the bold rounded Viewy header and reduced preview at normal/large text sizes. No separate result-retry action should appear. Diagnostics must not push Capture offscreen. |
+
+## Measurement guidance checks
+
+Physical rendering and handheld usefulness remain unverified. With valid height,
+check both English and Spanish, normal/compact layouts, large text, TalkBack and
+reduced/disabled motion:
+
+- Move, pan continuously, settle and wait for readiness: only the stable top/bottom
+  instruction should remain, with no automatic hints at any duration. Alignment
+  changes must not produce left/right messages.
+- Aim near straight up/down, then leave the restricted range: **Cannot align at
+  this angle.** / **No se puede alinear en este ángulo.** must appear immediately,
+  remain visible throughout the restriction and clear immediately on leaving it.
+  Capture must remain blocked while invalid. Missing, stale and unreliable
+  readings must also stay silent while still blocking capture. Hardware failures
+  must retain diagnostic information and recovery controls.
+- Before any top capture, background/return and open/close Settings, tutorials,
+  mode selection and height editing: no interruption correction. Repeat after top:
+  discard the pair and show one capture-cleared correction on return. Genuine
+  camera loss should explain camera interruption. Neither should affect a result.
+- Trigger reversed/too-close/unusable endpoint rejections in a controlled harness:
+  corrections must appear once and expire without reappearing on later readings.
+  A fresh rejection may show the same reason again. Restart, successful stage
+  changes, suspension and completion must clear obsolete messages. Check retained
+  error text in compact status dialogs, alignment explanations in Capture
+  semantics and no repeated TalkBack announcements for unchanged text.
+- Confirm preview dimensions, reticle and controls remain fixed when errors appear
+  and clear; large text should use the existing status dialog instead of covering
+  the reticle. Confirm Android accessibility timeout preferences extend correction
+  visibility on API 29+, and language changes cannot restore an old error. Error
+  presentation has no animation and should behave the same with motion disabled.
 
 ## Galaxy S22 camera startup and recovery checks
 

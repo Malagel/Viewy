@@ -134,9 +134,9 @@ class DiagnosticsPresentationTest {
         }
         assertEquals(R.string.diag_waiting_reading, captureBlockReason(ready.copy(measurement = ready.measurement.copy(latest = null)), true))
         val vertical = ready.copy(measurement = ready.measurement.copy(latest = top.copy(direction = ViewingDirection(0.0, 0.0, 1.0))))
-        assertEquals(R.string.guidance_near_vertical, captureBlockReason(vertical, true))
+        assertEquals(R.string.diag_near_vertical, captureBlockReason(vertical, true))
         val misaligned = ready.copy(measurement = ready.measurement.copy(top = top, latest = bottom.copy(direction = ViewingDirection(0.0, 1.0, 0.0))))
-        assertEquals(R.string.guidance_right, captureBlockReason(misaligned, true))
+        assertEquals(R.string.diag_right, captureBlockReason(misaligned, true))
     }
 
     @Test fun stagesAndNoticesRemainVisibleWithoutAResult() {

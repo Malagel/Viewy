@@ -35,10 +35,10 @@ internal class DiagnosticFormatting(private val unit: HeightUnit, private val lo
 @StringRes
 internal fun captureStatusResource(status: CaptureStatus?) = when (status) {
     null, CaptureStatus.WAITING -> R.string.diag_waiting_reading
-    CaptureStatus.SETTLING -> R.string.guidance_settling
-    CaptureStatus.MOVING -> R.string.guidance_moving
+    CaptureStatus.SETTLING -> R.string.diag_settling
+    CaptureStatus.MOVING -> R.string.diag_moving
     CaptureStatus.STALE -> R.string.diag_stale
-    CaptureStatus.UNRELIABLE -> R.string.guidance_unreliable
+    CaptureStatus.UNRELIABLE -> R.string.diag_unreliable
     CaptureStatus.READY -> R.string.diag_ready
 }
 
@@ -83,10 +83,10 @@ internal fun captureBlockReason(state: MeasurementUiState, cameraPermission: Boo
         !state.camera.ready -> state.camera.messageRes
         !state.acquisition.running -> orientationReadiness(state)
         m.latest?.quality?.status != CaptureStatus.READY -> captureStatusResource(m.latest?.quality?.status)
-        m.latest.direction.let { hypot(it.x, it.y) < MeasurementPolicy.minimumHorizontalNorm } -> R.string.guidance_near_vertical
-        m.alignment == Alignment.TURN_LEFT -> R.string.guidance_left
-        m.alignment == Alignment.TURN_RIGHT -> R.string.guidance_right
-        m.alignment == Alignment.NEAR_VERTICAL -> R.string.guidance_near_vertical
+        m.latest.direction.let { hypot(it.x, it.y) < MeasurementPolicy.minimumHorizontalNorm } -> R.string.diag_near_vertical
+        m.alignment == Alignment.TURN_LEFT -> R.string.diag_left
+        m.alignment == Alignment.TURN_RIGHT -> R.string.diag_right
+        m.alignment == Alignment.NEAR_VERTICAL -> R.string.diag_near_vertical
         m.canCapture -> R.string.diag_capture_allowed
         else -> R.string.diag_waiting_reading
     }

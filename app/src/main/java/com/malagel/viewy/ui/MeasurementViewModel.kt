@@ -2,6 +2,8 @@ package com.malagel.viewy.ui
 
 import android.app.Application
 import android.content.Context
+import android.os.Build
+import android.view.accessibility.AccessibilityManager
 import android.os.SystemClock
 import android.os.Handler
 import android.os.Looper
@@ -32,6 +34,7 @@ data class MeasurementUiState(
     val resumed: Boolean = false,
     val previewEpoch: Long = 0,
     val cameraFailureVisible: Boolean = false,
+    val guidance: Int? = null,
 ) {
     val recoveryVisible: Boolean get() = requiresCamera && heightConfigured && !measurement.completed &&
         (if (!visibility.permissionGranted) resumed && visibility.surfaceVisible && visibility.windowFocused &&
@@ -52,6 +55,11 @@ data class MeasurementUiState(
 /** Owns ONE foreground acquisition; diagnostics only observes its snapshots. Everything runs on main. */
 class MeasurementViewModel(application: Application) : AndroidViewModel(application) {
     private val workflow = KnownHeightWorkflow()
+    private val guidance = MeasurementGuidance {
+        if (Build.VERSION.SDK_INT >= 29) application.getSystemService(AccessibilityManager::class.java)
+            ?.getRecommendedTimeoutMillis(5_000, AccessibilityManager.FLAG_CONTENT_TEXT)?.toLong() ?: 5_000L
+        else 5_000L
+    }
     private val tutorials = TutorialCoordinator(
         LocalTutorialSeenStore(application.getSharedPreferences(LocalTutorialSeenStore.FILE_NAME, Context.MODE_PRIVATE)),
         methodTutorials.keys,
@@ -60,7 +68,8 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
     val state = mutableState.asStateFlow()
     private val acquisition = AndroidOrientationAcquisition(application) { value ->
         workflow.update(value.observation, value.referenceFrameId, value.running, SystemClock.elapsedRealtimeNanos())
-        mutableState.value = mutableState.value.copy(measurement = workflow.state, acquisition = value)
+        val next = mutableState.value.copy(measurement = workflow.state, acquisition = value)
+        mutableState.value = next.copy(guidance = guidance.update(next, SystemClock.elapsedRealtime()))
     }
 
     private val recoveryHandler = Handler(Looper.getMainLooper())
@@ -147,15 +156,18 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
 
     fun restartOrientation() {
         if (!mutableState.value.acquisitionEligible) return
-        workflow.restart(MeasurementNotice.SENSOR_RESTARTED)
+        workflow.restart(MeasurementNotice.SENSOR_RESTARTED.takeIf { workflow.state.top != null && !workflow.state.completed })
         resources.restartOrientation()
         reconcile()
     }
 
-    private fun publish() { mutableState.value = mutableState.value.copy(
-        measurement = workflow.state, camera = resources.camera, previewEpoch = resources.previewEpoch,
-        cameraFailureVisible = resources.cameraFailureVisible,
-    ) }
+    private fun publish() {
+        val next = mutableState.value.copy(
+            measurement = workflow.state, camera = resources.camera, previewEpoch = resources.previewEpoch,
+            cameraFailureVisible = resources.cameraFailureVisible,
+        )
+        mutableState.value = next.copy(guidance = guidance.update(next, SystemClock.elapsedRealtime()))
+    }
     override fun onCleared() {
         resources.reconcile(false, false, animateRelease = false)
         acquisition.stop()

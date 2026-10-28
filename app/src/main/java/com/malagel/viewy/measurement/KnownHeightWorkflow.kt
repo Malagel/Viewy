@@ -10,7 +10,7 @@ enum class Alignment { ALIGNED, TURN_LEFT, TURN_RIGHT, NEAR_VERTICAL }
 
 /** Presentation resolves these reasons to localized text; workflow logic owns no UI strings. */
 enum class MeasurementNotice {
-    CAMERA_INTERRUPTED, SESSION_CHANGED, CAPTURE_EXPIRED, WAIT_FOR_STABILITY,
+    CAMERA_INTERRUPTED, ACQUISITION_SUSPENDED, SESSION_CHANGED, CAPTURE_EXPIRED, WAIT_FOR_STABILITY,
     NEAR_VERTICAL, INCOMPATIBLE_CAPTURES, ALIGN_WITH_TOP, AIM_BELOW_TOP,
     UNUSABLE_ENDPOINTS, SMALL_SEPARATION, SENSOR_RESTARTED,
 }
@@ -45,6 +45,8 @@ data class MeasurementState(
     val latest: OrientationObservation? = null,
     val frameId: String? = null,
     val notice: MeasurementNotice? = null,
+    /** Monotonic event identity, including repeated rejections with the same reason. */
+    val noticeId: Long = 0,
 ) {
     val completed: Boolean get() = result != null
     val alignment: Alignment? get() = top?.let { a -> latest?.let { alignment(a.direction, it.direction) } }
@@ -66,8 +68,10 @@ class KnownHeightWorkflow(private val policy: AcquisitionPolicy = AcquisitionPol
         state = state.copy(heightMeters = meters)
     }
 
-    fun cameraReady(ready: Boolean) {
-        if (!ready && state.cameraReady && !state.completed) restart(MeasurementNotice.CAMERA_INTERRUPTED)
+    fun cameraReady(ready: Boolean, intentionalSuspension: Boolean = false) {
+        if (!ready && state.cameraReady && state.top != null && !state.completed) {
+            restart(if (intentionalSuspension) MeasurementNotice.ACQUISITION_SUSPENDED else MeasurementNotice.CAMERA_INTERRUPTED)
+        }
         state = if (ready) state.copy(cameraReady = true) else state.copy(cameraReady = false, latest = null, frameId = null)
     }
 
@@ -83,7 +87,7 @@ class KnownHeightWorkflow(private val policy: AcquisitionPolicy = AcquisitionPol
     }
 
     fun restart(message: MeasurementNotice? = null) {
-        state = state.copy(stage = MeasurementStage.TOP, top = null, bottom = null, result = null, latest = null, frameId = null, notice = message)
+        state = state.copy(stage = MeasurementStage.TOP, top = null, bottom = null, result = null, latest = null, frameId = null, notice = message, noticeId = state.noticeId + 1)
         lastTapNanos = null
     }
 
@@ -100,17 +104,17 @@ class KnownHeightWorkflow(private val policy: AcquisitionPolicy = AcquisitionPol
         if (observation == null || observation.quality.status != CaptureStatus.READY ||
             nowNanos < observation.timestampNanos || nowNanos - observation.timestampNanos > policy.maximumAgeNanos
         ) {
-            state = state.copy(notice = MeasurementNotice.WAIT_FOR_STABILITY)
+            state = state.copy(notice = MeasurementNotice.WAIT_FOR_STABILITY, noticeId = state.noticeId + 1)
             return
         }
         if (observation.referenceFrameId != state.frameId) {
-            restart(MeasurementNotice.SESSION_CHANGED)
+            restart(MeasurementNotice.SESSION_CHANGED.takeIf { state.top != null })
             return
         }
         val first = state.top
         if (first == null) {
             if (hypot(observation.direction.x, observation.direction.y) < MeasurementPolicy.minimumHorizontalNorm) {
-                state = state.copy(notice = MeasurementNotice.NEAR_VERTICAL)
+                state = state.copy(notice = MeasurementNotice.NEAR_VERTICAL, noticeId = state.noticeId + 1)
                 return
             }
             state = state.copy(top = observation, stage = MeasurementStage.BOTTOM, notice = null)
@@ -126,12 +130,13 @@ class KnownHeightWorkflow(private val policy: AcquisitionPolicy = AcquisitionPol
             is ObservationComparison.Comparable -> Unit
         }
         if (alignment(first.direction, observation.direction) != Alignment.ALIGNED) {
-            state = state.copy(stage = MeasurementStage.CORRECTION, notice = MeasurementNotice.ALIGN_WITH_TOP)
+            state = state.copy(stage = MeasurementStage.CORRECTION, notice = MeasurementNotice.ALIGN_WITH_TOP, noticeId = state.noticeId + 1)
             return
         }
         when (val result = KnownHeightDistance.estimate(state.heightMeters!!, first.direction, observation.direction)) {
             is KnownHeightResult.Failure -> state = state.copy(
                 stage = MeasurementStage.CORRECTION,
+                noticeId = state.noticeId + 1,
                 notice = when (result.reason) {
                     DistanceFailureReason.REVERSED_ENDPOINTS -> MeasurementNotice.AIM_BELOW_TOP
                     else -> MeasurementNotice.UNUSABLE_ENDPOINTS
@@ -139,7 +144,7 @@ class KnownHeightWorkflow(private val policy: AcquisitionPolicy = AcquisitionPol
             )
             is KnownHeightResult.Estimate -> {
                 if (result.diagnostics.elevationSeparationRadians < MeasurementPolicy.minimumSeparationRadians) {
-                    state = state.copy(stage = MeasurementStage.CORRECTION, notice = MeasurementNotice.SMALL_SEPARATION)
+                    state = state.copy(stage = MeasurementStage.CORRECTION, notice = MeasurementNotice.SMALL_SEPARATION, noticeId = state.noticeId + 1)
                 } else {
                     state = state.copy(stage = MeasurementStage.RESULT, bottom = observation, result = result, notice = null)
                     lastTapNanos = nowNanos

@@ -123,7 +123,7 @@ Source paths below are relative to `app/src/main/java/com/malagel/viewy/`:
 | `ui/MethodTutorialContent.kt` and `ui/MethodTutorialDialog.kt` | Resource-based prose/equation blocks and reusable single-card presentation with basic/detailed pages. |
 | `ui/TutorialMathNotation.kt` and `ui/TutorialEquation.kt` | Pure authored-notation parsing and native mathematical layout with localized spoken descriptions. |
 | `ui/HeightLabelText.kt` | Locale-aware compact height labels with the existing six-significant-digit cap, trimmed zero padding and at least one decimal; stored inputs are untouched. |
-| `ui/MeasurementGuidance.kt` | Contextual hints from existing workflow gates; corrected live-condition notices disappear without changing capture eligibility. |
+| `ui/MeasurementGuidance.kt` | One-time workflow error presentation and expiry, plus the current near-vertical restriction. |
 | `measurement/KnownHeightWorkflow.kt` | Immutable top/bottom/correction/result state, compatibility/alignment gates, retry and restart. |
 | `ui/MeasurementViewModel.kt` | Selection state, one shared foreground sensor adapter, workflow and immutable StateFlow snapshots. |
 | `settings/AppPreferences.kt` | Typed global units and diagnostics preferences in one application-context Preferences DataStore, independent of tutorials. |
@@ -389,9 +389,32 @@ physically right (decrease bearing), negative means left. Screen orientation and
 roll do not change that gravity-relative meaning. Gates cannot establish fixed
 camera position.
 
-Transient preview hints use a short delay and fades to avoid sensor-state flicker;
-this never delays capture gating. Permission/orientation failures and camera
-failures requiring user action retain recovery controls. Diagnostics is a read-only full-screen surface in the current host
+`MeasurementGuidance` is a deterministic presentation controller owned by the
+ViewModel. It consumes monotonic milliseconds from existing state publications,
+including the orientation adapter's freshness tick; it adds no timer or sensor
+work. Workflow notice IDs identify new events even when the reason repeats, while
+stored reasons remain available to diagnostics after presentation expires.
+Workflow failure events and the current near-vertical restriction produce text;
+movement, settling, freshness, readiness and left/right alignment updates are silent.
+The near-vertical message has priority while the existing angle restriction applies,
+with immediate appearance and clearing and no display timeout. There is no movement
+tracking, condition hysteresis, debounce or live-hint cooldown. Corrections last
+five seconds, extended by Android's recommended text timeout on API 29+;
+hardware recovery hides them and retains persistent actions. Presentation never
+changes capture eligibility or sensor quality assessment.
+
+Suspension clears displayed errors. Only a new reset that
+lost a pending capture can wait for eligible acquisition to resume; an old notice
+cannot replay after returning. Restart and stage changes clear obsolete guidance,
+and results suppress all guidance. Camera readiness loss emits a notice only with
+a pending top; resource ineligibility identifies intentional suspension separately
+from genuine camera interruption. Retrying orientation without a pending capture
+does not claim lost progress. Compose renders one static preview-edge surface,
+with localized resource lookup at render time, no animation state and no preview
+resize. Text uses a polite accessibility live region; constrained layouts retain
+the existing status dialog. Alignment restrictions are
+also exposed through capture accessibility semantics. Permission/orientation
+failures and camera failures requiring user action retain recovery controls. Diagnostics is a read-only full-screen surface in the current host
 window, including the exceptional workspace; the Activity draws an inaccessible
 backdrop while that workspace owns interaction. The shared overlay host preserves
 measurement bounds, suspends acquisition, hides covered accessibility and focus, and

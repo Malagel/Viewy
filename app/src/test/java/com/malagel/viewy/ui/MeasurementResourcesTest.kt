@@ -96,6 +96,7 @@ class MeasurementResourcesTest {
                 repeat(3) { h.reconcile() }
                 assertEquals(epoch, h.resources.previewEpoch)
                 assertNull(h.workflow.state.top)
+                assertEquals(MeasurementNotice.ACQUISITION_SUSPENDED, h.workflow.state.notice)
                 assertNull(h.workflow.state.latest)
                 assertNull(h.workflow.state.frameId)
                 assertEquals(2.0, h.workflow.state.heightMeters!!, 0.0)
@@ -122,6 +123,7 @@ class MeasurementResourcesTest {
         h.capture(0.0)
         val completed = h.workflow.state
         assertNotNull(completed.result)
+        assertNull(completed.notice)
         assertFalse(h.resources.camera.ready)
         assertEquals(listOf(true), h.releases)
         assertFalse(h.resources.previewChanged(old, camera))
@@ -343,5 +345,28 @@ class MeasurementResourcesTest {
         assertTrue(h.registration.accepts(fallback))
         h.registration.invalidate()
         assertFalse(h.registration.accepts(fallback))
+    }
+
+    @Test fun overlaysAndBackgroundBeforeTopNeverReportLostProgress() {
+        val h = Harness()
+        val base = h.ui
+        val hidden = listOf(
+            base.copy(visibility = base.visibility.copy(covered = true)),
+            base.copy(visibility = base.visibility.copy(heightEditing = true)),
+            base.copy(selection = base.selection.openModes()),
+            base.copy(tutorial = TutorialState(card = TutorialCard(1, method))),
+            base.copy(diagnosticsOpen = true), base.copy(resumed = false),
+        )
+        for (overlay in hidden) {
+            h.bind()
+            h.sample(0.5)
+            h.ui = overlay
+            h.reconcile()
+            assertNull(h.workflow.state.notice)
+            h.ui = base
+            h.bind()
+            h.sample(0.5)
+            assertNull(h.workflow.state.notice)
+        }
     }
 }

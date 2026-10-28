@@ -252,4 +252,65 @@ class KnownHeightWorkflowTest {
         w.capture(CaptureResult.Captured(observation(10.0, base+2_000_000_000L)), base+2_000_000_000L)
         assertEquals(result, w.state.result)
     }
+
+    @Test fun cameraShutdownWithoutTopIsSilentForIntentionalAndUnexpectedLoss() {
+        for (intentional in listOf(false, true)) {
+            val w = workflow()
+            repeat(3) {
+                w.cameraReady(false, intentional)
+                w.update(null, null, false, base)
+                assertNull(w.state.notice)
+                assertEquals(MeasurementStage.TOP, w.state.stage)
+                assertNull(w.state.top)
+                w.cameraReady(true)
+            }
+        }
+    }
+
+    @Test fun shutdownReportsLostProgressOnceAndDistinguishesIntentionalSuspension() {
+        for (intentional in listOf(false, true)) {
+            val w = workflow()
+            top(w)
+            w.cameraReady(false, intentional)
+            val interrupted = w.state
+            assertEquals(if (intentional) MeasurementNotice.ACQUISITION_SUSPENDED else MeasurementNotice.CAMERA_INTERRUPTED, interrupted.notice)
+            assertNull(interrupted.top)
+            w.cameraReady(false, intentional)
+            w.update(null, null, false, base)
+            assertEquals(interrupted.noticeId, w.state.noticeId)
+            w.cameraReady(true)
+            assertEquals(interrupted.noticeId, w.state.noticeId)
+        }
+    }
+
+    @Test fun repeatedRejectionsHaveNewIdentitiesButSensorUpdatesDoNotReissueThem() {
+        val w = workflow()
+        top(w)
+        bottom(w, e = 40.0)
+        val first = w.state.noticeId
+        w.update(observation(40.0, base + 2_000_000_000L), "frame", true, base + 2_000_000_000L)
+        assertEquals(first, w.state.noticeId)
+        bottom(w, e = 40.0, time = base + 2_000_000_000L)
+        assertTrue(w.state.noticeId > first)
+        assertEquals(MeasurementNotice.AIM_BELOW_TOP, w.state.notice)
+        w.restart()
+        assertNull(w.state.notice)
+    }
+
+    @Test fun exactFifteenSecondBoundaryStillAcceptsValidGeometry() {
+        assertEquals(15_000_000_000L, AcquisitionPolicy().maximumPairGapNanos)
+        val w = workflow()
+        top(w)
+        bottom(w, time = base + 15_000_000_000L)
+        assertNotNull(w.state.result)
+        w.cameraReady(false)
+        assertNull(w.state.notice)
+    }
+
+    @Test fun changedFrameAtFirstTapDoesNotClaimLostProgress() {
+        val w = workflow()
+        w.capture(CaptureResult.Captured(observation(30.0).copy(referenceFrameId = "new")), base)
+        assertNull(w.state.top)
+        assertNull(w.state.notice)
+    }
 }

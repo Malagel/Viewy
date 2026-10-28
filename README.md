@@ -49,8 +49,8 @@ Viewy wordmark uses bundled [Nunito Bold](https://github.com/google/fonts/blob/c
 ([SIL Open Font License](app/src/main/assets/licenses/nunito_ofl.txt));
 no fonts are downloaded during use.
 
-Follow alignment/stability guidance. Preview-center aiming and preview/sensor
-timing are approximate, and uncertainty is unquantified. No photos, recordings,
+Follow the top/bottom instructions and keep the phone still for each capture.
+Preview-center aiming and preview/sensor timing are approximate, and uncertainty is unquantified. No photos, recordings,
 measurement history or telemetry are stored; the app operates entirely offline.
 
 - [Product specification](docs/PRODUCT_SPEC.md): implemented behavior and future requirements.

@@ -9,15 +9,11 @@ import androidx.annotation.StringRes
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
@@ -69,7 +65,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.malagel.viewy.R
 import com.malagel.viewy.camera.CameraPreview
 import com.malagel.viewy.measurement.*
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.first
@@ -140,12 +135,11 @@ fun ViewyScreen(
     val openSettings = {
         context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:${context.packageName}".toUri()))
     }
-    val candidate = contextualGuidance(state)
-    // Delay changing sensor hints; capture eligibility itself is never delayed.
-    var hint by remember { mutableStateOf<Int?>(null) }
-    LaunchedEffect(candidate) {
-        delay(if (candidate == null) 500 else 250)
-        hint = candidate
+    val hint = state.guidance
+    val captureRestriction = when (measurement.alignment) {
+        com.malagel.viewy.measurement.Alignment.TURN_LEFT,
+        com.malagel.viewy.measurement.Alignment.TURN_RIGHT -> stringResource(R.string.notice_align)
+        else -> null
     }
     MeasurementSelector(
         state.selection, model::dismissSelection, model::backSelection, model::browseMode, model::selectMethod,
@@ -208,12 +202,12 @@ fun ViewyScreen(
                                                 }
                                             }
                                         } else {
-                                            AnimatedContent(
-                                                targetState = hint,
-                                                modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
-                                                transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "Preview guidance",
-                                            ) { message ->
-                                                if (message != null) Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.9f), shape = RoundedCornerShape(16.dp)) {
+                                            hint?.let { message ->
+                                                Surface(
+                                                    Modifier.align(Alignment.BottomCenter).padding(12.dp),
+                                                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.9f),
+                                                    shape = RoundedCornerShape(16.dp),
+                                                ) {
                                                     Text(stringResource(message), Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
                                                         .semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.bodyMedium)
                                                 }
@@ -240,6 +234,7 @@ fun ViewyScreen(
                         MeasurementControls(
                             captureTop = measurement.top == null, canCapture = measurement.canCapture,
                             compact = compact, onRestart = model::restart, onCapture = model::capture,
+                            captureRestriction = captureRestriction,
                             modeControl = { ModeControl(model::openModes) },
                         )
                     }
@@ -267,7 +262,8 @@ fun ViewyScreen(
                             TextButton(onClick = { showWorkspace = true }, modifier = Modifier.weight(1f)) {
                                 Text(stringResource(R.string.open_viewfinder))
                             }
-                            MeasurementControls(measurement.top == null, measurement.canCapture, true, model::restart, model::capture) {
+                            MeasurementControls(measurement.top == null, measurement.canCapture, true, model::restart, model::capture,
+                                captureRestriction) {
                                 ModeControl(model::openModes)
                             }
                         }
@@ -304,7 +300,7 @@ fun ViewyScreen(
                         // The dialog suspends hardware; retain the failure that prompted it.
                         RecoveryControls(statusSnapshot ?: state, permission, requested, requestPermission, openSettings,
                             { showStatus = false }, { showStatus = false })
-                        candidate?.let { Text(stringResource(it)) }
+                        statusSnapshot?.guidance?.let { Text(stringResource(it)) }
                     }
                 }
             }, confirmButton = { TextButton(onClick = { showStatus = false }) { Text(stringResource(R.string.close)) } },
@@ -447,7 +443,7 @@ private fun distance(meters: Double, unit: HeightUnit): String = distanceText(me
 @Composable
 private fun MeasurementControls(
     captureTop: Boolean, canCapture: Boolean, compact: Boolean,
-    onRestart: () -> Unit, onCapture: () -> Unit, modeControl: @Composable () -> Unit,
+    onRestart: () -> Unit, onCapture: () -> Unit, captureRestriction: String? = null, modeControl: @Composable () -> Unit,
 ) {
     Row(Modifier.widthIn(max = 320.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
@@ -458,7 +454,10 @@ private fun MeasurementControls(
         val captureLabel = stringResource(if (captureTop) R.string.capture_top else R.string.capture_bottom)
         Button(
             onClick = onCapture, enabled = canCapture,
-            modifier = Modifier.size(if (compact) 72.dp else 88.dp).semantics { contentDescription = captureLabel },
+            modifier = Modifier.size(if (compact) 72.dp else 88.dp).semantics {
+                contentDescription = captureLabel
+                captureRestriction?.let { stateDescription = it }
+            },
             shape = CircleShape, contentPadding = PaddingValues(0.dp),
             border = BorderStroke(2.dp, if (canCapture) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)),
             colors = ButtonDefaults.buttonColors(

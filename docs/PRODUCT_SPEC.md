@@ -136,16 +136,34 @@ future validated features; they have no selectable methods.
   releases resources immediately. Completed results keep acquisition stopped until
   Restart or saving height.
 - Rear-camera preview in a rounded rectangle with a thin, centered plus-shaped
-  aiming reticle. Contextual guidance fades inside the preview; normal readiness
-  adds no warning. Startup, first-frame waiting, intentional suspension and return
+  aiming reticle. Workflow failures and near-vertical restrictions receive preview-edge messages; normal aiming
+  stays silent. Startup, first-frame waiting, intentional suspension and return
   from overlays stay silent, with no camera warning or Retry control. Recoverable
   failures receive up to three automatic retries with short increasing delays;
   only exhausted retries or conditions requiring user action show camera recovery
   controls. Permission recovery remains available. Unexpected sustained preview
   loss is recoverable; brief stream transitions do not trigger rebinding.
-- Top capture followed by bottom capture within 15 s, with guidance for fresh,
-  stable aiming and horizontal alignment. The camera location must stay fixed
-  and the endpoints must lie on one vertical line.
+- Top capture followed by bottom capture within 15 s. **Aim at the top** and
+  **Aim at the bottom** remain the stable primary instructions. Routine movement,
+  settling, startup, readiness, missing/stale/unreliable sensor readings, small
+  left/right adjustments produce no preview text, even when sustained.
+  Near-vertical aiming shows **Cannot align at this angle.** for as long as the aim
+  remains in the restricted range, clearing immediately when it leaves.
+  Sensor quality, freshness, near-vertical and alignment gates
+  still block invalid captures immediately. Hardware failures retain recovery
+  actions. The camera location must stay fixed and the endpoints must lie on one
+  vertical line; the 2° horizontal alignment gate remains enforced, without a
+  visual alignment overlay.
+- New rejected captures and lost pending captures receive concise, event-driven
+  corrections. Each failure is shown once for a readable interval, extended by
+  Android accessibility timeout preferences where supported; sensor updates do
+  not repeat it. Restart, successful stage changes, suspension and completion
+  clear obsolete messages. A new interruption with a recorded top explains the
+  cleared capture on return; genuine camera loss uses the camera interruption
+  notice. Suspension before any capture is silent, and completed results show no
+  guidance. One static preview-edge surface leaves the reticle and controls fixed;
+  constrained layouts retain the existing status dialog. Capture semantics explain
+  a blocked horizontal alignment without left/right preview messages.
 - Before height entry, the aiming-caption area stays blank but reserves space
   for both top and bottom instructions at the current text size and width. This
   prevents the preview from shrinking when instructions appear or change.
