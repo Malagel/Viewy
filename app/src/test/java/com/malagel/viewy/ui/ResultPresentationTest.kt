@@ -33,9 +33,9 @@ class ResultPresentationTest {
 
     @Test fun metricImperialAndLocaleAreAppliedOnlyToPresentation() {
         assertEquals("730.45 m", distanceText(730.45, HeightUnit.METERS, Locale.US))
-        assertEquals("10 ft", distanceText(3.048, HeightUnit.FEET, Locale.US))
+        assertEquals("10.00 ft", distanceText(3.048, HeightUnit.FEET, Locale.US))
         assertEquals("10.01 ft", distanceText(3.05, HeightUnit.FEET, Locale.US))
-        assertEquals("1.500 m", distanceText(1500.0, HeightUnit.METERS, spanish))
+        assertEquals("1.500,00 m", distanceText(1500.0, HeightUnit.METERS, spanish))
         assertEquals("730,45 m", distanceText(730.45, HeightUnit.METERS, spanish))
         assertEquals("1,6", measurementNumberText(1.6, spanish))
         assertEquals("0,00000012", measurementNumberText(0.00000012345, spanish))
@@ -57,14 +57,14 @@ class ResultPresentationTest {
     }
 
     @Test fun resultDistanceScalesAtTenKilometersOrOneMileUsingTheUnroundedDistance() {
-        assertEquals("9,999 m", distanceText(9999.0, HeightUnit.METERS, Locale.US))
-        assertEquals("10 km", distanceText(10_000.0, HeightUnit.METERS, Locale.US))
+        assertEquals("9,999.00 m", distanceText(9999.0, HeightUnit.METERS, Locale.US))
+        assertEquals("10.00 km", distanceText(10_000.0, HeightUnit.METERS, Locale.US))
         assertEquals("10.73 km", distanceText(10_730.0, HeightUnit.METERS, Locale.US))
         assertEquals("10,05 km", distanceText(10_050.0, HeightUnit.METERS, spanish))
-        assertEquals("5,279 ft", distanceText(1609.0392, HeightUnit.FEET, Locale.US))
-        assertEquals("1 mi", distanceText(1609.344, HeightUnit.FEET, Locale.US))
-        assertEquals("2 mi", distanceText(3218.688, HeightUnit.FEET, Locale.US))
-        assertEquals("2,5 mi", distanceText(4023.36, HeightUnit.FEET, spanish))
+        assertEquals("5,279.00 ft", distanceText(1609.0392, HeightUnit.FEET, Locale.US))
+        assertEquals("1.00 mi", distanceText(1609.344, HeightUnit.FEET, Locale.US))
+        assertEquals("2.00 mi", distanceText(3218.688, HeightUnit.FEET, Locale.US))
+        assertEquals("2,50 mi", distanceText(4023.36, HeightUnit.FEET, spanish))
         assertEquals("m", ResultNumberFormatter(Math.nextDown(10_000.0), HeightUnit.METERS, Locale.US).unitLabel)
         assertEquals("ft", ResultNumberFormatter(Math.nextDown(1609.344), HeightUnit.FEET, Locale.US).unitLabel)
         // Object heights use base units regardless of the result-distance thresholds.
@@ -77,7 +77,7 @@ class ResultPresentationTest {
             Triple(10_000.0, HeightUnit.METERS, "km"), Triple(1609.344, HeightUnit.FEET, "mi"),
         )) {
             val formatter = ResultNumberFormatter(meters, preference, Locale.US)
-            assertEquals("0", formatter.frameText(0f))
+            assertEquals("0.00", formatter.frameText(0f))
             repeat(101) { frame ->
                 formatter.frameText(frame / 100f)
                 assertEquals(label, formatter.unitLabel)
@@ -86,11 +86,35 @@ class ResultPresentationTest {
         }
     }
 
+    @Test fun primaryDistanceFillsItsReservedDecimalSlotInsteadOfLeavingAGap() {
+        for ((meters, expected) in listOf(
+            9.8 to "9.80", 9.0 to "9.00", 9.801 to "9.80", 9.999 to "10.00",
+            730.5 to "730.50", 0.0012345 to "0.0012",
+        )) {
+            val formatter = ResultNumberFormatter(meters, HeightUnit.METERS, Locale.US)
+            assertEquals(expected, formatter.finalText)
+            assertEquals(expected, formatter.layoutText)
+            assertEquals(expected, formatter.frameText(1f))
+        }
+        val english = ResultNumberFormatter(9.8, HeightUnit.METERS, Locale.US)
+        assertEquals("0.00", english.frameText(0f))
+        assertEquals("4.90", english.frameText(0.5f))
+        assertEquals("9.80 m", distanceText(9.8, HeightUnit.METERS, Locale.US))
+        assertEquals("9,80 m", distanceText(9.8, HeightUnit.METERS, spanish))
+        assertEquals("1.00 ft", distanceText(0.3048, HeightUnit.FEET, Locale.US))
+        assertEquals("10.50 km", distanceText(10_500.0, HeightUnit.METERS, Locale.US))
+        assertEquals("1.50 mi", distanceText(2414.016, HeightUnit.FEET, Locale.US))
+        // Secondary quantities and editable height keep their existing compact precision policy.
+        assertEquals("9.8", distanceNumberText(9.8, HeightUnit.METERS, Locale.US))
+        assertEquals("1.6", measurementNumberText(1.6, Locale.US))
+        assertEquals("9.8", heightInputText(9.8, Locale.US))
+    }
+
     @Test fun counterUsesStablePrecisionAndEndsAtExactlyTheNormalFormattedValue() {
         for (value in listOf(730.0, 730.001, 999.999, 0.0000012345, 1609.344, 10_000.0, 1e20)) {
             for (locale in listOf(Locale.US, spanish)) for (unit in HeightUnit.entries) {
                 val formatter = ResultNumberFormatter(value, unit, locale)
-                assertEquals("0", formatter.frameText(0f))
+                assertEquals(0.0, NumberFormat.getNumberInstance(locale).parse(formatter.frameText(0f))!!.toDouble(), 0.0)
                 assertEquals(distanceText(value, unit, locale), "${formatter.frameText(1f)} ${formatter.unitLabel}")
                 val parser = NumberFormat.getNumberInstance(locale)
                 var last = 0.0

@@ -473,8 +473,11 @@ kilometers at or above it; feet below 1,609.344 m (one mile), miles at or above 
 The comparison uses unrounded meters, and the chosen unit stays fixed from zero
 through completion. Height formatting uses base units independently.
 Number presentation uses localized grouped plain decimals, HALF_UP to hundredths
-for ordinary values and two significant digits below 0.01. Exact integers omit
-fractional padding; non-integers retain at least one fractional digit even when
+for ordinary values and two significant digits below 0.01. Primary-distance
+frames and final text retain the destination's fractional padding (at least two
+places), matching the measured layout text rather than leaving unused decimal
+space before a right-aligned value. Supporting height and elevation omit decimals
+for integers and retain at least one fractional digit for non-integers even when
 rounded to an integer. Display-only decimal arithmetic keeps large converted feet
 finite without changing stored Double values or geometry. Counter frames share
 the destination’s decimal scale and a measured fixed numeric slot with tabular

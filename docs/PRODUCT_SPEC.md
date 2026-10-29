@@ -224,13 +224,16 @@ future validated features; they have no selectable methods.
   threshold. Imperial results use decimal feet below one mile (5,280 ft) and miles
   at or above it. The unit is chosen from the unrounded final distance and remains
   fixed throughout counting; object heights retain meters or feet. Results use
-  locale-specific grouping and decimal separators, with HALF_UP rounding to at most two fractional digits for ordinary values.
-  Exact integers omit decimals; non-integers retain at least one fractional digit
-  even if rounded to a whole value (730.001 → 730.0). Positive values below 0.01
-  use two significant digits in plain decimal form so they do not become zero.
-  Large magnitudes remain grouped plain decimals without scientific notation.
-  The same policy applies to result height and elevation. These display digits
-  are not calibrated accuracy; the approximation marker and disclaimer remain.
+  locale-specific grouping and decimal separators with HALF_UP rounding. The primary
+  distance uses two fractional digits for ordinary values, including trailing zeros
+  (9.8 → 9.80, 9 → 9.00), throughout counting and at completion. This fills its
+  reserved numeric width without an extra gap before short results. Positive values
+  below 0.01 use two significant digits in plain decimal form so they do not become
+  zero. Large magnitudes remain grouped plain decimals without scientific notation.
+  Supporting height and elevation remain compact: at most two fractional digits for
+  ordinary values, no decimals for integers, and at least one fractional digit for
+  non-integers even when rounding reaches a whole value. These display digits are
+  not calibrated accuracy; the approximation marker and disclaimer remain.
 - Result animation is presentation-only: ordinary updates, unit/language changes
   and overlay navigation do not replay it. A recreated host shows a retained
   completed result directly. System animation scaling applies; disabled motion

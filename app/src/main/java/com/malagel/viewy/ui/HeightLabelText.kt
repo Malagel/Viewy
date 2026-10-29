@@ -42,21 +42,21 @@ internal enum class ResultDistanceUnit(val metersPerUnit: Double, val label: Str
     }
 }
 
-/** Counter uses the destination's decimal scale, so small intermediate frames cannot widen it. */
+/** Counter and final result fill the same decimal slot, with at least two fractional digits. */
 internal class ResultNumberFormatter(meters: Double, unit: com.malagel.viewy.measurement.HeightUnit, private val locale: Locale) {
     private val displayUnit = ResultDistanceUnit.forDistance(meters, unit)
     val unitLabel = displayUnit.label
     private val value = BigDecimal.valueOf(meters).divide(BigDecimal.valueOf(displayUnit.metersPerUnit), MathContext.DECIMAL128)
     private val fractionDigits = maxOf(2, roundedMeasurement(value).scale())
-    val finalText = measurementNumberText(value, locale)
-    val layoutText = decimalText(value.setScale(fractionDigits, RoundingMode.HALF_UP), locale, fractionDigits)
+    val finalText = decimalText(value.setScale(fractionDigits, RoundingMode.HALF_UP), locale, fractionDigits)
+    val layoutText = finalText
 
     fun frameText(fraction: Float): String = when {
         fraction >= 1f -> finalText
-        fraction <= 0f -> decimalText(BigDecimal.ZERO, locale, 0)
+        fraction <= 0f -> decimalText(BigDecimal.ZERO, locale, fractionDigits)
         else -> {
             val frame = value.multiply(BigDecimal.valueOf(fraction.toDouble())).setScale(fractionDigits, RoundingMode.HALF_UP)
-            decimalText(frame.stripTrailingZeros(), locale, if (frame.stripTrailingZeros().scale() > 0) 1 else 0)
+            decimalText(frame, locale, fractionDigits)
         }
     }
 }

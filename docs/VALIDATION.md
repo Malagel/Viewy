@@ -79,7 +79,9 @@ Focused JVM coverage checks localized decimal result/height formatting, HALF_UP
 rounding, integer versus non-integer padding, tiny positive values, large grouped
 magnitudes, exact kilometer/mile thresholds and Metric/Imperial conversion (including display overflow beyond
 Double in feet). Counter-frame tests check monotonic display, stable decimal scale
-and exact final formatting with the destination unit fixed throughout counting. Presentation policy tests check once-per-estimate
+and exact final formatting with the destination unit fixed throughout counting.
+Primary-distance regression checks cover padded one-decimal/whole values, rounding
+carry, English/Spanish formatting and independent compact supporting quantities. Presentation policy tests check once-per-estimate
 entry, settled host restoration, equal-valued new-result identity during exit,
 and count/height/separation/disclaimer ordering.
 Existing workflow/resource tests cover rejected second captures, immediate release,
@@ -118,7 +120,12 @@ normal/compact/exceptional windows and large system fonts:
    must not accept touch, keyboard focus or accessibility actions. With animation
    scale zero, final distance and all three supporting elements appear together;
    repeat with reduced and increased system duration scales.
-6. Check readable distance/unit placement, localized grouping/decimals, bottom
+6. Check primary distances such as 9.80 and 9.00 with animations enabled and
+   disabled: the final number must fill the decimal width reserved during counting,
+   with balanced spacing to the approximation marker and unit. Repeat in Spanish
+   (9,80), feet, kilometers/miles and with large fonts. Supporting height/angle and
+   editable height input must retain their compact formatting.
+   Check readable distance/unit placement, localized grouping/decimals, bottom
    disclaimer, scrolling when constrained, and large/tiny displayed values. The
    approximation marker and disclaimer must remain visible, without confidence or
    accuracy claims. Check results just below/at/above 10,000 m and one mile
