@@ -34,9 +34,9 @@
     <string name="notice_near_vertical">Apunta más lejos de la vertical; aquí la alineación horizontal no es fiable.</string>
     <string name="notice_incompatible">Las capturas ya no comparten una sesión válida. Apunta de nuevo al extremo superior.</string>
     <string name="notice_align">Alinéate con el extremo superior antes de capturar el inferior.</string>
-    <string name="notice_below_top">Apunta por debajo del extremo superior registrado, al extremo inferior del objeto.</string>
+    <string name="notice_below_top">Apunta debajo del extremo superior.</string>
     <string name="notice_unusable">Los extremos están demasiado cerca o no son utilizables. Apunta de nuevo al extremo inferior o reinicia más cerca del objeto.</string>
-    <string name="notice_small_separation">La separación angular entre los extremos es demasiado pequeña. Reinicia más cerca del objeto.</string>
+    <string name="notice_small_separation">La separación es demasiado pequeña.</string>
     <string name="notice_sensor_restarted">Se reinició la sesión del sensor. Apunta de nuevo al extremo superior.</string>
     <string name="reticle_description">Retícula central de puntería</string>
     <string name="camera_starting">Iniciando cámara trasera…</string>

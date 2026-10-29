@@ -34,9 +34,9 @@
     <string name="notice_near_vertical">Aim farther from straight up or down; horizontal alignment is unreliable here.</string>
     <string name="notice_incompatible">Captures no longer share a valid session. Aim at the top again.</string>
     <string name="notice_align">Align with the top before recording the bottom.</string>
-    <string name="notice_below_top">Aim below the recorded top, at the object\'s bottom.</string>
+    <string name="notice_below_top">Aim below the recorded top.</string>
     <string name="notice_unusable">Endpoints are too close or unusable. Re-aim at the bottom, or restart closer to the object.</string>
-    <string name="notice_small_separation">Endpoints are too close in angle. Restart closer to the object.</string>
+    <string name="notice_small_separation">Endpoints are too close in angle.</string>
     <string name="notice_sensor_restarted">Sensor session restarted. Aim at the top again.</string>
     <string name="reticle_description">Center aiming reticle</string>
     <string name="camera_starting">Starting rear camera…</string>
