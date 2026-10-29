@@ -3,7 +3,10 @@ package com.malagel.viewy.camera
 import android.content.Context
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
+import android.hardware.camera2.CameraCaptureSession
+import android.hardware.camera2.CaptureResult
 import android.hardware.camera2.CaptureRequest
+import android.hardware.camera2.TotalCaptureResult
 import android.hardware.display.DisplayManager
 import android.os.Build
 import android.os.Handler
@@ -40,7 +43,7 @@ data class CameraPreviewState(
     val errorDetail: String? = null,
 )
 
-/** Preview only. One explicit rear camera/physical output, CameraX zoom, no images or storage. */
+/** Logical rear-camera preview with CameraX zoom and observed physical-lens mapping. */
 @androidx.annotation.OptIn(ExperimentalCamera2Interop::class)
 class CameraPreview(
     private val context: Context,
@@ -56,6 +59,11 @@ class CameraPreview(
     private var cameraInfo: androidx.camera.core.CameraInfo? = null
     private var cameraControl: androidx.camera.core.CameraControl? = null
     private val zoom = PreviewZoomSession()
+    private var bindingEpoch = 0L
+    private var identityRequired = false
+    private var identityVerified = false
+    private var lastFrameNumber = -1L
+    private var acknowledgedZoomToken: Long? = null
     private var zoomTimeout: Runnable? = null
     private var zoomSettling: Runnable? = null
     private var description = CameraPreviewState()
@@ -92,6 +100,9 @@ class CameraPreview(
                 // CameraX resets controls on closure, even if the use case remains bound.
                 // Revoke acknowledgements immediately; the readiness watchdog owns recovery.
                 zoom.request(zoom.state.ratio)
+                identityVerified = false
+                lastFrameNumber = -1L
+                acknowledgedZoomToken = null
                 zoomTimeout?.let(handler::removeCallbacks)
                 zoomSettling?.let(handler::removeCallbacks)
             }
@@ -153,12 +164,12 @@ class CameraPreview(
             val manager = context.getSystemService(CameraManager::class.java)
             val logical = manager.getCameraCharacteristics(logicalId)
             val physicalIds = if (Build.VERSION.SDK_INT >= 28) logical.physicalCameraIds else emptySet()
-            // A logical camera may switch lenses even at 1×. Pin its largest-area rear imager.
-            // If no physical metadata can be read, fail rather than silently allow lens switching.
-            val physical = physicalIds.mapNotNull { id ->
+            // Keep the logical output unpinned; physical metadata supplies aiming axes.
+            val physicalCandidates = physicalIds.mapNotNull { id ->
                 runCatching { id to manager.getCameraCharacteristics(id) }.getOrNull()
             }.filter { (_, c) -> c[CameraCharacteristics.LENS_FACING] == CameraCharacteristics.LENS_FACING_BACK }
-                .sortedBy { it.first }.maxByOrNull { (_, c) ->
+                .sortedBy { it.first }
+            val physical = physicalCandidates.maxByOrNull { (_, c) ->
                     c[CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE]?.let { it.width * it.height } ?: 0f
                 }
             if (physicalIds.isNotEmpty() && physical == null) {
@@ -176,7 +187,37 @@ class CameraPreview(
                     .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY).build())
                 .setPreviewStabilizationEnabled(false)
             val interop = Camera2Interop.Extender(builder)
-            if (Build.VERSION.SDK_INT >= 28 && physical != null) interop.setPhysicalCameraId(selectedId)
+            identityRequired = physicalIds.isNotEmpty()
+            if (identityRequired) {
+                val mappings = physicalCandidates.associate { (id, c) ->
+                    id to CameraDirectionMapping.forRearCamera("rear-$logicalId/physical-$id",
+                        if (Build.VERSION.SDK_INT >= 28) c[CameraCharacteristics.LENS_POSE_REFERENCE] else null,
+                        c[CameraCharacteristics.LENS_POSE_ROTATION])
+                }
+                val epoch = bindingEpoch
+                interop.setSessionCaptureCallback(object : CameraCaptureSession.CaptureCallback() {
+                    override fun onCaptureCompleted(session: CameraCaptureSession, request: CaptureRequest, result: TotalCaptureResult) {
+                        val id = if (Build.VERSION.SDK_INT >= 29) result[CaptureResult.LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_ID] else null
+                        val frame = result.frameNumber
+                        // Observe metadata only; CameraX owns requests and session lifecycle.
+                        handler.post {
+                            if (disposed || failed || epoch != bindingEpoch || !open || frame <= lastFrameNumber) return@post
+                            lastFrameNumber = frame
+                            val currentMapping = mappings[id]
+                                ?: return@post fail(R.string.camera_no_consistent_lens, "Unavailable/unknown active rear camera: $id", retryable = false)
+                            identityVerified = true
+                            val changed = id != description.physicalCameraId
+                            if (changed) {
+                                description = description.copy(physicalCameraId = id, mapping = currentMapping)
+                                zoom.restartSettling()
+                                zoomSettling?.let(handler::removeCallbacks)
+                                acknowledgedZoomToken?.takeIf(zoom::owns)?.let(::scheduleZoomSettling)
+                            }
+                            if (changed || !description.ready) publish()
+                        }
+                    }
+                })
+            }
             interop.setCaptureRequestOption(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_OFF)
             interop.setCaptureRequestOption(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE, CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_OFF)
             // No unsupported principal-point correction: preview processing/crop/distortion and
@@ -204,7 +245,7 @@ class CameraPreview(
 
     private fun publish() {
         if (disposed || failed) return
-        val ready = open && streaming
+        val ready = open && streaming && (!identityRequired || identityVerified)
         scheduleWatchdog(ready)
         description = description.copy(zoom = zoom.state, ready = ready, open = open, streaming = streaming, messageRes = if (ready) R.string.camera_ready else R.string.camera_waiting)
         onState(description)
@@ -238,6 +279,7 @@ class CameraPreview(
     }
 
     private fun applyZoom(token: Long) {
+        acknowledgedZoomToken = null
         zoomTimeout?.let(handler::removeCallbacks)
         zoomSettling?.let(handler::removeCallbacks)
         publish() // Block capture before submitting platform work.
@@ -252,14 +294,9 @@ class CameraPreview(
                 if (!disposed && !failed && zoom.owns(token)) {
                     try {
                         future.get() // LiveData reports the target immediately; only this future acknowledges application.
-                        if (zoom.applied(token, SystemClock.elapsedRealtime())) {
-                            handler.removeCallbacks(deadline)
-                            val settle = Runnable {
-                                if (!disposed && !failed && zoom.settle(token, SystemClock.elapsedRealtime())) publish()
-                            }
-                            zoomSettling = settle
-                            handler.postDelayed(settle, PreviewZoomSession.SETTLE_MILLIS)
-                        }
+                        acknowledgedZoomToken = token
+                        handler.removeCallbacks(deadline)
+                        scheduleZoomSettling(token)
                     } catch (error: Exception) {
                         fail(R.string.camera_interrupted, "Zoom: " + error.javaClass.simpleName)
                     }
@@ -270,7 +307,24 @@ class CameraPreview(
         }
     }
 
+    private fun scheduleZoomSettling(token: Long) {
+        if (!zoom.applied(token, SystemClock.elapsedRealtime())) return
+        zoomSettling?.let(handler::removeCallbacks)
+        lateinit var settle: Runnable
+        settle = Runnable {
+            if (disposed || failed || !zoom.owns(token)) return@Runnable
+            if (zoom.settle(token, SystemClock.elapsedRealtime())) publish()
+            else handler.postDelayed(settle, 1L)
+        }
+        zoomSettling = settle
+        handler.postDelayed(settle, PreviewZoomSession.SETTLE_MILLIS)
+    }
+
     private fun clearZoom() {
+        bindingEpoch++
+        identityVerified = false
+        lastFrameNumber = -1L
+        acknowledgedZoomToken = null
         zoom.close() // Revoke queued futures and drain callbacks before releasing the camera.
         cameraControl = null
         zoomTimeout?.let(handler::removeCallbacks)

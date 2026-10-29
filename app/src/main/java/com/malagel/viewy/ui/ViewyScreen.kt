@@ -329,7 +329,7 @@ private fun RecoveryControls(
             Text(stringResource(state.camera.messageRes))
             TextButton(onClick = onCameraRetry) { Text(stringResource(R.string.camera_retry)) }
         }
-        state.acquisitionEligible && state.camera.ready && !state.acquisition.running -> {
+        state.orientationFailureVisible -> {
             Text(stringResource(R.string.guidance_orientation))
             TextButton(onClick = onOrientationRetry) { Text(stringResource(R.string.orientation_retry)) }
         }

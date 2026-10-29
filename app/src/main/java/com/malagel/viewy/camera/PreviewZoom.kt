@@ -45,6 +45,13 @@ internal class PreviewZoomSession {
         return true
     }
 
+    /** A reported lens transition needs fresh settling, not another zoom request. */
+    fun restartSettling() {
+        if (!state.available) return
+        state = state.copy(settled = false)
+        settleAt = null
+    }
+
     fun settle(token: Long, nowMillis: Long): Boolean {
         if (token != generation || settleAt?.let { nowMillis >= it } != true) return false
         state = state.copy(settled = true)

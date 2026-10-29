@@ -138,7 +138,7 @@ class MeasurementPresentationTest {
         assertFalse(starting.copy(selection = MeasurementSelection(),
             visibility = starting.visibility.copy(permissionGranted = false)).recoveryVisible)
         assertFalse(starting.copy(visibility = starting.visibility.copy(permissionGranted = false, windowFocused = false)).recoveryVisible)
-        assertTrue(ready.copy(acquisition = AcquisitionState(running = false)).recoveryVisible)
+        assertFalse(ready.copy(acquisition = AcquisitionState(running = false)).recoveryVisible)
     }
 
     @Test fun suspendedFailureSnapshotsNeverShowRecoveryControlsOnTheMeasurementSurface() {

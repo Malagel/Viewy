@@ -38,9 +38,11 @@ data class MeasurementUiState(
     val alignmentCue: AlignmentCueState = AlignmentCueState(),
 ) {
     val canCapture: Boolean get() = measurement.canCapture && camera.zoom.settled
+    val orientationFailureVisible: Boolean get() = acquisitionEligible && camera.ready &&
+        !acquisition.running && acquisition.failure != null
     val recoveryVisible: Boolean get() = requiresCamera && heightConfigured && !measurement.completed &&
         (if (!visibility.permissionGranted) viewfinderInteractive
-        else acquisitionEligible && (cameraFailureVisible || (camera.ready && !acquisition.running)))
+        else acquisitionEligible && (cameraFailureVisible || orientationFailureVisible))
     val canOpenSettings: Boolean get() = !diagnosticsOpen && !selection.isOpen && !tutorial.selectorExiting && tutorial.card == null && tutorial.pendingMethod == null
     val canOpenHelp: Boolean get() = selection.activeMethod != null && !selection.isOpen && !tutorial.selectorExiting && tutorial.card == null && tutorial.pendingMethod == null
     val requiresCamera: Boolean get() = selection.activeMethod?.requiresCamera == true

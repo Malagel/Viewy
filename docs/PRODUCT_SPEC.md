@@ -164,6 +164,11 @@ future validated features; they have no selectable methods.
   necessary; a reported range entirely below 1× cannot start acquisition.
   Capture is blocked during asynchronous zoom application and a short settling
   interval. Zoom does not establish camera-center stability or calibrated accuracy.
+  The logical rear camera is unpinned so Android can select its lens. On
+  multi-camera devices, acquisition requires a readable reported active rear lens.
+  A lens change updates the aiming-axis mapping, restarts orientation and zoom
+  settling, and invalidates an incomplete pair. Expected orientation restarts
+  stay quiet; actual sensor discovery/registration failures retain recovery.
   Zoom controls, the ratio label and the preview-edge height editor fade with
   preview suspension and streaming recovery, including Settings, mode selection
   and focus loss. Their 225 ms fades are slightly longer than the camera's 165 ms

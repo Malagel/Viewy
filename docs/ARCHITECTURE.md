@@ -112,7 +112,7 @@ Source paths below are relative to `app/src/main/java/com/malagel/viewy/`:
 | `orientation/OrientationSession.kt` | Pure bounded recent-ray statistics, frame/time validity, captures and pair compatibility. |
 | `orientation/AndroidOrientationAcquisition.kt` | Sensor discovery/registration, callback isolation, freshness publication and cleanup. |
 | `camera/CameraDirectionMapping.kt` | Pure policy mapping the selected optical axis into native device axes. |
-| `camera/CameraPreview.kt` | CameraX Preview selection/pinning, metadata, stream/errors and unbinding. |
+| `camera/CameraPreview.kt` | CameraX logical preview, active-lens mapping, zoom, stream/errors and unbinding. |
 | `ui/MeasurementResources.kt`, `orientation/OrientationRegistration.kt` | Shared resource reconciliation, synchronous preview release and sensor registration ownership. |
 | `camera/PreviewSession.kt` | Ownership tokens reject callbacks/disposal from obsolete previews and clear readiness on release. |
 | `measurement/HeightInput.kt` | Decimal validation and meters/feet conversion without presentation rounding. |
@@ -282,13 +282,17 @@ detect translation or distinguish real rotation from reference drift.
 
 ## Camera, workflow and lifecycle
 
-CameraX binds only Preview. The first default rear camera is selected; for a
-logical output, readable physical rear candidates are ordered deterministically
-and the one with largest reported sensor area is pinned through Camera2 interop.
-This is not a field-of-view/accuracy guarantee. If inspection/pinning/binding fails,
-report failure rather than silently allow lens switching. Nonlogical/older outputs
-retain the selected camera ID. CameraX zoom preserves this selection; there is no
-lens-switch UI.
+CameraX binds only Preview to the default rear logical camera without pinning a
+physical output. Readable rear physical cameras supply pose-based direction
+mappings. The largest reported sensor supplies the provisional startup mapping;
+for multi-camera devices, readiness requires a completed capture reporting a
+readable active physical ID. Missing/unknown IDs fail explicitly. Metadata is
+copied to the main thread with binding-generation and frame-order guards;
+CameraX retains ownership of all session and zoom controls. Reported lens changes
+update the mapping, restart zoom settling without resubmitting controls, and
+restart orientation through the existing resource owner. Orientation restart
+clears old observations and invalidates an incomplete pair. Expected stopped
+snapshots remain quiet; explicit discovery/registration failures retain Retry.
 
 A 4:3 stream is requested with supported-resolution fallback. PreviewView uses
 COMPATIBLE/TextureView for rounded clipping/overlays and FILL_CENTER for
@@ -329,14 +333,15 @@ product cap. It explicitly requests 1.0× (or a higher supported minimum) throug
 range drives button bounds, pinch/button request clamping, the request and the
 label; sub-1× zoom is never selectable. A range entirely below 1× fails closed.
 There is no Compose image scaling. Zoom changes do
-not rebind or change the selected logical/physical camera or orientation mapping.
+not rebind the logical camera. Reported physical-lens changes update its direction
+mapping and require fresh orientation before capture.
 
-The 1× floor avoids zoom-out ratios whose logical-camera behavior can depend on
-another lens: [`setPhysicalCameraId`](https://developer.android.com/reference/androidx/camera/camera2/interop/Camera2Interop.Extender#setPhysicalCameraId(java.lang.String))
-forces the selected physical output, whereas Android's
+The 1× floor excludes requested zoom-out. Android's
 [zoom-ratio contract](https://developer.android.com/reference/android/hardware/camera2/CaptureRequest#CONTROL_ZOOM_RATIO)
-allows optical lens switching. Physical field-of-view behavior remains subject to
-device validation.
+allows optical lens selection; fixed requested zoom does not promise a physical
+lens lock. The active-ID check detects reported changes after top capture, which
+invalidate the incomplete pair even though user zoom is locked. Compatibility
+fallbacks for devices without active-camera metadata are not implemented.
 
 The preview's native scale detector and localized Compose buttons route through
 `MeasurementResources`, which rejects changes after top capture, on completion or
@@ -349,7 +354,7 @@ for the latest request future ([repeating-request acknowledgement](https://devel
 preview drain interval. This is an unvalidated usability guard, not an exposure
 synchronization or latency bound. Zoom settling gates both shutter enablement and
 the ViewModel capture entry point, separately from camera readiness, so ordinary
-zoom changes neither invalidate sensor sessions nor restart acquisition. Failed,
+zoom changes preserve sensor acquisition, while a reported lens change restarts it. Failed,
 closed or timed-out current requests enter existing camera recovery with capture
 blocked; obsolete failures are ignored. Requests have a four-second deadline
 (twelve seconds during startup). Every replacement binding resets zoom rather
@@ -359,7 +364,8 @@ zoom before capture can resume. Fixed 1× cameras remain usable
 with disabled zoom controls; invalid capability ranges fail closed. The localized
 ratio label stays visible with the controls, using nearly opaque surfaces.
 
-Capture requires OPEN plus STREAMING and current orientation readiness. Permission
+Capture requires OPEN plus STREAMING, a verified active ID on multi-camera
+devices and current orientation readiness. Permission
 is rechecked on resume; denial retains permission recovery controls. Camera readiness
 alone never requests recovery UI. `CameraRecovery` distinguishes quiet binding/retry
 waiting from a failure requiring user action. `MeasurementResources` owns one
@@ -372,7 +378,7 @@ exceptions, temporary camera contention and watchdog expiration are retryable;
 permission/security failures, missing rear/consistent physical lenses, incompatible
 stream configuration and system-policy/fatal errors skip automatic retries. CameraX
 error codes follow its [state contract](https://developer.android.com/reference/androidx/camera/core/CameraState).
-No retry changes lens selection or pinning.
+Retries retain the same default rear logical-camera selection.
 
 Ineligibility cancels scheduled work immediately, resets the cycle and revokes
 preview ownership before release. Retry generations reject even already-queued

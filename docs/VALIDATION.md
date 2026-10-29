@@ -166,13 +166,17 @@ change. With Known Object Height configured:
    not a validated preview latency bound or proof of stability.
 3. Compare logical/physical IDs and mapping in Developer Options → diagnostics at
    different ratios. Diagnostics intentionally releases the camera; each return
-   resets zoom. Also inspect the CameraX/Camera2 session on-device if needed to
-   verify actual physical-output identity throughout a live sweep; metadata pinning
-   alone does not prove device behavior.
+   resets zoom. Check that reported lens changes update the mapping and clear old
+   orientation samples without an orientation-unavailable flash. Fresh readings
+   and settling must precede capture. Test transitions in both zoom directions;
+   actual lens choice and switch timing remain device-controlled. Missing/unknown
+   active IDs must block acquisition; actual sensor failures must still offer Retry.
 4. Verify capture stays disabled throughout zoom application/settling; capture top
    and confirm buttons and pinch cannot change zoom. Complete bottom capture and
    confirm zoom controls disappear. Restart, pair expiry and invalidation must
    permit zoom again; the displayed result and alignment behavior must be unchanged.
+   An automatic reported lens change after top must discard the incomplete pair,
+   even when the requested zoom stays fixed.
 5. Background/resume, rotate/recreate, open/close Settings/help/height editing and
    exercise permission loss and camera contention. Confirm immediate release,
    safe reset at rebinding, bounded recovery and rejection of obsolete zoom work.
@@ -213,7 +217,8 @@ sequential Gradle execution.
 Lint reported no errors; warnings concern dependency updates, backup guidance,
 the intentional portrait request, the API-33-only locale-config attribute (older
 versions use AppCompat), and an existing discouraged platform API. This used the
-installed JDK 17/API 37 SDK; a clean or release build was not verified.
+installed JDK 17/API 37 SDK; debug/release assembly also passes for the unpinned
+CameraX preview. A clean build was not verified.
 The previously recorded merged-manifest inspection found CAMERA plus an
 app-private signature permission, with no Internet, network-state, microphone,
 location or storage permissions. Deployment-script mocked unit tests and Bash
@@ -380,8 +385,8 @@ CameraX callback timing, actual binding, hardware cleanup or rendered fades.
   and overlay transitions; verify no competing bindings or revived stale preview.
 - Revoke camera permission in Android settings and return. Confirm permission
   controls, blocked captures and no automatic retry loop. Restore permission and
-  verify silent startup. Check unsupported pinned-preview behavior separately if
-  reproducible; recovery must never switch to an unsuitable lens.
+  verify silent startup. Check missing/unknown active-camera identity separately
+  if reproducible; recovery must never use an unknown aiming-axis mapping.
 - Interrupt after a top capture: discard the incomplete pair and require fresh
   observations while preserving height. Complete a measurement, open overlays,
   background/return and wait: preserve the result with camera/sensors stopped and
@@ -394,10 +399,10 @@ CameraX callback timing, actual binding, hardware cleanup or rendered fades.
 ## Outstanding reliability limits
 
 The reported trial does not complete the manual matrix. Outstanding verification
-includes real camera initialization/pinning, selected-lens metadata, actual
+includes real camera initialization, active-lens metadata, actual
 stabilization/autofocus behavior, permissions, lifecycle cleanup, UI/accessibility,
 handheld usefulness of provisional gates, repeated reference measurements and
-portability beyond the Galaxy S22 (including unsupported pinned previews).
+portability beyond the Galaxy S22 (including missing active-camera metadata).
 Wireless reconnection has had mixed developer-reported reliability; mocks do not
 resolve that limitation.
 
