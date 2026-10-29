@@ -44,7 +44,7 @@ restart/stages/suspension, silent no-capture shutdown and the exact 15-second bo
 silent startup/waiting versus actionable failures; three progressive retries,
 exhaustion, manual/new-session/success reset, cancellation and stale retry callbacks;
 monotonic startup/interruption deadlines without sleeps; localized height-label formatting, whole/fractional values, display
-precision and scientific notation; selection availability, inactive startup,
+precision and decimal-only notation; selection availability, inactive startup,
 automatic initial mode presentation, mode/method navigation, Back, disabled modes,
 activation, dismissal and reselection; tutorial first-use eligibility and stable-ID
 preference keys, store/coordinator reconstruction, dismissal and manual reopening,
@@ -64,6 +64,69 @@ new top/restart, completion and suspension/resumption. Animation rendering and
 physical correction usefulness remain manual checks.
 Source and tests define the individual cases. Mocked deployment tests verify script decisions using
 fictional devices/configuration, not real wireless reliability.
+
+## Measurement result presentation
+
+The result presentation passed the JVM suite, debug assembly and lint with the
+bounded Gradle invocation above using JDK 17 and API 37. Lint reported no errors;
+remaining warnings concern existing platform and dependency declarations. No
+device, emulator or instrumentation validation was performed by the agent.
+The developer reports that the result flow works as intended after manual testing;
+device/OS and specific coverage were not recorded. The distance thresholds, control
+spacing and adjusted timing still need the targeted device checks below.
+
+Focused JVM coverage checks localized decimal result/height formatting, HALF_UP
+rounding, integer versus non-integer padding, tiny positive values, large grouped
+magnitudes, exact kilometer/mile thresholds and Metric/Imperial conversion (including display overflow beyond
+Double in feet). Counter-frame tests check monotonic display, stable decimal scale
+and exact final formatting with the destination unit fixed throughout counting. Presentation policy tests check once-per-estimate
+entry, settled host restoration, equal-valued new-result identity during exit,
+and count/height/separation/disclaimer ordering.
+Existing workflow/resource tests cover rejected second captures, immediate release,
+completed-result retention across suspension, Restart with saved height, height-save
+reset and rejection of obsolete camera callbacks. These tests do not execute
+Compose rendering, system animation scaling, Android restoration or CameraX.
+
+Developer device checks remain required, in English and Spanish, both units,
+normal/compact/exceptional windows and large system fonts:
+
+1. Capture top then a valid bottom. Verify immediate removal of all camera imagery,
+   reticle, zoom, guidance and the preview-edge editor; the rounded container and
+   bottom controls must not move. Check the large approximate horizontal distance
+   fades in over 215 ms while counting from zero over 750 ms with deceleration,
+   then height, elevation difference and
+   disclaimer fade in separately in that order. Compare the separation with the
+   stored Diagnostics value; individual endpoint angles stay out of the panel.
+   A rejected bottom must retain the acquisition/correction interface.
+2. Tap Restart during the counter, during each reveal and after completion. The
+   entire visible result must fade out together over about 225 ms while a single
+   fresh acquisition starts immediately, retaining height. With deliberately slow
+   camera readiness, verify no old preview frame is presented as live; streaming
+   fades in only when ready. Repeated Restart, overlays and rapid background/return
+   must not create competing bindings or leave partial/stuck results.
+3. Open Settings/help/Diagnostics and return; change units and language with a
+   result displayed. Formatting must update without replaying entry or acquiring.
+   Background/resume and recreate the Activity with a completed result, including
+   during entry: retain the measurement and show it settled after recreation.
+   Collapse/reopen the exceptional workspace without replaying the counter.
+4. Edit the result’s object-height row: Cancel retains the result; Save resets to
+   a fresh top capture with the saved height. Restart stays the sole retry action;
+   Capture must remain disabled throughout a completed result.
+5. With TalkBack, check one final approximate horizontal-distance announcement,
+   no spoken counter frames, hidden rows absent until reveal, meaningful elevation
+   text and a clearly labeled height-edit action. Outgoing camera/result controls
+   must not accept touch, keyboard focus or accessibility actions. With animation
+   scale zero, final distance and all three supporting elements appear together;
+   repeat with reduced and increased system duration scales.
+6. Check readable distance/unit placement, localized grouping/decimals, bottom
+   disclaimer, scrolling when constrained, and large/tiny displayed values. The
+   approximation marker and disclaimer must remain visible, without confidence or
+   accuracy claims. Check results just below/at/above 10,000 m and one mile
+   (5,280 ft), including unit/language changes; units must stay fixed throughout
+   counting. Check long heights and Spanish labels: height and zoom must keep a
+   gap; the height action must shorten only its display and retain an accessible
+   edit description. Verify opening/saving untouched height input preserves the
+   full stored value.
 
 ## Camera zoom verification
 
@@ -232,10 +295,10 @@ Keep records externally; the app has no history/export feature.
 | Help layout and measurement preservation | Confirm **?** immediately left of the settings gear, with the existing spacing, a smaller visible circle, a 48 dp touch target and a TalkBack **How to use** click label. A normal tap always opens help regardless of diagnostics preference; disabled holds open neither help nor diagnostics. With valid height and a live preview, open/read/dismiss manual help: preview bounds, header, stage and bottom controls must stay stationary; the Mode launcher stays composed in its usual position. Repeat with a top capture and result: preserve height and completed results, discard incomplete pairs immediately, and verify acquisition stays stopped on both help pages. Dismissal starts a fresh camera/sensor session only for an unfinished measurement. Pending first-use help must prevent camera initialization. Test small/split windows, large fonts/display scale, TalkBack, cutouts and gesture/three-button insets; content must scroll, Close remain reachable, math remain readable and all pages use the same card/window. Confirm stacked fractions and lowered endpoint subscripts, no raw TeX commands, natural spoken equation descriptions, and horizontal equation scrolling when large text exceeds the card width. Repeat from the exceptional viewfinder workspace and its collapsed presentation. JVM state checks do not establish these rendering or physical-session properties. |
 | Diagnostics access, state and layout | With diagnostics off, hold and release **?**: no tutorial, diagnostics or haptic. Enable it in Settings: tap still opens basic help; hold opens exactly one dark full-screen Diagnostics surface with method name and Back, a haptic and a separate TalkBack long-click action. Repeat quick taps/holds and after relaunch; tutorials, Settings and mode selection must never stack with diagnostics. Before height entry, inspect inactive prerequisites and undiscovered sources without a permission prompt or acquisition. With live preview, top capture, correction and result, open/close repeatedly: verify unchanged preview bounds, stopped camera/sensor work, preserved height/completed result, immediate incomplete-pair invalidation and blocked background controls. Background/recreate with diagnostics open: navigation and completed results remain while acquisition stays stopped. Completed endpoint geometry must stay readable without a live frame. Disable the preference and verify access is removed. Check all four sections, missing values, unavailable physical IDs, mapping evidence, stale/moving/unreliable versus failure, platform accuracy and poles. Verify stored geometry and degree-based derivatives in Metric/Imperial and English/Spanish. Repeat in compact and exceptional workspace layouts, large fonts, TalkBack, small/split windows, cutouts and system navigation insets; Back and all rows must be reachable by scrolling. No recording, source selection, restart, export or threshold controls should appear. JVM checks exercise routing and retained snapshots, not physical gesture arbitration, haptics, TalkBack, actual Activity retention or camera composition. |
 | Screen navigation motion | Open and close Settings and diagnostics from inactive/height-gated/live measurement as applicable: check a smooth short fade/vertical movement, stationary preview and no blank exit frame. Enter Language and Developer Options, then use in-app and Android Back: check opposite horizontal motion, stable bounds and no measurement flash. Rapid taps, repeated Back and taps on outgoing/background controls must not navigate twice, edit preferences or dismiss the exceptional workspace. Check the same transitions from the exceptional viewfinder with its matching Activity backdrop. Change units, diagnostics preference and language in place: these updates must not replay navigation. Recreate with a destination open: it should appear settled while normal hardware interruption rules still apply. Repeat with animation scale disabled/reduced, large fonts, small/split windows, TalkBack and system insets; input and accessibility must recover after completion. Rendering, frame pacing and actual input/Back arbitration require manual validation; JVM tests verify the presentation policy only. |
-| Settings and units | Open Settings inactive (after dismissing selection), before height entry, with live preview, after top capture and after a result. Confirm the full-screen dark surface, Back hierarchy through Developer Options/language selection, suspended camera/sensor work and no overlapping help/selector interaction. Repeat from the exceptional workspace dialog. Toggle units repeatedly: all height/result labels and the next height entry use meters or decimal feet; saved physical height and completed results survive; an incomplete pair was invalidated on Settings entry. No height-unit chips remain. Check point/comma input and unchanged display precision. Restart the process to verify saved units/diagnostics and inactive startup. Check slow initial preference loading does not flash incorrect units. |
+| Settings and units | Open Settings inactive (after dismissing selection), before height entry, with live preview, after top capture and after a result. Confirm the full-screen dark surface, Back hierarchy through Developer Options/language selection, suspended camera/sensor work and no overlapping help/selector interaction. Repeat from the exceptional workspace dialog. Toggle units repeatedly: all height/result labels and the next height entry use meters or decimal feet; saved physical height and completed results survive; an incomplete pair was invalidated on Settings entry. No height-unit chips remain. Check point/comma input and the decimal result presentation policy. Restart the process to verify saved units/diagnostics and inactive startup. Check slow initial preference loading does not flash incorrect units. |
 | Language and recreation | First test a cold launch with Use device language saved: remove the task through Recents, reopen, visit Language, and select Español for the first time in that process. Confirm no black frame, window replacement or Activity recreation, and that the Language page remains open. Repeat after a developer-performed data reset; saved English → Español and saved Español cold launch are comparison cases. Then on API 23–32 and 33+, choose English, Español and Use device language repeatedly, both inactive and with a selected method. The language selector must update in place without Activity recreation, a black/blank frame or flashing the method/main Settings; Back must then return to main Settings. Repeat in the exceptional workspace. With device language English, switch between English and Use device language and confirm the radio choice updates when the effective display language stays the same. Reopen Settings after process restart. Check tutorials (including math explanations and spoken equations), mode navigation, permissions, guidance, height input, errors and accessibility. Change the app language through Android 13+ system settings and confirm the in-app selection follows. Device Spanish uses Spanish; an unsupported device language with no override falls back to English. Verify Spanish decimal commas and decimal feet independent of language. Using the in-app selector, change language with a top capture and a result: retain the method, height, settings destination and completed result while acquisition stays stopped; incomplete pairs were invalidated on Settings entry. Separately recreate for an unrelated configuration change: retain navigation and height, while a real hardware interruption still clears incomplete pairs and preserves completed results. Return/background with Settings open, rapid Back and large text must not restore invalid sessions or stack modals. |
 | Developer Options and full reset | On a disposable test installation, set Imperial, Spanish, diagnostics enabled and tutorial completion; grant camera access and create app-private test files/cache if a harness is available. Open Erase all app data, cancel/outside-dismiss/Back and confirm all data, language and permissions remain. Only an explicit Erase all data confirmation may request deletion; duplicate taps must be blocked. Confirm Android closes the process without relaunching or a success claim and leaves the app installed. Manually reopen: inactive mode sheet, Metric, diagnostics off, device language, tutorials eligible and camera permission requested only after valid height. Verify app-private files/cache are gone and permissions revoked in system settings. Repeat on pre-33 AppCompat storage and 33+ system-managed locales with a device language different from the override. Platform rejection/error behavior is covered by injected JVM fakes; do not invoke the real deletion API in automated tests. |
-| Layout and accessibility | Check the consistent dark palette under both system themes, large font/display sizes, TalkBack labels, small/split windows, platform-overridden orientations, height-dialog keyboard and navigation insets. On the normal screen, capture/navigation and the stage/result must stay visible without scrolling. Workflow errors should remain readable near the preview edge without moving controls or covering the reticle; moving/settling/alignment changes must remain silent. Verify persistent recovery actions and status dialogs in compact layouts. Exceptional windows/text scaling offer **Open viewfinder** with scrollable details and fixed controls. Check centered stage/≈ results in both units (Spanish: “≈ [value and unit] de distancia”), a blank reserved caption area before height entry and unchanged preview bounds as top/bottom instructions appear or switch (also with large text), closer symmetric Restart/Mode placement, the solid shutter disc, enlarged initial height action, the rounded borderless height editor and the raised control row. Check the larger circular gear retains its size and position, uses a subtly richer purple than other tonal buttons, looks enabled and opens Settings. Whole heights should display one decimal, fractional heights should retain meaningful digits up to the existing precision cap, and opening height editing should preserve the full stored input. Check the bold rounded Viewy header and reduced preview at normal/large text sizes. No separate result-retry action should appear. Diagnostics must not push Capture offscreen. |
+| Layout and accessibility | Check the consistent dark palette under both system themes, large font/display sizes, TalkBack labels, small/split windows, platform-overridden orientations, height-dialog keyboard and navigation insets. On the normal screen, capture/navigation and the stage area must stay visible without scrolling the screen; constrained result content can scroll inside its container. Workflow errors should remain readable near the preview edge without moving controls or covering the reticle; moving/settling/alignment changes must remain silent. Verify persistent recovery actions and status dialogs in compact layouts. Exceptional windows/text scaling offer **Open viewfinder** with scrollable details and fixed controls. Check centered stage instructions and the in-container ≈ horizontal result in both units, a blank reserved caption area before height entry and unchanged preview bounds as top/bottom instructions appear or switch (also with large text), closer symmetric Restart/Mode placement, the solid shutter disc, enlarged initial height action, the rounded borderless height editor and the raised control row. Check the larger circular gear retains its size and position, uses a subtly richer purple than other tonal buttons, looks enabled and opens Settings. Whole heights should display one decimal, fractional heights should retain meaningful digits up to the existing precision cap, and opening height editing should preserve the full stored input. Check the bold rounded Viewy header and reduced preview at normal/large text sizes. No separate result-retry action should appear. Diagnostics must not push Capture offscreen. |
 
 ## Measurement guidance checks
 

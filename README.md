@@ -22,10 +22,13 @@ two aiming directions. Application ID: `com.malagel.viewy`.
    about one second, then capture while still.
 3. Aim at the bottom on the same vertical line, settle, and capture within 15 s
    of the top capture. Remain still briefly after each capture.
-4. Read the centered approximate horizontal distance below the preview. Use the
-   circular **Restart** arrow at bottom left to try again. The preview-edge height
-   control edits height; saving starts a new measurement. Camera and orientation
-   acquisition stop behind a completed result.
+4. Read the approximate horizontal distance inside the former camera container.
+   Long results use kilometers from 10,000 m or miles from 5,280 ft.
+   The distance counts up, followed by editable object height, elevation difference
+   and an approximation disclaimer. Use the circular **Restart** arrow at bottom
+   left to try again; the result fades out as acquisition resumes. Tap the height
+   row to edit it; saving starts a new measurement. Camera and orientation
+   acquisition stop immediately on completion.
 
 The app uses Material 3's baseline dark palette. The normal portrait screen keeps
 capture/navigation visible without scrolling; the input dialog handles the

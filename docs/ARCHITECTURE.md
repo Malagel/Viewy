@@ -8,8 +8,8 @@ camera, height, guidance, capture and result controls; it collects state with
 lifecycle awareness. Insets, bounded width and a weighted preview reserve space
 for capture/navigation without scrolling. Constrained status and exceptional
 viewfinder dialogs preserve readable content; the latter keeps capture/navigation
-fixed while details scroll. Stage/result text spans the preview width and is
-centered after height is configured. The stage area reserves the larger measured
+fixed while details scroll. Stage instructions span the preview width and are
+centered before completion; completed results occupy the rounded preview container. The stage area reserves the larger measured
 height of the top/bottom captions even when empty, accounting for font size and
 wrapping without adding hidden text or changing the weighted preview's size. Restart and Mode share a circular action component in a centered,
 bounded-width control row around the solid shutter disc. A spacious header and
@@ -122,7 +122,8 @@ Source paths below are relative to `app/src/main/java/com/malagel/viewy/`:
 | `tutorial/LocalTutorialSeenStore.kt` | Small local completion store keyed by stable method ID. |
 | `ui/MethodTutorialContent.kt` and `ui/MethodTutorialDialog.kt` | Resource-based prose/equation blocks and reusable single-card presentation with basic/detailed pages. |
 | `ui/TutorialMathNotation.kt` and `ui/TutorialEquation.kt` | Pure authored-notation parsing and native mathematical layout with localized spoken descriptions. |
-| `ui/HeightLabelText.kt` | Locale-aware compact height labels with the existing six-significant-digit cap, trimmed zero padding and at least one decimal; stored inputs are untouched. |
+| `ui/HeightLabelText.kt` | Locale-aware plain-decimal result formatting/counter frames and six-significant-digit height labels; full-precision editable input is untouched. |
+| `ui/MeasurementResultPanel.kt` and `ui/ResultPresentation.kt` | Result layout, host-local entry identity, deterministic reveal timeline and retained result exit; no measurement or hardware ownership. |
 | `ui/MeasurementGuidance.kt` | One-time workflow error presentation and expiry, plus the current near-vertical restriction. |
 | `ui/AlignmentGuidance.kt` and `ui/AlignmentChevrons.kt` | Deterministic alignment presentation filtering and decorative Compose chevrons; independent of capture validation. |
 | `measurement/KnownHeightWorkflow.kt` | Immutable top/bottom/correction/result state, compatibility/alignment gates, retry and restart. |
@@ -401,8 +402,14 @@ OPEN plus STREAMING, also over 165 ms. Presentation never extends a hardware ses
 
 `MeasurementUiState.previewVisible` supplies the same eligible-and-ready target
 for the live camera and zoom controls. The preview-edge height editor shares that
-target during acquisition, with an uncovered, focused result/recovery exception
-that keeps height editable without a live camera. Common viewfinder interaction
+target during acquisition, with an uncovered, focused recovery exception
+that keeps height editable without a live camera. On completion it is removed;
+height editing belongs to the result panel’s object-height action. A shared
+preview-control row reserves zoom’s measured width and a 16 dp gap before giving
+the height action its remaining width. A full label falls back to a height cue,
+ellipsized single-line number and separate unit when constrained; accessibility
+retains the complete formatted height/edit description. This does not change
+height storage or editable input. Common viewfinder interaction
 gates hide both controls for overlays, height editing, focus loss and inactivity.
 The controls use fade-only Compose transitions over 225 ms in either direction,
 slightly longer than the preview. Outgoing zoom retains its last visible ratio and
@@ -410,7 +417,8 @@ button appearance until exit completes, even when camera snapshots reset.
 Transitioning controls exclude touch, focus and accessibility immediately and
 become interactive after entry settles. Interrupted fades reverse in place;
 system animation scaling applies. Fade state never delays hardware release or
-changes binding keys, zoom/capture state, alignment or result presentation.
+changes binding keys, zoom/capture state or alignment. Completion removes these
+controls immediately rather than retaining their outgoing camera visuals.
 
 Selection is held in the ViewModel separately from the workflow.
 `MeasurementSelection` permits a null active method and typed Closed/Modes/Methods
@@ -432,6 +440,47 @@ hardware readiness. Camera loss, sensor shutdown and later frame changes never
 clear them. Acquisition stays stopped behind the result; Restart or saving height
 clears it and allows a fresh eligible session while preserving the entered height.
 No hardware session or measurement survives process death.
+
+`MeasurementResultOverlay` reads RESULT plus the stored estimate, retaining only
+that estimate and its saved height through a 225 ms fade on Restart or height save.
+The existing LivePreview remains the only PreviewView/binding owner, outside the
+animated result subtree. Workflow reset and acquisition reconciliation run
+immediately; result exit never gates startup. Live imagery is rendered only for
+eligible OPEN plus STREAMING readiness, and completion hides both live and frozen
+imagery immediately without requesting a suspension bitmap. Existing suspension
+snapshot and recovery fades are preserved.
+
+`ResultEntryMemory` is local to the screen host and compares estimate references;
+ordinary publications, units, locale and overlay navigation cannot claim a second
+entry. Composition keys use the same reference identity, so a new equal-valued
+estimate replaces even an unfinished exit at long system animation scales. It initializes with an existing estimate as already presented, including
+Activity recreation, and retains consumed identity across exceptional-workspace
+remounts. No animation state enters the workflow or process-death persistence.
+The result surface enters with a 215 ms fade (50 ms longer than the camera fade);
+restored visible results appear directly. One Compose Animatable drives a linear
+1290 ms timeline: the first 750 ms use a
+clamped ease-out counter fraction, then height, separation and disclaimer each
+fade over 180 ms. Leaving RESULT cancels entry; disposal cancels all remaining
+work. Compose duration scaling reaches the final timeline directly when disabled.
+Hidden rows reserve layout space but have no accessibility targets; the counter
+exposes only its final localized approximate horizontal-distance description.
+The object-height button has a localized edit action. Exit revokes result input,
+focus and semantics while retaining its visual section. Scrollable content and a
+minimum readable distance font handle constrained bounds without resizing the host.
+
+Result distance units are chosen once per destination: meters below 10,000 m,
+kilometers at or above it; feet below 1,609.344 m (one mile), miles at or above it.
+The comparison uses unrounded meters, and the chosen unit stays fixed from zero
+through completion. Height formatting uses base units independently.
+Number presentation uses localized grouped plain decimals, HALF_UP to hundredths
+for ordinary values and two significant digits below 0.01. Exact integers omit
+fractional padding; non-integers retain at least one fractional digit even when
+rounded to an integer. Display-only decimal arithmetic keeps large converted feet
+finite without changing stored Double values or geometry. Counter frames share
+the destination’s decimal scale and a measured fixed numeric slot with tabular
+digits; the final frame uses exactly the normal formatted result. Height labels
+retain their six-significant-digit cap in plain decimal form. Editable input
+retains its independent full-precision, ungrouped representation.
 
 The workflow owns top/bottom/correction/result transitions, finite height,
 compatibility checks and retry. Saving height restarts. The workflow retains

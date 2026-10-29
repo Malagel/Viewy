@@ -74,10 +74,11 @@ future validated features; they have no selectable methods.
   suspends acquisition and discards an incomplete endpoint pair. Acquisition
   resumes only after the covering surface finishes closing.
 - Units default to Metric (meters); Imperial uses decimal feet for heights and
-  distances. Tapping the units row switches immediately, including existing
+  short distances; long results automatically use kilometers or miles as described
+  below. Tapping the units row switches immediately, including existing
   results. Height entry follows this preference without an independent selector.
   Stored physical values remain in meters; changing units neither edits height nor
-  recalculates geometry or resets captures. Display precision is unchanged.
+  recalculates geometry or resets captures. Presentation rounding never changes stored values.
 - Language defaults to **Use device language**, with **English** and **Español**
   overrides. Unsupported device languages fall back to English. Android per-app
   language settings and the in-app picker share the same override on Android 13+;
@@ -117,9 +118,13 @@ future validated features; they have no selectable methods.
   orientation acquisition or requesting camera permission. Entry uses the global
   unit system (meters or decimal feet), accepts decimal
   point or comma, without grouping separators. A rounded, borderless preview-edge
-  control edits height. Its label omits zero padding, keeps one decimal for whole
-  values and retains the six-significant-digit display cap; stored height remains
-  unchanged. Both height actions focus the decimal field and request
+  control edits height during acquisition or recovery. Its label uses grouped plain
+  decimals, omits zero padding, keeps one decimal for whole values and retains the
+  six-significant-digit display cap; stored height remains
+  unchanged. Zoom and height share a row with a 16 dp gap. The height action is
+  limited to the remaining width; where its full label cannot fit, it shows the
+  height cue, a single-line value with ellipsis when needed, and the unit. Its
+  accessible edit description retains the complete display value. Both height actions focus the decimal field and request
   its keyboard automatically. The height-entry card fades in 20 dp above the
   keyboard’s initially observed maximum height and keeps that position for the
   entire opening, including when the keyboard is hidden or reopened. It waits
@@ -163,7 +168,8 @@ future validated features; they have no selectable methods.
   preview suspension and streaming recovery, including Settings, mode selection
   and focus loss. Their 225 ms fades are slightly longer than the camera's 165 ms
   fade; outgoing controls stop accepting input immediately. Height editing remains
-  available on completed results and actionable recovery screens.
+  available through the result’s object-height row after completion and through
+  the preview-edge editor on actionable recovery screens.
 - Top capture followed by bottom capture within 15 s. **Aim at the top** and
   **Aim at the bottom** remain the stable primary instructions. Routine movement,
   settling, startup, readiness, missing/stale/unreliable sensor readings, small
@@ -201,11 +207,41 @@ future validated features; they have no selectable methods.
 - Before height entry, the aiming-caption area stays blank but reserves space
   for both top and bottom instructions at the current text size and width. This
   prevents the preview from shrinking when instructions appear or change.
-  Once configured, a single centered stage label becomes the approximate
-  horizontal distance to that line, displayed with two significant digits and
-  an ≈ marker.
-  This is not slant range. Reversed, insufficiently separated,
-  misaligned or unusable observations require correction.
+  Before completion the area shows only the top/bottom instruction; after
+  completion it stays blank with the same reserved height. Reversed, insufficiently
+  separated, misaligned or unusable observations require correction.
+- Successful completion immediately releases camera/orientation acquisition and
+  replaces all camera imagery, controls and guidance with a clean results surface
+  inside the same rounded container, preserving its size and position. A large
+  **Horizontal distance** value with an ≈ marker counts up from zero over about
+  750 ms with smooth deceleration while the surface fades in over 215 ms,
+  followed by three sequential 180 ms fades after counting finishes:
+  editable object height, captured elevation difference in degrees, then a short
+  approximation disclaimer near the bottom. This is horizontal distance to the
+  object’s vertical line, not slant range; individual endpoint angles remain in
+  Diagnostics. The height row is an accessible edit action; saving restarts.
+- Result distances use meters below 10,000 m and kilometers at or above that
+  threshold. Imperial results use decimal feet below one mile (5,280 ft) and miles
+  at or above it. The unit is chosen from the unrounded final distance and remains
+  fixed throughout counting; object heights retain meters or feet. Results use
+  locale-specific grouping and decimal separators, with HALF_UP rounding to at most two fractional digits for ordinary values.
+  Exact integers omit decimals; non-integers retain at least one fractional digit
+  even if rounded to a whole value (730.001 → 730.0). Positive values below 0.01
+  use two significant digits in plain decimal form so they do not become zero.
+  Large magnitudes remain grouped plain decimals without scientific notation.
+  The same policy applies to result height and elevation. These display digits
+  are not calibrated accuracy; the approximation marker and disclaimer remain.
+- Result animation is presentation-only: ordinary updates, unit/language changes
+  and overlay navigation do not replay it. A recreated host shows a retained
+  completed result directly. System animation scaling applies; disabled motion
+  shows final distance and supporting information together. Screen readers receive
+  the final approximate horizontal distance, never intermediate counter values.
+  The panel can scroll in constrained windows or at large text sizes; exceptional
+  magnitudes can scroll horizontally without reducing readability. Restart remains
+  the existing bottom-left action: it resets immediately with height retained,
+  makes acquisition eligible immediately, and fades the whole outgoing result
+  over 225 ms. The single live preview fades in only once actually ready, so a
+  slow camera cannot expose an old frame as live.
 - Explicit unquantified uncertainty for nominal captures. There is no validated
   angular-error input or automatic uncertainty range.
 - Restart and reset when saving height. The result has no separate retry control.
