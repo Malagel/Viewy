@@ -46,13 +46,14 @@ class MeasurementPresentationTest {
         assertTrue(starting.copy(camera = ready.camera, acquisition = ready.acquisition).previewHeightEditVisible)
     }
 
-    @Test fun heightRemainsEditableForRecoveryAndResultsButHidesWhenCovered() {
+    @Test fun previewHeightEditorIsForAcquisitionAndRecoveryOnly() {
         val permission = ready.copy(visibility = ready.visibility.copy(permissionGranted = false))
         val failure = ready.copy(camera = ready.camera.copy(ready = false), cameraFailureVisible = true)
         val result = com.malagel.viewy.domain.KnownHeightDistance.estimate(2.0,
             ViewingDirection(1.0, 0.0, 0.5), observation.direction) as com.malagel.viewy.domain.KnownHeightResult.Estimate
         val completed = ready.copy(measurement = ready.measurement.copy(result = result))
-        for (state in listOf(permission, failure, completed)) {
+        assertFalse(completed.previewHeightEditVisible) // Completed height editing belongs to the result panel.
+        for (state in listOf(permission, failure)) {
             assertFalse(state.previewVisible)
             assertTrue(state.previewHeightEditVisible)
             assertFalse(state.copy(visibility = state.visibility.copy(covered = true)).previewHeightEditVisible)

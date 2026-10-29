@@ -59,6 +59,7 @@ import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
@@ -133,12 +134,10 @@ fun ViewyScreen(
         editHeight = true
     }
     val measurement = state.measurement
+    val resultEntryMemory = remember(model) { ResultEntryMemory(measurement.result) }
     val textMeasurer = rememberTextMeasurer()
     val density = LocalDensity.current
     val previewStatusLabel = stringResource(R.string.preview_status)
-    val resultDescription = measurement.result?.let {
-        stringResource(R.string.horizontal_result, distance(it.horizontalDistanceMeters, unit))
-    }
     val requestPermission = { requested = true; launcher.launch(Manifest.permission.CAMERA) }
     val openSettings = {
         context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:${context.packageName}".toUri()))
@@ -186,17 +185,14 @@ fun ViewyScreen(
                                     val useStatusDialog = !overflow && ((compact && recoveryNeeded) || hintHeight > with(density) { (maxHeight / 2 - 54.dp).toPx() })
                                     if (state.heightConfigured) {
                                         LivePreview(model, state)
-                                        var retainedZoomState by remember { mutableStateOf(state) }
-                                        SideEffect { if (state.previewVisible) retainedZoomState = state }
-                                        PreviewControlFade(state.previewVisible, Modifier.align(Alignment.TopStart)) {
-                                            // Keep the outgoing ratio and enabled appearance until its fade completes.
-                                            ZoomControls(if (state.previewVisible) state else retainedZoomState,
-                                                model::requestZoom, Modifier.padding(8.dp))
+                                        if (!measurement.completed) {
+                                            CameraPreviewControls(state, unit, compact, model::requestZoom, openHeight,
+                                                Modifier.align(Alignment.TopCenter))
+                                            PreviewControlFade(state.previewVisible && state.acquisition.running, Modifier.align(Alignment.Center)) {
+                                                Reticle(Modifier.size(40.dp))
+                                            }
+                                            AlignmentChevrons(state.alignmentCue)
                                         }
-                                        PreviewControlFade(state.previewVisible && state.acquisition.running, Modifier.align(Alignment.Center)) {
-                                            Reticle(Modifier.size(40.dp))
-                                        }
-                                        AlignmentChevrons(state.alignmentCue)
                                     }
                                     if (!state.heightConfigured) {
                                         Button(
@@ -207,7 +203,7 @@ fun ViewyScreen(
                                     } else {
                                         // Long recovery text has a scrollable dialog in constrained windows.
                                         if (measurement.completed) {
-                                            // The result remains below the stopped viewfinder; Restart resumes acquisition.
+                                            // The result overlay owns all completed-measurement content.
                                         } else if (useStatusDialog) {
                                             FilledTonalIconButton(onClick = { statusSnapshot = state; showStatus = true }, modifier = Modifier.align(Alignment.BottomStart).padding(4.dp)
                                                 .semantics { contentDescription = previewStatusLabel }) {
@@ -231,23 +227,12 @@ fun ViewyScreen(
                                                 }
                                             }
                                         }
-                                        val heightLabel = stringResource(R.string.height_edit, heightLabelText(unit.fromMeters(measurement.heightMeters!!), LocalLocale.current.platformLocale), unit.label)
-                                        PreviewControlFade(state.previewHeightEditVisible, Modifier.align(Alignment.TopEnd)) {
-                                            if (compact) {
-                                                LabeledIconButton(R.string.object_height, "↕", openHeight, description = heightLabel)
-                                            } else {
-                                                FilledTonalButton(
-                                                    onClick = openHeight, shape = CircleShape,
-                                                    modifier = Modifier.padding(12.dp),
-                                                    colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f)),
-                                                ) { Text(heightLabel) }
-                                            }
-                                        }
                                     }
+                                    MeasurementResultOverlay(measurement, unit, resultEntryMemory, state.viewfinderInteractive, openHeight)
                                 }
                             }
                             MeasurementStageArea(
-                                measurement, unit, resultDescription, textMeasurer,
+                                measurement, textMeasurer,
                                 if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
                             )
                         }
@@ -314,7 +299,7 @@ fun ViewyScreen(
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(stringResource(R.string.measurement_method_subtitle))
-                    Text(stageText(measurement, unit))
+                    Text(stageText(measurement))
                     if (!state.heightConfigured) TextButton(onClick = { showStatus = false; editHeight = true }) { Text(stringResource(R.string.enter_height)) }
                     else {
                         // The dialog suspends hardware; retain the failure that prompted it.
@@ -400,7 +385,7 @@ private fun LivePreview(model: MeasurementViewModel, state: MeasurementUiState) 
         tween(CAMERA_FADE_MILLIS), label = "Streaming preview",
     )
     val currentAlpha by rememberUpdatedState(liveAlpha)
-    val animateSnapshot = state.resumed && state.visibility.surfaceVisible
+    val animateSnapshot = state.resumed && state.visibility.surfaceVisible && !state.measurement.completed
     LaunchedEffect(frozen, animateSnapshot) {
         if (frozen != null && animateSnapshot) {
             frozenAlpha.snapTo(currentAlpha)
@@ -422,8 +407,11 @@ private fun LivePreview(model: MeasurementViewModel, state: MeasurementUiState) 
         }
         onDispose { view.setOnTouchListener(null) }
     }
-    AndroidView(factory = { view }, modifier = Modifier.fillMaxSize().graphicsLayer { alpha = liveAlpha })
-    frozen?.let { bitmap ->
+    AndroidView(factory = { view }, modifier = Modifier.fillMaxSize()
+        .focusProperties { canFocus = state.previewVisible }
+        .then(if (!state.previewVisible) Modifier.clearAndSetSemantics {} else Modifier)
+        .graphicsLayer { alpha = if (state.previewVisible) liveAlpha else 0f })
+    frozen?.takeIf { !state.measurement.completed }?.let { bitmap ->
         Image(bitmap.asImageBitmap(), contentDescription = null, contentScale = ContentScale.FillBounds,
             modifier = Modifier.fillMaxSize().graphicsLayer { alpha = frozenAlpha.value })
     }
@@ -442,6 +430,65 @@ private fun LivePreview(model: MeasurementViewModel, state: MeasurementUiState) 
         onDispose {
             preview?.close()
             if (token != null) model.stopPreview(token)
+        }
+    }
+}
+
+/** A shared row gives the height editor only the space left after zoom and a fixed gap. */
+@Composable
+private fun CameraPreviewControls(
+    state: MeasurementUiState, unit: HeightUnit, compact: Boolean,
+    onZoom: (Float) -> Unit, onEditHeight: () -> Unit, modifier: Modifier = Modifier,
+) {
+    var retainedZoomState by remember { mutableStateOf(state) }
+    SideEffect { if (state.previewVisible) retainedZoomState = state }
+    val number = heightLabelText(unit.fromMeters(state.measurement.heightMeters!!), LocalLocale.current.platformLocale)
+    val description = stringResource(R.string.height_edit, number, unit.label)
+    Row(modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        PreviewControlFade(state.previewVisible, Modifier) {
+            // Keep the outgoing ratio and enabled appearance until its fade completes.
+            ZoomControls(if (state.previewVisible) state else retainedZoomState, onZoom)
+        }
+        Box(Modifier.weight(1f), contentAlignment = Alignment.TopEnd) {
+            PreviewControlFade(state.previewHeightEditVisible, Modifier) {
+                if (compact) {
+                    LabeledIconButton(R.string.object_height, "↕", onEditHeight, description = description)
+                } else {
+                    CameraHeightButton(number, unit.label, description, onEditHeight)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CameraHeightButton(number: String, unit: String, description: String, onClick: () -> Unit) {
+    val measurer = rememberTextMeasurer()
+    val style = MaterialTheme.typography.labelLarge
+    val density = LocalDensity.current
+    BoxWithConstraints(Modifier.padding(4.dp), contentAlignment = Alignment.TopEnd) {
+        val fullLabelFits = remember(description, style, constraints.maxWidth, density) {
+            measurer.measure(description, style, softWrap = false).size.width <=
+                (constraints.maxWidth - with(density) { 32.dp.roundToPx() })
+        }
+        FilledTonalButton(
+            onClick = onClick, shape = CircleShape,
+            modifier = Modifier.widthIn(max = maxWidth).semantics { contentDescription = description },
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+            colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f)),
+        ) {
+            if (fullLabelFits) {
+                Text(description, Modifier.clearAndSetSemantics {}, maxLines = 1)
+            } else {
+                // Keep the height cue and unit readable; only the visible number may be shortened.
+                Row(Modifier.clearAndSetSemantics {}, verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("↕")
+                    Text(number, Modifier.weight(1f, fill = false), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(unit, maxLines = 1)
+                }
+            }
         }
     }
 }
@@ -480,8 +527,6 @@ private fun ZoomControls(state: MeasurementUiState, onZoom: (Float) -> Unit, mod
 @Composable
 private fun MeasurementStageArea(
     measurement: MeasurementState,
-    unit: HeightUnit,
-    resultDescription: String?,
     textMeasurer: TextMeasurer,
     style: TextStyle,
 ) {
@@ -497,21 +542,18 @@ private fun MeasurementStageArea(
             )
         }
         Box(Modifier.fillMaxWidth().heightIn(min = with(density) { reservedHeight.toDp() }), contentAlignment = Alignment.Center) {
-            if (measurement.heightMeters != null) Text(
-                stageText(measurement, unit), Modifier.fillMaxWidth().semantics {
-                    liveRegion = LiveRegionMode.Polite
-                    if (resultDescription != null) contentDescription = resultDescription
-                }, textAlign = TextAlign.Center, style = style,
+            if (measurement.heightMeters != null && !measurement.completed) Text(
+                stageText(measurement),
+                Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite }, textAlign = TextAlign.Center, style = style,
             )
         }
     }
 }
 
 @Composable
-private fun stageText(state: MeasurementState, unit: HeightUnit): String = state.result?.let {
-    stringResource(R.string.distance_estimate, distance(it.horizontalDistanceMeters, unit))
-} ?: stringResource(when {
+private fun stageText(state: MeasurementState): String = stringResource(when {
     state.heightMeters == null -> R.string.known_height_method
+    state.completed -> R.string.result_horizontal_distance
     state.stage == MeasurementStage.TOP -> R.string.measurement_stage_top
     else -> R.string.measurement_stage_bottom
 })
@@ -522,10 +564,6 @@ internal fun LabeledIconButton(@StringRes label: Int, symbol: String, onClick: (
         Text(symbol, fontSize = with(LocalDensity.current) { 24.dp.toSp() }, modifier = Modifier.clearAndSetSemantics {})
     }
 }
-
-/** Two significant digits for estimates; precision of internal calculations is retained. */
-@Composable
-private fun distance(meters: Double, unit: HeightUnit): String = distanceText(meters, unit, LocalLocale.current.platformLocale)
 
 @Composable
 private fun MeasurementControls(

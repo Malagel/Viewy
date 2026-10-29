@@ -47,7 +47,7 @@ class MeasurementResourcesTest {
         fun reconcile() {
             ui = ui.copy(measurement = workflow.state)
             resources.reconcile(ui.acquisitionEligible, ui.requiresOrientation,
-                ui.resumed && ui.visibility.surfaceVisible && ui.visibility.windowFocused)
+                ui.resumed && ui.visibility.surfaceVisible && ui.visibility.windowFocused && !ui.measurement.completed)
         }
 
         fun bind(): Long {
@@ -168,7 +168,7 @@ class MeasurementResourcesTest {
         assertNotNull(completed.result)
         assertNull(completed.notice)
         assertFalse(h.resources.camera.ready)
-        assertEquals(listOf(true), h.releases)
+        assertEquals(listOf(false), h.releases) // Completion needs no decorative camera snapshot.
         assertFalse(h.resources.previewChanged(old, camera))
         repeat(3) {
             h.ui = h.ui.copy(diagnosticsOpen = true, resumed = false)

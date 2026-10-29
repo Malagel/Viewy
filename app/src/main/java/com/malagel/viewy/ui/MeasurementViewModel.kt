@@ -53,7 +53,7 @@ data class MeasurementUiState(
         visibility.permissionGranted && viewfinderInteractive
     val previewVisible: Boolean get() = acquisitionEligible && camera.ready
     val previewHeightEditVisible: Boolean get() = requiresCamera && heightConfigured && viewfinderInteractive &&
-        (previewVisible || measurement.completed || recoveryVisible)
+        (previewVisible || recoveryVisible)
 }
 
 /** Owns ONE foreground acquisition; diagnostics only observes its snapshots. Everything runs on main. */
@@ -112,7 +112,7 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
     private fun reconcile() {
         val state = mutableState.value
         resources.reconcile(state.acquisitionEligible, state.requiresOrientation,
-            animateRelease = state.resumed && state.visibility.surfaceVisible && state.visibility.windowFocused)
+            animateRelease = state.resumed && state.visibility.surfaceVisible && state.visibility.windowFocused && !state.measurement.completed)
         publish()
     }
 

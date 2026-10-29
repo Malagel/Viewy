@@ -23,7 +23,9 @@
     <string name="cancel">Cancel</string>
     <string name="height_edit">Object height: %1$s %2$s · Edit</string>
     <string name="height_label">Height (%1$s)</string>
-    <string name="distance_estimate">≈ %1$s away</string>
+    <string name="result_horizontal_distance">Horizontal distance</string>
+    <string name="result_elevation_difference">Elevation difference: %1$s°</string>
+    <string name="result_disclaimer">Approximate result. Depends on object height and stable positioning.</string>
     <string name="guidance_near_vertical">Cannot align at this angle.</string>
     <string name="guidance_orientation">Orientation sensor unavailable. Retry orientation to start a new session.</string>
     <string name="notice_acquisition_suspended">Capture cleared. Aim at the top again.</string>
