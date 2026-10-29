@@ -31,7 +31,7 @@
     <string name="notice_acquisition_suspended">Se descartó la captura. Apunta de nuevo al extremo superior.</string>
     <string name="notice_camera_interrupted">Se interrumpió la cámara. Apunta de nuevo al extremo superior.</string>
     <string name="notice_session_changed">Cambió la sesión de orientación. Apunta de nuevo al extremo superior.</string>
-    <string name="notice_expired">Se superó el tiempo de captura. Apunta de nuevo al extremo superior.</string>
+    <string name="notice_expired">Se superó el tiempo de captura.</string>
     <string name="notice_wait_stability">Mantén el teléfono quieto y espera una dirección reciente y estable.</string>
     <string name="notice_near_vertical">Apunta más lejos de la vertical; aquí la alineación horizontal no es fiable.</string>
     <string name="notice_incompatible">Las capturas ya no comparten una sesión válida. Apunta de nuevo al extremo superior.</string>

@@ -31,7 +31,7 @@
     <string name="notice_acquisition_suspended">Capture cleared. Aim at the top again.</string>
     <string name="notice_camera_interrupted">Camera interrupted. Aim at the top again.</string>
     <string name="notice_session_changed">Orientation session changed. Aim at the top again.</string>
-    <string name="notice_expired">Capture took too long. Aim at the top again.</string>
+    <string name="notice_expired">Capture took too long.</string>
     <string name="notice_wait_stability">Hold still and wait for a fresh, stable direction.</string>
     <string name="notice_near_vertical">Aim farther from straight up or down; horizontal alignment is unreliable here.</string>
     <string name="notice_incompatible">Captures no longer share a valid session. Aim at the top again.</string>
