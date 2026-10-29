@@ -10,7 +10,7 @@ class HeightLabelTextTest {
     @Test fun wholeHeightsHaveOneDecimal() {
         assertEquals("2.0", heightLabelText(2.0, Locale.US))
         assertEquals("120.0", heightLabelText(120.0, Locale.US))
-        assertEquals("100000.0", heightLabelText(100000.0, Locale.US))
+        assertEquals("100,000.0", heightLabelText(100000.0, Locale.US))
     }
 
     @Test fun fractionalHeightsDoNotGainZeroPadding() {
@@ -19,12 +19,12 @@ class HeightLabelTextTest {
         assertEquals("0.125", heightLabelText(0.125, Locale.US))
     }
 
-    @Test fun existingPrecisionCapAndCompactExponentsRemain() {
+    @Test fun existingPrecisionCapUsesPlainDecimalsAtEveryMagnitude() {
         assertEquals("2.34312", heightLabelText(2.343123456, Locale.US))
         assertEquals("2.0", heightLabelText(2.0000001, Locale.US))
-        assertEquals("1.23457e+08", heightLabelText(123456789.0, Locale.US))
-        assertEquals("1.23457e-06", heightLabelText(0.00000123456789, Locale.US))
-        assertEquals("2.0e+06", heightLabelText(2000000.0, Locale.US))
+        assertEquals("123,457,000.0", heightLabelText(123456789.0, Locale.US))
+        assertEquals("0.00000123457", heightLabelText(0.00000123456789, Locale.US))
+        assertEquals("2,000,000.0", heightLabelText(2000000.0, Locale.US))
     }
 
     @Test fun localeDecimalSeparatorAndDigitsArePreserved() {
@@ -39,7 +39,7 @@ class HeightLabelTextTest {
         assertEquals("6.0", heightLabelText(HeightUnit.FEET.fromMeters(whole), Locale.US))
         assertEquals("6.12345", heightLabelText(HeightUnit.FEET.fromMeters(fractional), Locale.US))
     }
-    @Test fun globalHeightEntryAndDistanceFormattingUseTheDisplayLocaleWithoutGrouping() {
+    @Test fun globalHeightEntryRetainsFullPrecisionAndResultsUseTheDisplayLocale() {
         val spanish = Locale.forLanguageTag("es-CL")
         val meters = heightInMeters("6,125", HeightUnit.FEET)!!
         val input = heightInputText(HeightUnit.FEET.fromMeters(meters), spanish)
@@ -47,9 +47,9 @@ class HeightLabelTextTest {
         assertEquals(meters, heightInMeters(input, HeightUnit.FEET)!!, 1e-15)
         assertEquals("2,343123456", heightInputText(2.343123456, spanish))
         assertEquals("0.0000001", heightInputText(0.0000001, Locale.US))
-        assertEquals("3.1 m", distanceText(3.05, HeightUnit.METERS, Locale.US))
-        assertEquals("3,1 m", distanceText(3.05, HeightUnit.METERS, spanish))
-        assertEquals("10 ft", distanceText(3.05, HeightUnit.FEET, Locale.US))
+        assertEquals("3.05 m", distanceText(3.05, HeightUnit.METERS, Locale.US))
+        assertEquals("3,05 m", distanceText(3.05, HeightUnit.METERS, spanish))
+        assertEquals("10.01 ft", distanceText(3.05, HeightUnit.FEET, Locale.US))
         assertEquals("6,125", heightLabelText(HeightUnit.FEET.fromMeters(meters), spanish))
     }
 }
