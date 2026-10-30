@@ -95,14 +95,14 @@ class DiagnosticsPresentationTest {
         assertSame(pending, pending.withDiagnostics(true, true))
         coordinator.methodEntered(coordinator.state.navigationToken)
         val first = coordinator.state.card!!
-        assertEquals(TutorialPage.BASIC, first.page)
+        assertEquals(TutorialPage.INSTRUCTIONS, first.page)
         assertFalse(marked)
         coordinator.dismiss(first.id)
         val closed = ready.copy(tutorial = coordinator.state).withDiagnostics(true, true).withDiagnostics(false)
         assertTrue(marked)
         assertEquals(HelpAction.TUTORIAL, helpAction(closed, false, true))
         coordinator.openManually()
-        assertEquals(TutorialPage.BASIC, coordinator.state.card!!.page)
+        assertEquals(TutorialPage.INSTRUCTIONS, coordinator.state.card!!.page)
     }
 
     @Test fun inactiveAndUndiscoveredAreDifferentFromGenuineUnavailableHardware() {

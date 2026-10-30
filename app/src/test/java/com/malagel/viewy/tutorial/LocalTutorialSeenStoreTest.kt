@@ -40,7 +40,7 @@ class LocalTutorialSeenStoreTest {
         activate(nextLaunch)
         assertNull(nextLaunch.state.card)
         nextLaunch.openManually()
-        assertEquals(TutorialPage.BASIC, nextLaunch.state.card!!.page)
+        assertEquals(TutorialPage.INSTRUCTIONS, nextLaunch.state.card!!.page)
         assertEquals(mapOf("seen.known_object_height" to true), file.values)
     }
 

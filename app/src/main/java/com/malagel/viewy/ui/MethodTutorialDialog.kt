@@ -1,19 +1,32 @@
 package com.malagel.viewy.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
@@ -24,7 +37,7 @@ import com.malagel.viewy.R
 import com.malagel.viewy.tutorial.TutorialCard
 import com.malagel.viewy.tutorial.TutorialPage
 
-/** One stationary card and one modal window for both pages. Does not own measurement state. */
+/** One stationary card with shared section navigation. Does not own measurement state. */
 @Composable
 internal fun MethodTutorialDialog(
     card: TutorialCard,
@@ -34,6 +47,8 @@ internal fun MethodTutorialDialog(
     val content = methodTutorials[card.method] ?: return
     val title = stringResource(content.title)
     val dismiss = { onDismiss(card.id) }
+    val pages = key(card.id) { updateTransition(card.page, label = "Tutorial section") }
+    val settled = pages.currentState == pages.targetState && !pages.isRunning
     Dialog(
         onDismissRequest = dismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
@@ -57,44 +72,91 @@ internal fun MethodTutorialDialog(
                 Column {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.weight(1f)) {
-                            if (card.page == TutorialPage.DETAILS) TextButton(onClick = { onPage(card.id, TutorialPage.BASIC) }) {
-                                Text(stringResource(R.string.tutorial_go_back))
+                            card.page.previous?.let { previous ->
+                                TextButton(onClick = { if (settled) onPage(card.id, previous) }, enabled = settled) {
+                                    Text(stringResource(R.string.tutorial_go_back))
+                                }
                             }
                         }
                         TextButton(onClick = dismiss, modifier = Modifier.heightIn(min = 48.dp)) {
                             Text(stringResource(R.string.close))
                         }
                     }
-                    // Each page starts at the top; hardware-state recomposition never resets it.
-                    key(card.id, card.page) {
-                        Column(
-                            Modifier.weight(1f).verticalScroll(rememberScrollState())
-                                .padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp),
-                        ) {
-                            Text(title, Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineSmall)
-                            val sections = if (card.page == TutorialPage.BASIC) content.basic else content.details
-                            sections.forEach { section ->
-                                section.title?.let { Text(stringResource(it), Modifier.semantics { heading() }, style = MaterialTheme.typography.titleMedium) }
-                                section.blocks.forEach { block ->
-                                    when (block) {
-                                        TutorialBlock.KnownHeightIllustration -> KnownHeightTutorialAnimation(
-                                            contentDescription = stringResource(R.string.tutorial_known_height_animation_description),
-                                            modifier = Modifier.widthIn(max = 400.dp).fillMaxWidth()
-                                                .align(Alignment.CenterHorizontally),
-                                        )
-                                        is TutorialBlock.Paragraph -> Text(stringResource(block.text), style = MaterialTheme.typography.bodyLarge)
-                                        is TutorialBlock.Equation -> TutorialEquation(block.notation, block.spoken)
-                                    }
-                                }
+                    pages.AnimatedContent(
+                        modifier = Modifier.weight(1f).fillMaxWidth().clipToBounds(),
+                        transitionSpec = {
+                            val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
+                            (slideInHorizontally(
+                                tween(260, easing = FastOutSlowInEasing), initialOffsetX = { it * direction },
+                            ) togetherWith slideOutHorizontally(
+                                tween(260, easing = FastOutSlowInEasing), targetOffsetX = { -it * direction },
+                            )).using(null)
+                        },
+                    ) { page ->
+                        // Each entry owns its scroll state; outgoing content cannot receive input.
+                        NavigationInputGuard(!settled || page != card.page, Modifier.fillMaxSize()) {
+                            TutorialPageContent(content, page) {
+                                if (settled && page == card.page) page.next?.let { onPage(card.id, it) }
                             }
-                            if (card.page == TutorialPage.BASIC) {
-                                TextButton(onClick = { onPage(card.id, TutorialPage.DETAILS) }) {
-                                    Text(stringResource(R.string.tutorial_know_more))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TutorialPageContent(content: MethodTutorialContent, page: TutorialPage, onNext: () -> Unit) {
+    Column(Modifier.fillMaxSize()) {
+        Column(
+            Modifier.weight(1f).verticalScroll(rememberScrollState())
+                .padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(stringResource(page.titleResource()), Modifier.semantics { heading() },
+                style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            content.pages.getValue(page).forEach { section ->
+                section.title?.let {
+                    Text(stringResource(it), Modifier.semantics { heading() }, style = MaterialTheme.typography.titleMedium)
+                }
+                section.blocks.forEach { block ->
+                    when (block) {
+                        TutorialBlock.KnownHeightIllustration -> KnownHeightTutorialAnimation(
+                            contentDescription = stringResource(R.string.tutorial_known_height_animation_description),
+                            modifier = Modifier.widthIn(max = 400.dp).fillMaxWidth().align(Alignment.CenterHorizontally),
+                        )
+                        is TutorialBlock.Paragraph -> Text(stringResource(block.text), style = MaterialTheme.typography.bodyLarge)
+                        is TutorialBlock.Equation -> TutorialEquation(block.notation, block.spoken)
+                        is TutorialBlock.BulletList -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            block.items.forEach { item ->
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.semantics(mergeDescendants = true) {}) {
+                                    Text("•", Modifier.clearAndSetSemantics {}, style = MaterialTheme.typography.bodyLarge)
+                                    Text(stringResource(item), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
                                 }
                             }
                         }
                     }
+                }
+            }
+        }
+        page.next?.let { next ->
+            val nextDescription = stringResource(R.string.tutorial_next_section, stringResource(next.titleResource()))
+            val actionModifier = if (page == TutorialPage.INSTRUCTIONS) {
+                Modifier.align(Alignment.End).padding(end = 12.dp, bottom = 12.dp)
+            } else {
+                Modifier.align(Alignment.Start).padding(start = 12.dp, bottom = 12.dp)
+            }
+            if (page == TutorialPage.INSTRUCTIONS) {
+                MeasurementActionButton(label = nextDescription, onClick = onNext, modifier = actionModifier) {
+                    Icon(painterResource(R.drawable.ic_chevron_right), contentDescription = null, modifier = Modifier.size(28.dp))
+                }
+            } else {
+                TextButton(
+                    onClick = onNext,
+                    modifier = actionModifier.heightIn(min = 48.dp).semantics { contentDescription = nextDescription },
+                ) {
+                    Text(stringResource(next.titleResource()), fontWeight = FontWeight.Bold)
                 }
             }
         }

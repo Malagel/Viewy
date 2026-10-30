@@ -46,7 +46,7 @@ class TutorialCoordinatorTest {
         hidden()
         val card = coordinator.state.card!!
         assertEquals(method, card.method)
-        assertEquals(TutorialPage.BASIC, card.page)
+        assertEquals(TutorialPage.INSTRUCTIONS, card.page)
         assertNull(coordinator.state.pendingMethod)
         assertFalse(seen.hasSeen(method.id))
         coordinator.dismiss(card.id)
@@ -57,24 +57,49 @@ class TutorialCoordinatorTest {
         assertNull(coordinator.state.card)
     }
 
-    @Test fun manualReopeningStartsBasicAndNeverResetsCompletion() {
+    @Test fun manualReopeningStartsInstructionsAndNeverResetsCompletion() {
         activate()
         hidden()
         val first = coordinator.state.card!!
-        coordinator.changePage(first.id, TutorialPage.DETAILS)
-        assertEquals(first.copy(page = TutorialPage.DETAILS), coordinator.state.card)
+        coordinator.changePage(first.id, TutorialPage.HOW_IT_WORKS)
+        assertEquals(first.copy(page = TutorialPage.HOW_IT_WORKS), coordinator.state.card)
         assertTrue(seen.ids.isEmpty())
-        coordinator.changePage(first.id, TutorialPage.BASIC)
+        coordinator.changePage(first.id, TutorialPage.INSTRUCTIONS)
         assertEquals(first, coordinator.state.card)
-        coordinator.changePage(first.id, TutorialPage.DETAILS)
+        coordinator.changePage(first.id, TutorialPage.HOW_IT_WORKS)
         coordinator.dismiss(first.id) // Close/outside/Back use the same whole-card action.
         coordinator.openManually()
         val reopened = coordinator.state.card!!
         assertNotEquals(first.id, reopened.id)
-        assertEquals(TutorialPage.BASIC, reopened.page)
+        assertEquals(TutorialPage.INSTRUCTIONS, reopened.page)
         assertTrue(seen.hasSeen(method.id))
         coordinator.dismiss(reopened.id)
         assertNull(coordinator.state.card)
+    }
+
+    @Test fun threeSectionsNavigateInOrderWithoutCompletingUntilDismissal() {
+        activate()
+        hidden()
+        val card = coordinator.state.card!!
+        assertNull(TutorialPage.INSTRUCTIONS.previous)
+        assertEquals(TutorialPage.IMPORTANT, TutorialPage.INSTRUCTIONS.next)
+        assertEquals(TutorialPage.HOW_IT_WORKS, TutorialPage.IMPORTANT.next)
+        assertNull(TutorialPage.HOW_IT_WORKS.next)
+        for (page in TutorialPage.entries) {
+            coordinator.changePage(card.id, page)
+            assertEquals(card.copy(page = page), coordinator.state.card)
+            assertTrue(seen.ids.isEmpty())
+        }
+        assertEquals(TutorialPage.IMPORTANT, TutorialPage.HOW_IT_WORKS.previous)
+        assertEquals(TutorialPage.INSTRUCTIONS, TutorialPage.IMPORTANT.previous)
+        for (page in TutorialPage.entries) {
+            val id = coordinator.state.card!!.id
+            coordinator.changePage(id, page)
+            coordinator.dismiss(id)
+            assertTrue(seen.hasSeen(method.id))
+            coordinator.openManually()
+            assertEquals(TutorialPage.INSTRUCTIONS, coordinator.state.card!!.page)
+        }
     }
 
     @Test fun duplicateActivationHiddenAndHelpEventsProduceOneCard() {
@@ -123,7 +148,7 @@ class TutorialCoordinatorTest {
         hidden()
         val current = coordinator.state.card
         coordinator.dismiss(oldId)
-        coordinator.changePage(oldId, TutorialPage.DETAILS)
+        coordinator.changePage(oldId, TutorialPage.HOW_IT_WORKS)
         assertSame(current, coordinator.state.card)
         assertTrue(seen.ids.isEmpty())
     }
@@ -134,11 +159,11 @@ class TutorialCoordinatorTest {
         val token = coordinator.state.navigationToken
         coordinator.methodEntered(token)
         val id = coordinator.state.card!!.id
-        coordinator.changePage(id, TutorialPage.DETAILS)
+        coordinator.changePage(id, TutorialPage.HOW_IT_WORKS)
         val retained = coordinator.state
         repeat(2) { coordinator.methodEntered(token) }
         assertEquals(retained, coordinator.state)
-        assertEquals(TutorialPage.DETAILS, coordinator.state.card!!.page)
+        assertEquals(TutorialPage.HOW_IT_WORKS, coordinator.state.card!!.page)
         assertTrue(seen.ids.isEmpty())
         coordinator.dismiss(id)
         coordinator.methodEntered(token)
@@ -161,14 +186,14 @@ class TutorialCoordinatorTest {
     @Test fun processDeathBeforeDismissalLeavesTutorialEligibleOnNextActivation() {
         activate()
         hidden()
-        coordinator.changePage(coordinator.state.card!!.id, TutorialPage.DETAILS)
+        coordinator.changePage(coordinator.state.card!!.id, TutorialPage.HOW_IT_WORKS)
         val fresh = TutorialCoordinator(seen, setOf(method))
         val browsing = MeasurementSelection().browse(method.mode)
         fresh.selectionChanged(browsing)
         fresh.selectionChanged(browsing.activate(method), method)
         assertNull(fresh.state.card)
         fresh.methodEntered(fresh.state.navigationToken)
-        assertEquals(TutorialPage.BASIC, fresh.state.card!!.page)
+        assertEquals(TutorialPage.INSTRUCTIONS, fresh.state.card!!.page)
         assertTrue(seen.ids.isEmpty())
     }
 

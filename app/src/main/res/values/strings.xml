@@ -71,7 +71,15 @@
     <string name="calibration_description">Validated measurement calibration.</string>
     <string name="known_height_description">Estimate distance using a known object height and two viewing angles.</string>
     <string name="how_to_use">How to use</string>
-    <string name="tutorial_know_more">For nerds</string>
+    <string name="tutorial_instructions">Instructions</string>
+    <string name="tutorial_important">Important</string>
+    <string name="tutorial_how_it_works">How does it work?</string>
+    <string name="tutorial_next_section">Next section: %1$s</string>
+    <string name="tutorial_known_height_tips">Follow these tips to ensure you get the best results possible</string>
+    <string name="tutorial_known_height_tip_1">Keep yourself and your phone in the same place the whole time.</string>
+    <string name="tutorial_known_height_tip_2">Try pointing both shots in the same direction, only moving the phone vertically.</string>
+    <string name="tutorial_known_height_tip_3">Make sure to use the zoom to get a precise and steady shot.</string>
+    <string name="tutorial_known_height_tip_4">Ideally, use an object whose height you know beforehand.</string>
     <string name="tutorial_go_back">Go back</string>
     <string name="tutorial_steps">Take a measurement</string>
     <string name="tutorial_geometry">From height to distance</string>

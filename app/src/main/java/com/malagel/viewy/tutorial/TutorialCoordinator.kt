@@ -8,10 +8,15 @@ interface TutorialSeenStore {
     fun markSeen(methodId: String)
 }
 
-enum class TutorialPage { BASIC, DETAILS }
+enum class TutorialPage {
+    INSTRUCTIONS, IMPORTANT, HOW_IT_WORKS;
+
+    val previous: TutorialPage? get() = entries.getOrNull(ordinal - 1)
+    val next: TutorialPage? get() = entries.getOrNull(ordinal + 1)
+}
 
 /** Temporary presentation state, retained with the ViewModel, never written to preferences. */
-data class TutorialCard(val id: Long, val method: MeasurementMethod, val page: TutorialPage = TutorialPage.BASIC)
+data class TutorialCard(val id: Long, val method: MeasurementMethod, val page: TutorialPage = TutorialPage.INSTRUCTIONS)
 
 data class TutorialState(
     val navigationToken: Long = 0,
