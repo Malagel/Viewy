@@ -11,7 +11,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ScreenNavigationMotionTest {
-    @Test fun measurementBackAlwaysPresentsModesWithoutAnIntermediateMethodList() {
+    @Test fun methodEntryKeepsOutgoingMethodsAndBackAndHomeReturnToTheirOwnLists() {
         val method = MeasurementMethod.KNOWN_OBJECT_HEIGHT
         val browsing = MeasurementSelection().browse(method.mode)
         assertEquals(browsing.destination, homePresentationDestination(browsing.destination))
@@ -19,20 +19,50 @@ class ScreenNavigationMotionTest {
         // Navigation presentation does not depend on height entry, top capture or camera state.
         for (measurement in listOf(MeasurementState(), MeasurementState(heightMeters = 2.0))) {
             val state = MeasurementUiState(selection = selected, measurement = measurement)
-            assertEquals(SelectionDestination.Home, homePresentationDestination(state.selection.destination))
+            assertEquals(browsing.destination, homePresentationDestination(state.selection.destination))
             val back = state.selection.back()
-            assertEquals(SelectionDestination.Home, back.destination)
-            assertEquals(back.openModes(), back)
-            assertEquals(SelectionDestination.Home, homePresentationDestination(back.destination))
-            assertNull(back.browsingMode)
+            assertEquals(browsing.destination, back.destination)
+            assertEquals(browsing.destination, homePresentationDestination(back.destination))
+            assertEquals(method.mode, back.browsingMode)
+            assertNull(back.activeMethod)
+            val home = state.selection.openModes()
+            assertEquals(SelectionDestination.Home, homePresentationDestination(home.destination))
+            assertEquals(home, back.back())
+            assertNull(home.activeMethod)
+            assertNull(home.browsingMode)
         }
     }
 
-    @Test fun measurementNavigationUsesComplementaryDirectionsOnlyOnDestinationChanges() {
-        assertEquals(MeasurementMotion.ENTER, measurementMotion(false, true))
-        assertEquals(MeasurementMotion.RETURN_HOME, measurementMotion(true, false))
-        assertEquals(MeasurementMotion.NONE, measurementMotion(true, true))
-        assertEquals(MeasurementMotion.NONE, measurementMotion(false, false))
+    @Test fun measurementBackUsesHorizontalReturnForEveryMethodWhileHomeKeepsItsMotion() {
+        for (method in MeasurementMethod.entries) {
+            val measurement = SelectionDestination.Measurement(method)
+            val methods = SelectionDestination.Methods(method.mode)
+            assertEquals(MeasurementMotion.ENTER, measurementMotion(methods, measurement))
+            assertEquals(MeasurementMotion.RETURN_METHODS, measurementMotion(measurement, methods))
+            assertEquals(MeasurementMotion.RETURN_HOME, measurementMotion(measurement, SelectionDestination.Home))
+            assertEquals(MeasurementMotion.NONE, measurementMotion(measurement, measurement))
+            assertEquals(MeasurementMotion.NONE, measurementMotion(methods, methods))
+            assertEquals(MeasurementMotion.NONE, measurementMotion(SelectionDestination.Home, SelectionDestination.Home))
+        }
+    }
+
+    @Test fun selectionSegmentsPreserveBackAndHomeMotionAcrossRepeatedVisits() {
+        for (method in MeasurementMethod.entries) {
+            var selection = MeasurementSelection()
+            repeat(2) {
+                val methods = selection.browse(method.mode)
+                assertEquals(MeasurementMotion.NONE, measurementMotion(selection.destination, methods.destination))
+                val selected = methods.activate(method)
+                assertEquals(MeasurementMotion.ENTER, measurementMotion(methods.destination, selected.destination))
+                val back = selected.back()
+                assertEquals(MeasurementMotion.RETURN_METHODS, measurementMotion(selected.destination, back.destination))
+                val reentered = back.activate(method)
+                assertEquals(MeasurementMotion.ENTER, measurementMotion(back.destination, reentered.destination))
+                selection = reentered.openModes()
+                assertEquals(MeasurementMotion.RETURN_HOME, measurementMotion(reentered.destination, selection.destination))
+                assertEquals(MeasurementMotion.NONE, measurementMotion(back.destination, selection.destination))
+            }
+        }
     }
 
     @Test fun inactiveMeasurementIsInteractiveAndDoesNotRetainAnOldOverlay() {

@@ -8,9 +8,10 @@ two aiming directions. Application ID: `com.malagel.viewy`.
 ## Basic usage
 
 1. Viewy opens Home with no active measurement. Tap **Long Distance**,
-   then **Known Object Height**. Use **Home** or Android Back to return to all modes.
-   Mode/method lists slide inside the card; measurement enters and leaves with a
-   short fade and vertical motion.
+   then **Known Object Height**. Android Back returns to the method list;
+   **Home** returns directly to all modes.
+   Mode/method lists slide inside the card. Measurement fades in from the right;
+   Android Back reverses the horizontal motion, while Home uses a vertical fade/slide.
    On first activation, read and dismiss the method tutorial. The **?** button
    beside the settings gear reopens it. Advance from **Instructions** with **>**,
    read the **Important** tips, then tap **How does it work?** for geometry and

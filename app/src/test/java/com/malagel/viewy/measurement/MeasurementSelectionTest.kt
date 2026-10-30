@@ -26,7 +26,7 @@ class MeasurementSelectionTest {
         assertEquals(listOf(method), mode.methods)
     }
 
-    @Test fun backReturnsHomeFromMethodsAndMeasurementAndIsIdempotentAtHome() {
+    @Test fun backRetracesMethodsWhileHomeReturnsDirectlyToModes() {
         val home = MeasurementSelection()
         val methods = home.browse(mode)
         assertEquals(SelectionDestination.Methods(mode), methods.destination)
@@ -36,7 +36,9 @@ class MeasurementSelectionTest {
         assertEquals(SelectionDestination.Measurement(method), selected.destination)
         assertEquals(method, selected.activeMethod)
         assertFalse(selected.isOpen)
-        assertEquals(home, selected.back())
+        assertEquals(methods, selected.back())
+        assertNull(selected.back().activeMethod)
+        assertEquals(home, selected.back().back())
         assertEquals(home, selected.openModes())
         assertEquals(home, home.back())
         assertNull(selected.openModes().activeMethod)

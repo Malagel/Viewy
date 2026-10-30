@@ -61,13 +61,21 @@ height and independently scrollable mode/method lists. Destination-keyed Compose
 `AnimatedContent` slides forward left and backward right over 220 ms. Moving and
 outgoing lists cannot receive input; repeated Back is consumed during motion.
 The destination host owns Android Back navigation for both the card and measurement;
-the card only consumes repeated Back while its own transition is running. Measurement maps its Home presentation
-to the mode list rather than retaining the method submenu.
+the card only consumes repeated Back while its own transition is running. During
+measurement entry, the outgoing Home presentation maps the active method to its
+method list so the card does not navigate while fading out. Android Back from
+measurement requests that mode's method list; Home requests the mode list directly.
 
 `MeasurementDestinationHost` animates Home and the entire measurement presentation
-with complementary fades and 20 dp vertical movement (240 ms into measurement,
-280 ms returning Home). The key is measurement-destination identity, independent
-of sensor and preference publications. Compose duration scaling handles reduced
+with fades and 20 dp movement: measurement enters from the right over 270 ms
+while the method menu fades in place. Android Back uses the shared method-return
+transition: measurement exits right and the method list enters from the left over
+270 ms. Both destinations belong to the transition segment, so retained Compose
+callbacks distinguish Android Back from Home without captured navigation state.
+Returning Home retains its 280 ms vertical entrance and the measurement's downward
+exit. Content keys distinguish selection from measurement, leaving Home/Methods
+animation to the selection card. Sensor and preference publications do not change
+the transition target. Compose duration scaling handles reduced
 or disabled motion. Recreated hosts initialize settled. Input guards cover moving
 and outgoing destinations. Hardware eligibility changes synchronously with logical
 navigation, never with retained animation content. An open exceptional workspace
@@ -459,7 +467,7 @@ legacy persisted selection is ignored. Tutorial completion cannot activate a met
 Activity recreation retains navigation, height and completed results in memory;
 process death starts at Home. The ViewModel separately tracks the workflow's owning
 method, so Home clears the active destination without losing completed evidence.
-Returning Home invalidates incomplete pairs immediately via resource reconciliation.
+Returning to either selection list invalidates incomplete pairs immediately via resource reconciliation.
 Reselecting the owner preserves height/results; selecting a different method restarts
 the workflow and revokes prior hardware ownership. Unavailable modes have no
 activation path.

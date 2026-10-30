@@ -16,7 +16,10 @@ data class MeasurementSelection(val destination: SelectionDestination = Selectio
     val browsingMode: MeasurementMode? get() = (destination as? SelectionDestination.Methods)?.mode
 
     fun openModes() = copy(destination = SelectionDestination.Home)
-    fun back() = openModes()
+    fun back() = when (val current = destination) {
+        is SelectionDestination.Measurement -> copy(destination = SelectionDestination.Methods(current.method.mode))
+        else -> openModes()
+    }
     fun browse(mode: MeasurementMode) = if (destination == SelectionDestination.Home && mode.available) {
         copy(destination = SelectionDestination.Methods(mode))
     } else this

@@ -2,6 +2,7 @@ package com.malagel.viewy.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.AnimatedVisibility
@@ -11,6 +12,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
@@ -130,40 +133,62 @@ internal fun ScreenOverlayHost(
     }
 }
 
-/** A measurement's retained Home surface must never preserve the method submenu. */
-internal fun homePresentationDestination(destination: SelectionDestination): SelectionDestination =
-    destination.takeUnless { it is SelectionDestination.Measurement } ?: SelectionDestination.Home
+/** Keep the outgoing method list stable while measurement enters. */
+internal fun homePresentationDestination(destination: SelectionDestination): SelectionDestination = when (destination) {
+    is SelectionDestination.Measurement -> SelectionDestination.Methods(destination.method.mode)
+    else -> destination
+}
 
-internal enum class MeasurementMotion { ENTER, RETURN_HOME, NONE }
+internal enum class MeasurementMotion { ENTER, RETURN_METHODS, RETURN_HOME, NONE }
 
-internal fun measurementMotion(from: Boolean, to: Boolean): MeasurementMotion = when {
-    from == to -> MeasurementMotion.NONE
-    to -> MeasurementMotion.ENTER
-    else -> MeasurementMotion.RETURN_HOME
+/** The return destination distinguishes Android Back from the measurement Home control. */
+internal fun measurementMotion(
+    from: SelectionDestination, to: SelectionDestination,
+): MeasurementMotion = when {
+    from !is SelectionDestination.Measurement && to is SelectionDestination.Measurement -> MeasurementMotion.ENTER
+    from is SelectionDestination.Measurement && to is SelectionDestination.Methods -> MeasurementMotion.RETURN_METHODS
+    from is SelectionDestination.Measurement && to == SelectionDestination.Home -> MeasurementMotion.RETURN_HOME
+    else -> MeasurementMotion.NONE
 }
 
 /** Destination identity alone drives motion. Camera ownership follows ViewModel state immediately. */
 @Composable
 internal fun MeasurementDestinationHost(
-    transition: Transition<Boolean>, blocked: Boolean,
+    transition: Transition<SelectionDestination>, blocked: Boolean,
     content: @Composable (measuring: Boolean) -> Unit,
 ) {
     val offset = with(LocalDensity.current) { 20.dp.roundToPx() }
     val moving = transition.currentState != transition.targetState || transition.isRunning
     transition.AnimatedContent(
         modifier = Modifier.fillMaxSize().clipToBounds(),
+        // The selection card owns Home <-> Methods motion. Only crossing the
+        // measurement boundary replaces content in this host.
+        contentKey = { it is SelectionDestination.Measurement },
         transitionSpec = {
-            val entering = measurementMotion(initialState, targetState) == MeasurementMotion.ENTER
-            val duration = if (entering) ScreenMotion.enterMillis else 280
-            (fadeIn(tween(duration)) + slideInVertically(tween(duration, easing = FastOutSlowInEasing)) {
-                if (entering) offset else -offset
-            }) togetherWith (fadeOut(tween(ScreenMotion.exitMillis)) +
-                slideOutVertically(tween(ScreenMotion.exitMillis, easing = FastOutSlowInEasing)) {
-                    if (entering) -offset else offset
-                }) using SizeTransform(clip = false, sizeAnimationSpec = { _, _ -> tween(0) })
+            // Read both destinations from the segment. AnimatedContent retains
+            // callbacks, so separately captured navigation state can be stale.
+            val motion = measurementMotion(initialState, targetState)
+            val duration = if (motion == MeasurementMotion.RETURN_HOME) 280 else 270
+            val entrance = fadeIn(tween(duration)) + when (motion) {
+                MeasurementMotion.ENTER ->
+                    slideInHorizontally(tween(duration, easing = FastOutSlowInEasing)) { offset }
+                MeasurementMotion.RETURN_METHODS ->
+                    slideInHorizontally(tween(duration, easing = FastOutSlowInEasing)) { -offset }
+                else -> slideInVertically(tween(duration, easing = FastOutSlowInEasing)) { -offset }
+            }
+            val exit = fadeOut(tween(ScreenMotion.exitMillis)) + when (motion) {
+                MeasurementMotion.RETURN_METHODS ->
+                    slideOutHorizontally(tween(ScreenMotion.exitMillis, easing = FastOutSlowInEasing)) { offset }
+                MeasurementMotion.RETURN_HOME ->
+                    slideOutVertically(tween(ScreenMotion.exitMillis, easing = FastOutSlowInEasing)) { offset }
+                else -> ExitTransition.None
+            }
+            entrance togetherWith exit using SizeTransform(clip = false, sizeAnimationSpec = { _, _ -> tween(0) })
         },
-    ) { measuring ->
-        NavigationInputGuard(blocked || moving || measuring != transition.targetState, Modifier.fillMaxSize()) {
+    ) { destination ->
+        val measuring = destination is SelectionDestination.Measurement
+        val targetMeasuring = transition.targetState is SelectionDestination.Measurement
+        NavigationInputGuard(blocked || moving || measuring != targetMeasuring, Modifier.fillMaxSize()) {
             content(measuring)
         }
     }

@@ -150,7 +150,7 @@ fun ViewyScreen(
         else -> null
     }
     val measurementDestination = state.selection.activeMethod != null
-    val destinationTransition = updateTransition(measurementDestination, label = "Home and measurement")
+    val destinationTransition = updateTransition(state.selection.destination, label = "Home and measurement")
     val navigating = destinationTransition.currentState != destinationTransition.targetState || destinationTransition.isRunning
     val navigationToken = state.tutorial.navigationToken
     LaunchedEffect(measurementDestination, navigating, navigationToken) {

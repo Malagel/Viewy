@@ -29,8 +29,11 @@ future validated features; they have no selectable methods.
   its description. Card Back and Android Back reverse the 220 ms slide to modes.
   Back on Home follows normal Android exit behavior.
 - Selecting Known Object Height fades and subtly moves the entire measurement
-  destination into view over 240 ms. Home and Android Back from measurement
-  return directly to the initial mode list with complementary 280 ms motion.
+  destination in from the right over 270 ms. The outgoing method list stays in
+  place while fading out. Android Back from measurement returns to that mode's
+  method list, with measurement sliding right and the list sliding in from the
+  left over a 270 ms fade/slide transition shared by all methods. Home returns
+  directly to the initial mode list with the existing 280 ms fade and vertical motion.
   Outgoing content is immediately blocked from input and accessibility. Motion
   follows system animation scaling and does not replay on sensor or preference
   updates; recreated destinations appear settled.
