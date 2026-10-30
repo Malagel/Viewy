@@ -15,7 +15,7 @@
     <string name="capture_bottom">Capture bottom</string>
     <string name="long_distance">Long Distance</string>
     <string name="object_height">Object height</string>
-    <string name="height_instructions">Enter the vertical distance between the two endpoints. Saving starts a new measurement.</string>
+    <string name="height_instructions">Enter here the height of the object.</string>
     <string name="height_invalid">Enter a positive decimal height.</string>
     <string name="height_hint">Use a measured height when possible.</string>
     <string name="save_height">Save height</string>
@@ -26,10 +26,10 @@
     <string name="result_elevation_difference">Elevation difference: %1$s°</string>
     <string name="result_disclaimer">Approximate result. Depends on object height and stable positioning.</string>
     <string name="guidance_near_vertical">Cannot align at this angle.</string>
-    <string name="guidance_orientation">Orientation sensor unavailable. Retry orientation to start a new session.</string>
-    <string name="notice_acquisition_suspended">Capture cleared. Aim at the top again.</string>
-    <string name="notice_camera_interrupted">Camera interrupted. Aim at the top again.</string>
-    <string name="notice_session_changed">Orientation session changed. Aim at the top again.</string>
+    <string name="guidance_orientation">Orientation sensor unavailable.</string>
+    <string name="notice_acquisition_suspended">Capture cleared.</string>
+    <string name="notice_camera_interrupted">Camera interrupted.</string>
+    <string name="notice_session_changed">Camera lens changed.</string>
     <string name="notice_expired">Capture took too long.</string>
     <string name="notice_wait_stability">Hold still and wait for a fresh, stable direction.</string>
     <string name="notice_near_vertical">Aim farther from straight up or down; horizontal alignment is unreliable here.</string>
@@ -45,7 +45,7 @@
     <string name="camera_interrupted">Camera preview stopped. Retry the camera.</string>
     <string name="camera_system_unavailable">Camera access is unavailable. Check system camera settings or restart the device.</string>
     <string name="camera_unavailable">Camera is unavailable. Close other camera apps, then retry.</string>
-    <string name="camera_display_changed">Display changed. Restarting preview…</string>
+    <string name="camera_display_changed">Display changed. Restarting preview...</string>
     <string name="camera_start_failed">Unable to start the rear camera. Retry or check camera access in Settings.</string>
     <string name="camera_initialization_failed">Unable to initialize the rear camera. Retry the camera.</string>
     <string name="camera_no_rear">This device has no available rear camera.</string>
@@ -79,10 +79,12 @@
     <string name="tutorial_sensitivity">When errors grow</string>
     <string name="tutorial_camera_timing">Camera and timing</string>
     <string name="tutorial_steadiness">Steadiness is not accuracy</string>
+
     <string name="tutorial_known_height_intro">Find the approximate distance to an object whose height you know.</string>
     <string name="tutorial_known_height_step_1">1. Enter the height of the distant object, from top to bottom.</string>
     <string name="tutorial_known_height_step_2">2. Aim the reticle at the top of the object and press the capture button.</string>
     <string name="tutorial_known_height_step_3">3. Rotating the phone vertically, not moving it, aim at the bottom and capture again.</string>
+
     <string name="tutorial_known_height_geometry">Think of two right triangles sharing the same horizontal distance d. At elevation θ, an endpoint is d × tan(θ) above the camera. Subtract the bottom offset from the top to get height H:</string>
     <string name="tutorial_known_height_equation">d = \\frac{H}{\\tan(\\theta_{top}) − \\tan(\\theta_{bottom})}</string>
     <string name="tutorial_known_height_variables">d — horizontal distance to the object\'s vertical line, in meters.\nH — known vertical height between the endpoints, in meters.\nθ (theta) — viewing angle above the horizontal plane. The subscripts top and bottom identify the endpoints; angles below horizontal are negative.\ntan — tangent function; the calculation uses radians.</string>

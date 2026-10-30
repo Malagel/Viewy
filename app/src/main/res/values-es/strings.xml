@@ -1,6 +1,6 @@
 <resources>
     <string name="app_name">Viewy</string>
-    <string name="measurement_method_subtitle">Larga distancia · Altura conocida del objeto</string>
+    <string name="measurement_method_subtitle">Larga distancia · Altura conocida</string>
     <string name="camera_permission_explanation">Se necesita acceso a la cámara para apuntar. Viewy no toma ni guarda fotos.</string>
     <string name="camera_permission_retry">Permitir cámara / reintentar</string>
     <string name="camera_permission_allow">Permitir cámara</string>
@@ -15,7 +15,7 @@
     <string name="capture_bottom">Capturar extremo inferior</string>
     <string name="long_distance">Larga distancia</string>
     <string name="object_height">Altura del objeto</string>
-    <string name="height_instructions">Introduce la distancia vertical entre los dos extremos. Guardar inicia una nueva medición.</string>
+    <string name="height_instructions">Introduce aquí la altura del obejo lejano.</string>
     <string name="height_invalid">Introduce una altura decimal positiva.</string>
     <string name="height_hint">Usa una altura medida cuando sea posible.</string>
     <string name="save_height">Guardar altura</string>
@@ -27,9 +27,9 @@
     <string name="result_disclaimer">Resultado aproximado. Depende de la altura del objeto y de mantener una posición estable.</string>
     <string name="guidance_near_vertical">No se puede alinear en este ángulo.</string>
     <string name="guidance_orientation">Sensor de orientación no disponible. Reintenta la orientación para iniciar una nueva sesión.</string>
-    <string name="notice_acquisition_suspended">Se descartó la captura. Apunta de nuevo al extremo superior.</string>
-    <string name="notice_camera_interrupted">Se interrumpió la cámara. Apunta de nuevo al extremo superior.</string>
-    <string name="notice_session_changed">Cambió la sesión de orientación. Apunta de nuevo al extremo superior.</string>
+    <string name="notice_acquisition_suspended">Se descartó la captura.</string>
+    <string name="notice_camera_interrupted">Se interrumpió la cámara.</string>
+    <string name="notice_session_changed">Cambio de cámara detectado.</string>
     <string name="notice_expired">Se superó el tiempo de captura.</string>
     <string name="notice_wait_stability">Mantén el teléfono quieto y espera una dirección reciente y estable.</string>
     <string name="notice_near_vertical">Apunta más lejos de la vertical; aquí la alineación horizontal no es fiable.</string>
