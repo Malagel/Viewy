@@ -149,8 +149,6 @@ fun ViewyScreen(
         com.malagel.viewy.measurement.Alignment.TURN_RIGHT -> stringResource(R.string.diag_right)
         else -> null
     }
-    var homeDestination by remember { mutableStateOf<SelectionDestination>(SelectionDestination.Home) }
-    SideEffect { if (state.selection.isOpen) homeDestination = state.selection.destination }
     val measurementDestination = state.selection.activeMethod != null
     val destinationTransition = updateTransition(measurementDestination, label = "Home and measurement")
     val navigating = destinationTransition.currentState != destinationTransition.targetState || destinationTransition.isRunning
@@ -272,7 +270,7 @@ fun ViewyScreen(
             val exceptional = maxHeight < 360.dp || maxWidth < 280.dp || LocalDensity.current.fontScale > 2f
             val workspaceDialogOpen = exceptional && showWorkspace && (measurementDestination || navigating)
             val home: @Composable (Boolean) -> Unit = { interactive ->
-                HomeScreen(if (state.selection.isOpen) state.selection.destination else homeDestination,
+                HomeScreen(homePresentationDestination(state.selection.destination),
                     openAppSettings, model::backSelection, model::browseMode, model::selectMethod, interactive)
             }
             // Match the dialog's backdrop while it animates back to Home, avoiding a window-removal flash.

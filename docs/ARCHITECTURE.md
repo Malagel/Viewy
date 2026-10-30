@@ -60,6 +60,9 @@ can still dispose a dialog immediately; pending animation work is cancelled.
 height and independently scrollable mode/method lists. Destination-keyed Compose
 `AnimatedContent` slides forward left and backward right over 220 ms. Moving and
 outgoing lists cannot receive input; repeated Back is consumed during motion.
+The destination host owns Android Back navigation for both the card and measurement;
+the card only consumes repeated Back while its own transition is running. Measurement maps its Home presentation
+to the mode list rather than retaining the method submenu.
 
 `MeasurementDestinationHost` animates Home and the entire measurement presentation
 with complementary fades and 20 dp vertical movement (240 ms into measurement,

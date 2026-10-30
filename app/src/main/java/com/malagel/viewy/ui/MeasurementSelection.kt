@@ -51,9 +51,9 @@ internal fun SelectionLists(
 ) {
     val transition = updateTransition(destination, label = "Card destination")
     val moving = transition.currentState != transition.targetState || transition.isRunning
-    BackHandler(enabled = enabled && (moving || destination is SelectionDestination.Methods)) {
-        if (!moving) onBack()
-    }
+    // Navigation belongs to the destination host. Only consume repeated Back while
+    // the card itself is moving, including its return to the initial mode list.
+    BackHandler(enabled = enabled && moving) {}
     transition.AnimatedContent(
         modifier = modifier,
         transitionSpec = {

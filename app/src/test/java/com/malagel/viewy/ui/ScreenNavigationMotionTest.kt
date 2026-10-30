@@ -1,5 +1,9 @@
 package com.malagel.viewy.ui
 
+import com.malagel.viewy.domain.MeasurementMethod
+import com.malagel.viewy.measurement.MeasurementSelection
+import com.malagel.viewy.measurement.SelectionDestination
+import com.malagel.viewy.measurement.MeasurementState
 import com.malagel.viewy.settings.AppPreferences
 import com.malagel.viewy.settings.SettingsDestination
 import com.malagel.viewy.settings.SettingsUiState
@@ -7,6 +11,23 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ScreenNavigationMotionTest {
+    @Test fun measurementBackAlwaysPresentsModesWithoutAnIntermediateMethodList() {
+        val method = MeasurementMethod.KNOWN_OBJECT_HEIGHT
+        val browsing = MeasurementSelection().browse(method.mode)
+        assertEquals(browsing.destination, homePresentationDestination(browsing.destination))
+        val selected = browsing.activate(method)
+        // Navigation presentation does not depend on height entry, top capture or camera state.
+        for (measurement in listOf(MeasurementState(), MeasurementState(heightMeters = 2.0))) {
+            val state = MeasurementUiState(selection = selected, measurement = measurement)
+            assertEquals(SelectionDestination.Home, homePresentationDestination(state.selection.destination))
+            val back = state.selection.back()
+            assertEquals(SelectionDestination.Home, back.destination)
+            assertEquals(back.openModes(), back)
+            assertEquals(SelectionDestination.Home, homePresentationDestination(back.destination))
+            assertNull(back.browsingMode)
+        }
+    }
+
     @Test fun measurementNavigationUsesComplementaryDirectionsOnlyOnDestinationChanges() {
         assertEquals(MeasurementMotion.ENTER, measurementMotion(false, true))
         assertEquals(MeasurementMotion.RETURN_HOME, measurementMotion(true, false))

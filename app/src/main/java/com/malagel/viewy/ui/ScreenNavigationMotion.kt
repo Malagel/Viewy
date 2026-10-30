@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
+import com.malagel.viewy.measurement.SelectionDestination
 import com.malagel.viewy.settings.SettingsDestination
 
 internal enum class ScreenOverlay { NONE, SETTINGS, DIAGNOSTICS }
@@ -128,6 +129,10 @@ internal fun ScreenOverlayHost(
         }
     }
 }
+
+/** A measurement's retained Home surface must never preserve the method submenu. */
+internal fun homePresentationDestination(destination: SelectionDestination): SelectionDestination =
+    destination.takeUnless { it is SelectionDestination.Measurement } ?: SelectionDestination.Home
 
 internal enum class MeasurementMotion { ENTER, RETURN_HOME, NONE }
 
