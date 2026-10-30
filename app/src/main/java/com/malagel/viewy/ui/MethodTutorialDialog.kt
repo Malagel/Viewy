@@ -78,6 +78,11 @@ internal fun MethodTutorialDialog(
                                 section.title?.let { Text(stringResource(it), Modifier.semantics { heading() }, style = MaterialTheme.typography.titleMedium) }
                                 section.blocks.forEach { block ->
                                     when (block) {
+                                        TutorialBlock.KnownHeightIllustration -> KnownHeightTutorialAnimation(
+                                            contentDescription = stringResource(R.string.tutorial_known_height_animation_description),
+                                            modifier = Modifier.widthIn(max = 400.dp).fillMaxWidth()
+                                                .align(Alignment.CenterHorizontally),
+                                        )
                                         is TutorialBlock.Paragraph -> Text(stringResource(block.text), style = MaterialTheme.typography.bodyLarge)
                                         is TutorialBlock.Equation -> TutorialEquation(block.notation, block.spoken)
                                     }

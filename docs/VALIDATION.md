@@ -73,6 +73,28 @@ and measurement transitions, with reduced/disabled system motion.
 Source and tests define the individual cases. Mocked deployment tests verify script decisions using
 fictional devices/configuration, not real wireless reliability.
 
+## Known Object Height tutorial illustration
+
+The integrated illustration passed debug Kotlin/resource compilation, the JVM
+suite and Android lint using the bounded Gradle invocation with
+`:app:testDebugUnitTest :app:lintDebug`. No device or emulator was used.
+
+The supplied Compose frame previews cover height, top observation, rotation,
+bottom observation, distance and reset at 320 and 400 dp widths, plus a 240 dp
+static preview and an interactive loop, using Viewy's theme. Compilation and JVM
+checks do not verify rendered frames, lifecycle frame work or TalkBack behavior;
+visual and runtime validation remain unverified.
+
+Manually check the illustration appears after the introduction and before the
+numbered steps only on basic help. Inspect narrow widths and large text with
+scrolling; watch several loops for clipping and a fixed lens position during
+phone rotation. Close mid-loop, reopen, visit For nerds and Go back, and
+background/foreground the app: the basic sequence should restart. Verify no frame
+work below STARTED or after dismissal with a developer-owned profiler. With system
+motion disabled, including a live toggle, expect a stable distance diagram;
+restore normal motion and confirm looping resumes. In English and Spanish,
+TalkBack should announce one complete image description without frame updates.
+
 ## Measurement result presentation
 
 The result presentation passed the JVM suite, debug assembly and lint with the

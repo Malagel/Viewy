@@ -57,7 +57,11 @@ future validated features; they have no selectable methods.
   Manual help remains available after completion. Tutorial completion is
   independent of fresh-session Home startup and method selection.
 - Known Object Height basic help gives a brief usage procedure and describes the
-  approximate distance result in three steps: enter the object height, capture
+  approximate distance result. Before the numbered instructions, a looping
+  illustration shows known height, top and bottom observations from a fixed
+  camera position, and horizontal distance. Disabled system motion shows a static
+  distance diagram; the illustration has one localized accessible description.
+  The three steps are: enter the object height, capture
   the top, then tilt the phone without moving its position and capture the bottom.
   The detailed view explains the geometry with formatted fractions and endpoint
   subscripts, then covers sensor/camera/timing limitations and unquantified

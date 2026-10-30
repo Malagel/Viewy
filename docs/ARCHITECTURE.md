@@ -84,7 +84,16 @@ scroll state resets on content changes, while sensor-state publication leaves it
 alone. The measurement surface remains composed in place; pending/visible help
 suspends acquisition through the shared resource policy.
 
-Tutorial content distinguishes resource-backed prose from display equations.
+Tutorial content distinguishes resource-backed prose, display equations and the
+Known Object Height illustration. The basic page places the illustration between
+the introduction and steps as an explicit content block. Its transparent 2:1
+Canvas scales uniformly within a centered 400 dp maximum width. One draw-phase
+animation clock runs only while STARTED and is canceled on removal; page/card
+keys restart the sequence on reopening or returning to basic help. Compose system
+duration scaling applies, with a static distance frame when motion is disabled.
+The illustration owns no hardware or measurement state and exposes one localized
+image description without changing announcements.
+
 A small, pure TeX-style notation parser feeds native Compose fraction and
 subscript/superscript layout; this supports authored equations without a WebView,
 network access or rendering dependency. Unsupported/malformed notation falls

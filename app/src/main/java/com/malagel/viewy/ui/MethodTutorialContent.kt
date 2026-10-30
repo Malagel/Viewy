@@ -7,6 +7,7 @@ import com.malagel.viewy.ui.TutorialBlock.Equation
 import com.malagel.viewy.ui.TutorialBlock.Paragraph
 
 internal sealed interface TutorialBlock {
+    data object KnownHeightIllustration : TutorialBlock
     data class Paragraph(@param:StringRes val text: Int) : TutorialBlock
     data class Equation(@param:StringRes val notation: Int, @param:StringRes val spoken: Int) : TutorialBlock
 }
@@ -24,6 +25,7 @@ internal val methodTutorials = mapOf(
         title = R.string.known_height_method,
         basic = listOf(
             TutorialSection(null, listOf(Paragraph(R.string.tutorial_known_height_intro))),
+            TutorialSection(null, listOf(TutorialBlock.KnownHeightIllustration)),
             TutorialSection(R.string.tutorial_steps, listOf(
                 R.string.tutorial_known_height_step_1, R.string.tutorial_known_height_step_2,
                 R.string.tutorial_known_height_step_3,
