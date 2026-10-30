@@ -30,7 +30,7 @@ future validated features; they have no selectable methods.
   Back on Home follows normal Android exit behavior.
 - Selecting Known Object Height fades and subtly moves the entire measurement
   destination into view over 240 ms. Home and Android Back from measurement
-  return directly to the initial mode list with complementary 220 ms motion.
+  return directly to the initial mode list with complementary 280 ms motion.
   Outgoing content is immediately blocked from input and accessibility. Motion
   follows system animation scaling and does not replay on sensor or preference
   updates; recreated destinations appear settled.

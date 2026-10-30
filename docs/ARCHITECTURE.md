@@ -66,7 +66,7 @@ to the mode list rather than retaining the method submenu.
 
 `MeasurementDestinationHost` animates Home and the entire measurement presentation
 with complementary fades and 20 dp vertical movement (240 ms into measurement,
-220 ms returning Home). The key is measurement-destination identity, independent
+280 ms returning Home). The key is measurement-destination identity, independent
 of sensor and preference publications. Compose duration scaling handles reduced
 or disabled motion. Recreated hosts initialize settled. Input guards cover moving
 and outgoing destinations. Hardware eligibility changes synchronously with logical

@@ -154,7 +154,7 @@ internal fun MeasurementDestinationHost(
         modifier = Modifier.fillMaxSize().clipToBounds(),
         transitionSpec = {
             val entering = measurementMotion(initialState, targetState) == MeasurementMotion.ENTER
-            val duration = if (entering) ScreenMotion.enterMillis else 220
+            val duration = if (entering) ScreenMotion.enterMillis else 280
             (fadeIn(tween(duration)) + slideInVertically(tween(duration, easing = FastOutSlowInEasing)) {
                 if (entering) offset else -offset
             }) togetherWith (fadeOut(tween(ScreenMotion.exitMillis)) +
