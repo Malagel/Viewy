@@ -81,9 +81,10 @@
     <string name="tutorial_steadiness">Steadiness is not accuracy</string>
 
     <string name="tutorial_known_height_intro">Find the approximate distance to an object whose height you know.</string>
-    <string name="tutorial_known_height_step_1">1. Enter the height of the distant object, from top to bottom.</string>
-    <string name="tutorial_known_height_step_2">2. Aim the reticle at the top of the object and press the capture button.</string>
-    <string name="tutorial_known_height_step_3">3. Rotating the phone vertically, not moving it, aim at the bottom and capture again.</string>
+    <string name="tutorial_known_height_animation_description">Use the known height of the object. Keep the camera in one position, aim at the top and capture its viewing direction. Rotate the phone downward around the camera and capture the bottom. Viewy uses the height and both directions to estimate the horizontal distance to the vertical axis of the object, not the sloping distance to either endpoint. The object base need not be level with the observer.</string>
+    <string name="tutorial_known_height_step_1">1. First, enter the height of the distant object.</string>
+    <string name="tutorial_known_height_step_2">2. Aim the camera at the top of the object and press the capture button.</string>
+    <string name="tutorial_known_height_step_3">3. Finally, aim at the bottom and press capture again.</string>
 
     <string name="tutorial_known_height_geometry">Think of two right triangles sharing the same horizontal distance d. At elevation θ, an endpoint is d × tan(θ) above the camera. Subtract the bottom offset from the top to get height H:</string>
     <string name="tutorial_known_height_equation">d = \\frac{H}{\\tan(\\theta_{top}) − \\tan(\\theta_{bottom})}</string>

@@ -80,9 +80,12 @@
     <string name="tutorial_camera_timing">Cámara y tiempos</string>
     <string name="tutorial_steadiness">La estabilidad no garantiza exactitud</string>
     <string name="tutorial_known_height_intro">Obtén la distancia aproximada a un objeto cuya altura conoces.</string>
-    <string name="tutorial_known_height_step_1">1. Introduce la altura del objeto lejano, desde el extremo superior hasta el inferior.</string>
-    <string name="tutorial_known_height_step_2">2. Apunta la retícula al extremo superior del objeto y pulsa el botón de captura.</string>
-    <string name="tutorial_known_height_step_3">3. Inclina el teléfono verticalmente, sin desplazarlo, apunta al extremo inferior y vuelve a capturar.</string>
+    <string name="tutorial_known_height_animation_description">Usa la altura conocida del objeto. Mantén la cámara en una posición fija, apunta al extremo superior y registra su dirección. Gira el teléfono hacia abajo alrededor de la cámara y registra el extremo inferior. Viewy usa la altura y ambas direcciones para estimar la distancia horizontal al eje vertical del objeto, no la distancia inclinada a ninguno de los extremos. La base del objeto no tiene que estar al mismo nivel que la persona.</string>
+
+    <string name="tutorial_known_height_step_1">1. Primero, introduce la altura del objeto lejano.</string>
+    <string name="tutorial_known_height_step_2">2. Apunta la cámara a la parte superior del objeto y pulsa el botón de captura.</string>
+    <string name="tutorial_known_height_step_3">3. Finalmente, apunta a la parte inferior y vuelve a capturar.</string>
+    
     <string name="tutorial_known_height_geometry">Imagina dos triángulos rectángulos que comparten la misma distancia horizontal d. Con una elevación θ, un extremo se encuentra d × tan(θ) por encima de la cámara. Resta el desplazamiento inferior del superior para obtener la altura H:</string>
     <string name="tutorial_known_height_equation">d = \\frac{H}{\\tan(\\theta_{top}) − \\tan(\\theta_{bottom})}</string>
     <string name="tutorial_known_height_variables">d — distancia horizontal a la línea vertical del objeto, en metros.\nH — altura vertical conocida entre los extremos, en metros.\nθ (theta) — ángulo de observación sobre el plano horizontal. Los subíndices top y bottom identifican los extremos superior e inferior; los ángulos por debajo de la horizontal son negativos.\ntan — función tangente; el cálculo usa radianes.</string>
