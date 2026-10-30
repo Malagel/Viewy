@@ -26,12 +26,7 @@ internal val methodTutorials = mapOf(
             TutorialSection(null, listOf(Paragraph(R.string.tutorial_known_height_intro))),
             TutorialSection(R.string.tutorial_steps, listOf(
                 R.string.tutorial_known_height_step_1, R.string.tutorial_known_height_step_2,
-                R.string.tutorial_known_height_step_3, R.string.tutorial_known_height_step_4,
-                R.string.tutorial_known_height_step_5,
-            ).map(::Paragraph)),
-            TutorialSection(R.string.tutorial_limits, listOf(
-                R.string.tutorial_known_height_geometry_limits,
-                R.string.tutorial_known_height_accuracy_limits,
+                R.string.tutorial_known_height_step_3,
             ).map(::Paragraph)),
         ),
         details = listOf(
@@ -50,9 +45,7 @@ internal val methodTutorials = mapOf(
             TutorialSection(R.string.tutorial_camera_timing, listOf(
                 R.string.tutorial_known_height_camera, R.string.tutorial_known_height_timing,
             ).map(::Paragraph)),
-            TutorialSection(R.string.tutorial_steadiness, listOf(
-                R.string.tutorial_known_height_steadiness, R.string.tutorial_known_height_accuracy_limits,
-            ).map(::Paragraph)),
+            TutorialSection(R.string.tutorial_steadiness, listOf(Paragraph(R.string.tutorial_known_height_steadiness))),
         ),
     ),
 )

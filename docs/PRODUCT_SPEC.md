@@ -42,7 +42,7 @@ future validated features; they have no selectable methods.
 - Each implemented method has a contextual **?** control immediately left of the
   settings gear. It is absent while no method is active. It opens one
   centered, rounded, scrollable tutorial card over the stationary measurement
-  interface. **Know more** replaces the practical content with a technical
+  interface. **For nerds** replaces the practical content with a technical
   explanation with formatted equations in the same card. **Go back** appears at
   the top left only in the detailed view, opposite **Close**, and restores the
   practical content.
@@ -57,8 +57,8 @@ future validated features; they have no selectable methods.
   Manual help remains available after completion. Tutorial completion is
   independent of fresh-session Home startup and method selection.
 - Known Object Height basic help gives a brief usage procedure and describes the
-  approximate horizontal-distance result. It emphasizes fixed phone position,
-  a vertical target, horizontal alignment and the 15-second capture limit.
+  approximate distance result in three steps: enter the object height, capture
+  the top, then tilt the phone without moving its position and capture the bottom.
   The detailed view explains the geometry with formatted fractions and endpoint
   subscripts, then covers sensor/camera/timing limitations and unquantified
   accuracy. Steadiness is not presented as measurement accuracy.
