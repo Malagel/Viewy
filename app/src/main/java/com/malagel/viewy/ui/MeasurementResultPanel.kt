@@ -1,6 +1,7 @@
 package com.malagel.viewy.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
@@ -44,6 +45,7 @@ internal fun MeasurementResultOverlay(
     entryMemory: ResultEntryMemory,
     interactive: Boolean,
     onEditHeight: () -> Unit,
+    onSurfaceCovered: (KnownHeightResult.Estimate) -> Unit,
 ) {
     val result = measurement.result.takeIf { measurement.stage == MeasurementStage.RESULT }
     val current = result?.let { ResultContent(it, measurement.heightMeters!!) }
@@ -54,6 +56,13 @@ internal fun MeasurementResultOverlay(
         enter = fadeIn(tween(ResultReveal.entranceMillis)),
         exit = fadeOut(tween(225)),
     ) {
+        val latestOnSurfaceCovered by rememberUpdatedState(onSurfaceCovered)
+        LaunchedEffect(current?.let { ResultIdentity(it.estimate) }, transition.currentState, transition.targetState, transition.isRunning) {
+            if (transition.currentState == EnterExitState.Visible &&
+                transition.targetState == EnterExitState.Visible && !transition.isRunning) {
+                current?.let { latestOnSurfaceCovered(it.estimate) }
+            }
+        }
         (current ?: retained)?.let { content ->
             key(ResultIdentity(content.estimate)) {
                 MeasurementResultPanel(content, unit, entryMemory, current != null,
@@ -90,6 +99,7 @@ private fun MeasurementResultPanel(
     val alphaHeight = ResultReveal.supportingAlpha(elapsed.value, 0)
     val alphaSeparation = ResultReveal.supportingAlpha(elapsed.value, 1)
     val alphaDisclaimer = ResultReveal.supportingAlpha(elapsed.value, 2)
+    val alphaDistance = if (ResultReveal.distanceVisible(elapsed.value)) 1f else 0f
 
     Surface(Modifier.fillMaxSize().focusProperties { canFocus = active }
         .then(if (!active) Modifier.clearAndSetSemantics {}.pointerInput(Unit) {
@@ -108,12 +118,14 @@ private fun MeasurementResultPanel(
             ) {
                 Spacer(Modifier.height(0.dp))
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(stringResource(R.string.result_horizontal_distance), style = MaterialTheme.typography.titleMedium,
+                    Text(stringResource(R.string.result_horizontal_distance), Modifier.resultReveal(alphaDistance), style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
                     // Only the final value enters semantics; count-up frames never create announcements.
-                    Box(Modifier.fillMaxWidth().clearAndSetSemantics {
-                        contentDescription = description
-                        liveRegion = LiveRegionMode.Polite
+                    Box(Modifier.fillMaxWidth().graphicsLayer { alpha = alphaDistance }.clearAndSetSemantics {
+                        if (alphaDistance > 0f) {
+                            contentDescription = description
+                            liveRegion = LiveRegionMode.Polite
+                        }
                     }) {
                         ResultDistance(number, formatter.layoutText, formatter.unitLabel)
                     }

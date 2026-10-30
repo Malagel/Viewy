@@ -72,6 +72,39 @@ class MeasurementResourcesTest {
 
     private class Retry(val delay: Long, val action: () -> Unit, var canceled: Boolean = false)
 
+    @Test fun homeRevokesOwnershipImmediatelyAndSameMethodRetainsOnlyCompletedEvidence() {
+        val h = Harness()
+        val active = h.ui
+        val token = h.bind()
+        h.capture(0.5)
+        h.ui = active.copy(selection = active.selection.openModes())
+        h.reconcile() // No animation completion event is necessary for shutdown.
+        assertNull(h.ui.selection.activeMethod)
+        assertNull(h.workflow.state.top)
+        assertNull(h.workflow.state.latest)
+        assertEquals(2.0, h.workflow.state.heightMeters!!, 0.0)
+        assertEquals(1, h.releases.size)
+        assertFalse(h.resources.previewChanged(token, camera))
+        assertNull(h.resources.startPreview { fail("Home bound a camera") })
+        h.ui = active
+        h.bind()
+        assertFalse(h.workflow.state.canCapture)
+        h.capture(0.5)
+        h.capture(0.0)
+        val result = h.workflow.state.result!!
+        h.ui = active.copy(selection = active.selection.openModes())
+        h.reconcile()
+        assertSame(result, h.workflow.state.result)
+        h.ui = active.copy(selection = h.ui.selection.browse(method.mode).activate(method))
+        h.reconcile()
+        assertSame(result, h.workflow.state.result)
+        assertNull(h.resources.startPreview { fail("Retained result restarted acquisition") })
+        h.workflow.restart()
+        h.bind()
+        assertNull(h.workflow.state.result)
+        assertEquals(2.0, h.workflow.state.heightMeters!!, 0.0)
+    }
+
     @Test fun zoomUsesCurrentOwnerLocksAfterTopAndUnlocksAfterRestartOrInvalidation() {
         val h = Harness()
         h.reconcile()
@@ -125,7 +158,7 @@ class MeasurementResourcesTest {
             base.copy(selection = base.selection.openModes()),
             base.copy(tutorial = TutorialState(card = TutorialCard(1, method))),
             base.copy(tutorial = TutorialState(pendingMethod = method)),
-            base.copy(tutorial = TutorialState(selectorExiting = true)),
+            base.copy(tutorial = TutorialState(methodEntering = true)),
         )
         repeat(3) {
             for (overlay in overlays) {

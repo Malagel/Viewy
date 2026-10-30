@@ -4,26 +4,23 @@ import com.malagel.viewy.domain.MeasurementMethod
 import com.malagel.viewy.domain.MeasurementMode
 
 sealed interface SelectionDestination {
-    data object Closed : SelectionDestination
-    data object Modes : SelectionDestination
+    data object Home : SelectionDestination
     data class Methods(val mode: MeasurementMode) : SelectionDestination
+    data class Measurement(val method: MeasurementMethod) : SelectionDestination
 }
 
-/** In-memory navigation only. A new ViewModel starts inactive, regardless of legacy preferences. */
-data class MeasurementSelection(
-    val activeMethod: MeasurementMethod? = null,
-    val destination: SelectionDestination = SelectionDestination.Modes,
-) {
-    val isOpen: Boolean get() = destination != SelectionDestination.Closed
+/** In-memory destinations; workflow ownership survives returning Home separately. */
+data class MeasurementSelection(val destination: SelectionDestination = SelectionDestination.Home) {
+    val activeMethod: MeasurementMethod? get() = (destination as? SelectionDestination.Measurement)?.method
+    val isOpen: Boolean get() = activeMethod == null
     val browsingMode: MeasurementMode? get() = (destination as? SelectionDestination.Methods)?.mode
 
-    fun openModes() = copy(destination = SelectionDestination.Modes)
-    fun dismiss() = copy(destination = SelectionDestination.Closed)
-    fun back() = if (destination is SelectionDestination.Methods) openModes() else dismiss()
-    fun browse(mode: MeasurementMode) = if (destination == SelectionDestination.Modes && mode.available) {
+    fun openModes() = copy(destination = SelectionDestination.Home)
+    fun back() = openModes()
+    fun browse(mode: MeasurementMode) = if (destination == SelectionDestination.Home && mode.available) {
         copy(destination = SelectionDestination.Methods(mode))
     } else this
-    fun activate(method: MeasurementMethod) = if (browsingMode == method.mode) {
-        copy(activeMethod = method, destination = SelectionDestination.Closed)
+    fun activate(method: MeasurementMethod) = if (browsingMode == method.mode && method in method.mode.methods) {
+        copy(destination = SelectionDestination.Measurement(method))
     } else this
 }

@@ -19,14 +19,15 @@ internal class ResultEntryMemory(initialResult: KnownHeightResult.Estimate?) {
     }
 }
 
-/** One frame-driven timeline: counter, height, separation, disclaimer, without overlapping reveals. */
+/** One frame-driven timeline: surface, counter, height, separation, disclaimer. */
 internal object ResultReveal {
-    const val entranceMillis = 215
+    const val entranceMillis = 450
     const val countMillis = 750
     const val fadeMillis = 180
-    const val totalMillis = countMillis + 3 * fadeMillis
+    const val totalMillis = entranceMillis + countMillis + 3 * fadeMillis
 
-    fun countFraction(elapsed: Float): Float = (elapsed / countMillis).coerceIn(0f, 1f)
+    fun distanceVisible(elapsed: Float): Boolean = elapsed >= entranceMillis
+    fun countFraction(elapsed: Float): Float = ((elapsed - entranceMillis) / countMillis).coerceIn(0f, 1f)
     fun supportingAlpha(elapsed: Float, index: Int): Float =
-        ((elapsed - countMillis - index * fadeMillis) / fadeMillis).coerceIn(0f, 1f)
+        ((elapsed - entranceMillis - countMillis - index * fadeMillis) / fadeMillis).coerceIn(0f, 1f)
 }

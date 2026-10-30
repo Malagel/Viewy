@@ -29,7 +29,7 @@ class LocalTutorialSeenStoreTest {
         fun activate(coordinator: TutorialCoordinator) {
             coordinator.selectionChanged(browsing)
             coordinator.selectionChanged(browsing.activate(method), method)
-            coordinator.selectorHidden(coordinator.state.navigationToken)
+            coordinator.methodEntered(coordinator.state.navigationToken)
         }
         val first = TutorialCoordinator(LocalTutorialSeenStore(file.preferences), setOf(method))
         activate(first)

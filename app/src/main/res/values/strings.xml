@@ -13,7 +13,6 @@
     <string name="restart_measurement">Restart</string>
     <string name="capture_top">Capture top</string>
     <string name="capture_bottom">Capture bottom</string>
-    <string name="mode">Mode</string>
     <string name="long_distance">Long Distance</string>
     <string name="object_height">Object height</string>
     <string name="height_instructions">Enter the vertical distance between the two endpoints. Saving starts a new measurement.</string>
@@ -246,4 +245,5 @@
     <string name="zoom_in">Zoom in</string>
     <string name="zoom_out">Zoom out</string>
     <string name="zoom_ratio">Zoom %1$s</string>
+    <string name="home">Home</string>
 </resources>

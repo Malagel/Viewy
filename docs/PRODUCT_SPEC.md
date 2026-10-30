@@ -16,21 +16,29 @@ future validated features; they have no selectable methods.
 
 ## Implemented behavior
 
-- Each fresh application session starts with no active method and automatically
-  opens a Material 3 bottom sheet listing modes with short descriptions. Dismissing
-  it leaves only the dark Viewy background, header and Mode launcher; there is no
-  height entry, viewfinder placeholder, permission request or hardware acquisition.
-  Legacy saved method IDs are ignored. Activity recreation and returning from the
-  background retain the in-memory selection; process death starts inactive again.
-- Tapping Long Distance slides the mode list left and its method list in from the
-  right. Back returns to modes with the opposite transition; Back from modes or
-  an outside tap dismisses the sheet. Every reopening begins at modes. Entries
-  work by tapping and scroll when needed. There is no pager.
-- Selecting Known Object Height closes the sheet and shows its existing workflow.
-  Browsing suspends acquisition and invalidates any incomplete endpoint pair.
-  Dismissing or reselecting preserves the entered height and completed result. The measurement
-  surface stays stationary, blurs gradually on Android 12+ and dims while the
-  sheet opens; older versions use dimming. The sheet stays sharp.
+- Each fresh application session opens Home with Viewy's wordmark and Settings,
+  without an active method, camera preview, capture controls, permission prompt or
+  acquisition. A centered surface-container card with 28 dp corners and a maximum
+  width of 480 dp lists modes and descriptions; its contents scroll in constrained
+  windows. Unavailable modes remain disabled and labeled **Coming soon**.
+  Temporary interaction locks during navigation or Settings preserve the card's
+  normal colors; only unavailable modes use dimmed text.
+  Legacy saved method IDs are ignored. Activity recreation retains in-memory
+  navigation; process death starts at Home again.
+- Long Distance slides the card contents left to reveal Known Object Height and
+  its description. Card Back and Android Back reverse the 220 ms slide to modes.
+  Back on Home follows normal Android exit behavior.
+- Selecting Known Object Height fades and subtly moves the entire measurement
+  destination into view over 240 ms. Home and Android Back from measurement
+  return directly to the initial mode list with complementary 220 ms motion.
+  Outgoing content is immediately blocked from input and accessibility. Motion
+  follows system animation scaling and does not replay on sensor or preference
+  updates; recreated destinations appear settled.
+- Returning Home immediately releases camera and orientation ownership and
+  discards unfinished endpoint pairs, independently of animation completion.
+  Configured height and completed results survive within the session; entering
+  the same method displays its retained result without restarting acquisition.
+  A different method cannot inherit captures or results.
 - Each implemented method has a contextual **?** control immediately left of the
   settings gear. It is absent while no method is active. It opens one
   centered, rounded, scrollable tutorial card over the stationary measurement
@@ -43,27 +51,26 @@ future validated features; they have no selectable methods.
   content. Help suspends camera and orientation acquisition. Entered height and completed
   results remain available; an incomplete endpoint pair is discarded.
 - The first activation of each method automatically opens its tutorial after the
-  selector has finished closing. Only tutorial dismissal records completion,
+  measurement entrance has completed. Only tutorial dismissal records completion,
   locally by stable method ID across launches and process death. Termination
   before dismissal leaves first-use help eligible on the next activation.
   Manual help remains available after completion. Tutorial completion is
-  independent of fresh-session inactive startup and method selection.
+  independent of fresh-session Home startup and method selection.
 - Known Object Height basic help gives a brief usage procedure and describes the
   approximate horizontal-distance result. It emphasizes fixed phone position,
   a vertical target, horizontal alignment and the 15-second capture limit.
   The detailed view explains the geometry with formatted fractions and endpoint
   subscripts, then covers sensor/camera/timing limitations and unquantified
   accuracy. Steadiness is not presented as measurement accuracy.
-- The circular bottom-right Mode launcher uses an upward chevron and stays in
-  place while the sheet opens and closes. The modal sheet blocks interaction
-  with the background launcher while open.
+- The circular bottom-right **Home** control uses a house icon and returns to
+  the initial Home card. Restart and Capture retain their existing behavior.
 - A circular Settings control with a standard rounded gear sits at top right,
   using a slightly richer purple than the other tonal controls.
   It opens full-screen dark Material 3 settings with or without an active method.
   Settings provides global Metric/Imperial units, language selection and a separate
   Developer Options destination. Changes save automatically. Back from a child
-  destination returns to Settings; Back from Settings restores the measurement
-  surface. Modal settings, help and mode selection cannot be operated together.
+  destination returns to Settings; Back from Settings restores the underlying
+  Home or measurement destination. Covered navigation and help cannot be operated through Settings.
   Settings and diagnostics enter and leave with a short fade and subtle vertical
   motion over the stationary measurement surface. Settings child destinations,
   including Language and Developer Options, use horizontal fade/slide transitions
@@ -106,11 +113,11 @@ future validated features; they have no selectable methods.
   preferences/tutorial removal and app closure. Cancel changes nothing. Android
   performs the full storage clear and permission revocation without uninstalling.
   A rejected/failed request shows an error; an accepted request is not reported as
-  completed and does not relaunch the app. Manual reopening starts inactive with
-  mode selection, Metric, diagnostics off, device language and first-use help eligible.
+  completed and does not relaunch the app. Manual reopening starts at Home with
+  Metric, diagnostics off, device language and first-use help eligible.
 - Restart is a circular
-  arrow control matching Mode on the left of capture; the control row is raised
-  above the navigation inset for easier thumb access. Restart and Mode sit
+  arrow control matching Home on the left of capture; the control row is raised
+  above the navigation inset for easier thumb access. Restart and Home sit
   symmetrically closer to the large, solid shutter-style Capture button.
 - After method selection, until a positive finite height is saved, a tonal rounded
   rectangle offers
@@ -171,8 +178,8 @@ future validated features; they have no selectable methods.
   stay quiet; actual sensor discovery/registration failures retain recovery.
   Zoom controls, the ratio label and the preview-edge height editor fade with
   preview suspension and streaming recovery, including Settings, mode selection
-  and focus loss. Their 225 ms fades are slightly longer than the camera's 165 ms
-  fade; outgoing controls stop accepting input immediately. Height editing remains
+  and focus loss. Camera and controls share 225 ms fade-ins and fade-outs;
+  outgoing controls stop accepting input immediately. Height editing remains
   available through the result’s object-height row after completion and through
   the preview-edge editor on actionable recovery screens.
 - Top capture followed by bottom capture within 15 s. **Aim at the top** and
@@ -216,10 +223,12 @@ future validated features; they have no selectable methods.
   completion it stays blank with the same reserved height. Reversed, insufficiently
   separated, misaligned or unusable observations require correction.
 - Successful completion immediately releases camera/orientation acquisition and
-  replaces all camera imagery, controls and guidance with a clean results surface
-  inside the same rounded container, preserving its size and position. A large
+  replaces camera controls and guidance with a clean results surface inside the
+  same rounded container, preserving its size and position. The new color fades
+  directly over the last available preview image instead of an intermediate black
+  frame; the retained image is discarded when covered. A large
   **Horizontal distance** value with an ≈ marker counts up from zero over about
-  750 ms with smooth deceleration while the surface fades in over 215 ms,
+  750 ms with smooth deceleration after the surface finishes its 450 ms fade-in,
   followed by three sequential 180 ms fades after counting finishes:
   editable object height, captured elevation difference in degrees, then a short
   approximation disclaimer near the bottom. This is horizontal distance to the

@@ -11,7 +11,7 @@ viewfinder dialogs preserve readable content; the latter keeps capture/navigatio
 fixed while details scroll. Stage instructions span the preview width and are
 centered before completion; completed results occupy the rounded preview container. The stage area reserves the larger measured
 height of the top/bottom captions even when empty, accounting for font size and
-wrapping without adding hidden text or changing the weighted preview's size. Restart and Mode share a circular action component in a centered,
+wrapping without adding hidden text or changing the weighted preview's size. Restart and Home share a circular action component in a centered,
 bounded-width control row around the solid shutter disc. A spacious header and
 bundled Nunito Bold wordmark reserve more room above the flexible preview. The
 control row reserves space above the navigation inset. The manifest requests
@@ -55,16 +55,21 @@ once after the dialog gains focus, without reopening a deliberately dismissed
 keyboard during sensor-state recompositions. Actual Activity/window destruction
 can still dispose a dialog immediately; pending animation work is cancelled.
 
-Selection uses one Material 3 modal bottom sheet above the existing measurement
-surface, including the exceptional workspace dialog. Sheet offset drives Compose
-blur in place; Material's animated scrim dims the background, including below API
-31 where blur is unsupported. Measurement bounds remain intact while selection
-suspends camera and sensor sessions, including during sheet exit. A fixed, window-bounded sheet content area keeps the outer panel
-stationary while mode/method lists slide horizontally; each list scrolls for
-large text and compact windows. The sheet owns system insets and its Back handler:
-methods return to modes, modes dismiss, and outside taps dismiss at either level.
-The launcher remains composed in place throughout sheet opening and closing;
-the modal window blocks interaction with the background launcher while open.
+`HomeScreen` presents the existing header without contextual Help and a centered,
+480 dp maximum-width, 28 dp rounded selection card. The card has stable bounded
+height and independently scrollable mode/method lists. Destination-keyed Compose
+`AnimatedContent` slides forward left and backward right over 220 ms. Moving and
+outgoing lists cannot receive input; repeated Back is consumed during motion.
+
+`MeasurementDestinationHost` animates Home and the entire measurement presentation
+with complementary fades and 20 dp vertical movement (240 ms into measurement,
+220 ms returning Home). The key is measurement-destination identity, independent
+of sensor and preference publications. Compose duration scaling handles reduced
+or disabled motion. Recreated hosts initialize settled. Input guards cover moving
+and outgoing destinations. Hardware eligibility changes synchronously with logical
+navigation, never with retained animation content. An open exceptional workspace
+shares the destination transition in its own window, with a matching inaccessible
+Activity backdrop; returning Home completes before that workspace window is removed.
 
 Method help uses one centered edge-to-edge Compose Dialog with a bounded-width,
 fixed-height Material 3 card constrained by system bars, cutouts and available
@@ -86,14 +91,14 @@ horizontally in constrained widths, within the vertically scrollable page.
 
 A pure `TutorialCoordinator`, owned by the ViewModel, retains pending requests,
 card identity and basic/detailed page across Activity recreation. A navigation
-token rejects obsolete sheet callbacks; card IDs reject obsolete page/dismissal
-callbacks. Selection schedules eligible first-use help, then the selector hides
-its sheet and removes its modal window. A post-composition acknowledgement is
-sent only with a closed selection and unmounted sheet. Only a matching token may
-present the pending tutorial or clear the selector-exit acquisition gate. A recreated closed selector can acknowledge without
-animating a nonexistent sheet; repeated acknowledgements cannot duplicate or
-reopen a card. Navigation cancels pending/visible help without marking it seen.
-No timer coordinates the overlays.
+token rejects obsolete entrance callbacks; card IDs reject obsolete page/dismissal
+callbacks. Activation schedules eligible first-use help and sets a method-entry
+acquisition gate. The host acknowledges the token only when its actual destination
+transition is settled at Measurement. Only a matching active destination may clear
+the gate and show pending help. A recreated measurement destination acknowledges
+its settled state without replaying entrance. Repeated acknowledgements cannot
+duplicate or reopen a card. Navigation cancels pending/visible help without marking
+it seen. No timer coordinates navigation and tutorials.
 
 `LocalTutorialSeenStore` uses the dedicated app-private `method_tutorials`
 SharedPreferences file with boolean `seen.<stable method ID>` keys. Dismissal
@@ -116,8 +121,9 @@ Source paths below are relative to `app/src/main/java/com/malagel/viewy/`:
 | `ui/MeasurementResources.kt`, `orientation/OrientationRegistration.kt` | Shared resource reconciliation, synchronous preview release and sensor registration ownership. |
 | `camera/PreviewSession.kt` | Ownership tokens reject callbacks/disposal from obsolete previews and clear readiness on release. |
 | `measurement/HeightInput.kt` | Decimal validation and meters/feet conversion without presentation rounding. |
-| `measurement/MeasurementSelection.kt` | Pure selection transitions, active method and independent mode/method browsing state. |
-| `ui/MeasurementSelection.kt` | Chevron launcher and reusable animated bottom sheet with scrollable mode/method entries, disabled modes and independent navigation transitions. |
+| `measurement/MeasurementSelection.kt` | Pure Home/Methods/Measurement destination transitions and derived active method. |
+| `ui/HomeScreen.kt` | Home header, centered selection card and shared Home control. |
+| `ui/MeasurementSelection.kt` | Reusable animated card lists with scrollable entries, disabled modes and input gates. |
 | `tutorial/TutorialCoordinator.kt` | Pure help coordination, navigation/card callback identity and temporary presentation state; no measurement or hardware access. |
 | `tutorial/LocalTutorialSeenStore.kt` | Small local completion store keyed by stable method ID. |
 | `ui/MethodTutorialContent.kt` and `ui/MethodTutorialDialog.kt` | Resource-based prose/equation blocks and reusable single-card presentation with basic/detailed pages. |
@@ -306,9 +312,9 @@ Method hardware requirements, acquisition eligibility and completed measurement
 state are separate contracts. `MeasurementUiState.acquisitionEligible` requires
 an active camera method, saved height, permission, resumed Activity, a visible and
 focused viewfinder window, no completed result, and no covering navigation/editor.
-Settings/diagnostics remain covering through exit animation; selection remains
-covering until the tutorial coordinator accepts its tokened sheet-removal
-acknowledgement. Pending first-use help also blocks startup. Height editing and
+Settings/diagnostics remain covering through exit animation; method entry remains
+covered until the tutorial coordinator accepts its tokened entrance-completion
+acknowledgement. Home and Methods have no active hardware method. Pending first-use help also blocks startup. Height editing and
 status dialogs suspend acquisition; a collapsed exceptional workspace is inactive.
 The actual workspace window supplies focus, so an open exceptional dialog can
 acquire even though its Activity window has lost focus.
@@ -401,10 +407,10 @@ display listeners and watchdog callbacks and unbinds only the owned Preview.
 Orientation stop unregisters its listener and removes the freshness timer.
 
 A visible intentional suspension can copy one transient PreviewView bitmap, close
-the camera immediately, and fade that decorative image over 165 ms. No image is
+the camera immediately, and fade that decorative image over 225 ms. No image is
 stored or exposed to accessibility. Failure to obtain the bitmap skips the fade;
 backgrounding/disposal does not wait for it. The live preview fades in only after
-OPEN plus STREAMING, also over 165 ms. Presentation never extends a hardware session for an animation.
+OPEN plus STREAMING, over 225 ms. Presentation never extends a hardware session for an animation.
 
 `MeasurementUiState.previewVisible` supplies the same eligible-and-ready target
 for the live camera and zoom controls. The preview-edge height editor shares that
@@ -417,8 +423,7 @@ ellipsized single-line number and separate unit when constrained; accessibility
 retains the complete formatted height/edit description. This does not change
 height storage or editable input. Common viewfinder interaction
 gates hide both controls for overlays, height editing, focus loss and inactivity.
-The controls use fade-only Compose transitions over 225 ms in either direction,
-slightly longer than the preview. Outgoing zoom retains its last visible ratio and
+The controls and preview share one 225 ms duration for both fade-in and fade-out. Outgoing zoom retains its last visible ratio and
 button appearance until exit completes, even when camera snapshots reset.
 Transitioning controls exclude touch, focus and accessibility immediately and
 become interactive after entry settles. Interrupted fades reverse in place;
@@ -427,14 +432,16 @@ changes binding keys, zoom/capture state or alignment. Completion removes these
 controls immediately rather than retaining their outgoing camera visuals.
 
 Selection is held in the ViewModel separately from the workflow.
-`MeasurementSelection` permits a null active method and typed Closed/Modes/Methods
-destinations. A new ViewModel starts inactive at Modes; legacy persisted selection
-is ignored. Tutorial completion is stored separately and cannot activate a method.
-Activity recreation and background return retain navigation, height and completed
-results in memory; process death starts inactive. Browsing or reselecting the same
-method retains height/results while interrupting incomplete pairs. A different
-method explicitly restarts the workflow and revokes prior resource ownership.
-Unavailable modes have no activation path.
+`MeasurementSelection` has typed Home/Methods/Measurement destinations, with an
+active method derived only from Measurement. A new ViewModel starts at Home;
+legacy persisted selection is ignored. Tutorial completion cannot activate a method.
+Activity recreation retains navigation, height and completed results in memory;
+process death starts at Home. The ViewModel separately tracks the workflow's owning
+method, so Home clears the active destination without losing completed evidence.
+Returning Home invalidates incomplete pairs immediately via resource reconciliation.
+Reselecting the owner preserves height/results; selecting a different method restarts
+the workflow and revokes prior hardware ownership. Unavailable modes have no
+activation path.
 
 Known Object Height requires a positive finite saved height before offering camera
 permission recovery. Orientation additionally requires the method's orientation
@@ -452,9 +459,12 @@ that estimate and its saved height through a 225 ms fade on Restart or height sa
 The existing LivePreview remains the only PreviewView/binding owner, outside the
 animated result subtree. Workflow reset and acquisition reconciliation run
 immediately; result exit never gates startup. Live imagery is rendered only for
-eligible OPEN plus STREAMING readiness, and completion hides both live and frozen
-imagery immediately without requesting a suspension bitmap. Existing suspension
-snapshot and recovery fades are preserved.
+eligible OPEN plus STREAMING readiness. Completion retains a best-effort last-frame
+bitmap beneath the incoming result color, while releasing hardware immediately.
+The actual result entrance transition discards that bitmap once opaque; result
+identity checks also discard it on replacement or Restart. It is presentation-only,
+never persisted and never used for measurement. Existing suspension snapshots
+and recovery fades are preserved.
 
 `ResultEntryMemory` is local to the screen host and compares estimate references;
 ordinary publications, units, locale and overlay navigation cannot claim a second
@@ -462,10 +472,10 @@ entry. Composition keys use the same reference identity, so a new equal-valued
 estimate replaces even an unfinished exit at long system animation scales. It initializes with an existing estimate as already presented, including
 Activity recreation, and retains consumed identity across exceptional-workspace
 remounts. No animation state enters the workflow or process-death persistence.
-The result surface enters with a 215 ms fade (50 ms longer than the camera fade);
+The result surface enters with a 450 ms fade before the distance appears;
 restored visible results appear directly. One Compose Animatable drives a linear
-1290 ms timeline: the first 750 ms use a
-clamped ease-out counter fraction, then height, separation and disclaimer each
+1740 ms timeline: the first 450 ms allow the surface to fill, followed by a
+750 ms clamped ease-out counter fraction, then height, separation and disclaimer each
 fade over 180 ms. Leaving RESULT cancels entry; disposal cancels all remaining
 work. Compose duration scaling reaches the final timeline directly when disabled.
 Hidden rows reserve layout space but have no accessibility targets; the counter
@@ -604,8 +614,8 @@ exceptional workspace also keeps a matching Settings backdrop in the Activity,
 without duplicate accessibility, Back handling or reset dialogs, to cover the
 workspace window's teardown/reattachment. The underlying measurement composition
 and lifecycle owner stay mounted while acquisition is suspended. Covered controls are excluded from touch, focus and accessibility;
-settings opening is gated while selection or pending/visible tutorial help owns
-interaction. Language selection applies the Android locale without navigating,
+Settings opens from Home, Methods or Measurement; pending/visible tutorial help
+blocks opening and moving destinations cannot receive input. Language selection applies the Android locale without navigating,
 including when the selected override has the same effective language as the device.
 Back from either child returns to main settings, then closes settings.
 No settings navigation or measurement session is restored after process death.

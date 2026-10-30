@@ -43,7 +43,7 @@ class DiagnosticsPresentationTest {
         val card = TutorialCard(1, method)
         for (state in listOf(ready.copy(selection = selected.openModes()),
             ready.copy(tutorial = TutorialState(card = card)), ready.copy(tutorial = TutorialState(pendingMethod = method)),
-            ready.copy(selection = MeasurementSelection().dismiss()), ready.withDiagnostics(true, true))) {
+            ready.copy(selection = MeasurementSelection().openModes()), ready.withDiagnostics(true, true))) {
             for (long in listOf(false, true)) assertEquals(HelpAction.NONE, helpAction(state, long, true))
             assertSame(state, state.withDiagnostics(true, true))
         }
@@ -93,7 +93,7 @@ class DiagnosticsPresentationTest {
         coordinator.selectionChanged(selected, method)
         val pending = ready.copy(tutorial = coordinator.state)
         assertSame(pending, pending.withDiagnostics(true, true))
-        coordinator.selectorHidden(coordinator.state.navigationToken)
+        coordinator.methodEntered(coordinator.state.navigationToken)
         val first = coordinator.state.card!!
         assertEquals(TutorialPage.BASIC, first.page)
         assertFalse(marked)

@@ -7,8 +7,10 @@ two aiming directions. Application ID: `com.malagel.viewy`.
 
 ## Basic usage
 
-1. Viewy opens mode selection with no active measurement. Tap **Long Distance**,
-   then **Known Object Height**. Use the chevron **Mode** button to reopen selection.
+1. Viewy opens Home with no active measurement. Tap **Long Distance**,
+   then **Known Object Height**. Use **Home** or Android Back to return to all modes.
+   Mode/method lists slide inside the card; measurement enters and leaves with a
+   short fade and vertical motion.
    On first activation, read and dismiss the method tutorial. The **?** button
    beside the settings gear reopens it; **Know more** explains the geometry and
    limitations. Tap **Enter object height** and save the vertical distance
@@ -40,7 +42,7 @@ outside another modal. Tap **Measurement units** to switch Metric/Imperial, or
 **Language** to select **English**, **Español**, or **Use device language** (default).
 Changes save automatically. Settings, diagnostics, tutorials, selection and height
 editing suspend camera/sensor work and discard incomplete endpoint pairs. Entered
-height and completed results remain available, including after backgrounding.
+height and completed results remain available, including after Home navigation or backgrounding.
 Language and unit changes update the current screen in place. **Developer Options** contains
 a persistent **Enable diagnostics** preference (off by default) and **Erase all app data**.
 When enabled, hold **?** to open read-only method diagnostics; a normal tap always

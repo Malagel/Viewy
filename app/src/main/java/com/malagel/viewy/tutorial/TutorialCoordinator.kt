@@ -15,7 +15,7 @@ data class TutorialCard(val id: Long, val method: MeasurementMethod, val page: T
 
 data class TutorialState(
     val navigationToken: Long = 0,
-    val selectorExiting: Boolean = false,
+    val methodEntering: Boolean = false,
     val pendingMethod: MeasurementMethod? = null,
     val card: TutorialCard? = null,
 )
@@ -28,7 +28,7 @@ class TutorialCoordinator(
     var state = TutorialState()
         private set
     private var selection = MeasurementSelection()
-    private var hiddenToken: Long? = null
+    private var enteredToken: Long? = null
     private var nextCardId = 0L
 
     fun selectionChanged(next: MeasurementSelection, activated: MeasurementMethod? = null) {
@@ -36,26 +36,26 @@ class TutorialCoordinator(
         val validActivation = activated != null && selection.browsingMode == activated.mode &&
             next == selection.activate(activated)
         selection = next
-        hiddenToken = null
+        enteredToken = null
         // Navigation cancels a pending/visible tutorial without recording a dismissal.
-        state = TutorialState(navigationToken = state.navigationToken + 1, selectorExiting = !next.isOpen)
+        state = TutorialState(navigationToken = state.navigationToken + 1, methodEntering = next.activeMethod != null)
         if (validActivation && activated in supportedMethods && !seen.hasSeen(activated.id)) {
             state = state.copy(pendingMethod = activated)
         }
     }
 
-    /** Called only after the selector's modal window has left composition. */
-    fun selectorHidden(token: Long) {
+    /** Acknowledged only when the measurement destination has settled (also after recreation). */
+    fun methodEntered(token: Long) {
         if (token != state.navigationToken || selection.isOpen) return
-        hiddenToken = token
-        state = state.copy(selectorExiting = false)
+        enteredToken = token
+        state = state.copy(methodEntering = false)
         state.pendingMethod?.takeIf { it == selection.activeMethod }?.let(::show)
     }
 
     fun openManually() {
         val method = selection.activeMethod ?: return
         if (selection.isOpen || method !in supportedMethods || state.card != null) return
-        if (hiddenToken == state.navigationToken) show(method)
+        if (enteredToken == state.navigationToken) show(method)
         else state = state.copy(pendingMethod = method)
     }
 

@@ -23,7 +23,7 @@ class TutorialCoordinatorTest {
         navigate(selection.activate(method), activated = method)
     }
 
-    private fun hidden() = coordinator.selectorHidden(coordinator.state.navigationToken)
+    private fun hidden() = coordinator.methodEntered(coordinator.state.navigationToken)
 
     @Test fun inactiveStartupAndBrowsingNeverPresentTutorialsOrWriteCompletion() {
         coordinator.openManually()
@@ -31,14 +31,14 @@ class TutorialCoordinatorTest {
         navigate(selection.browse(method.mode))
         navigate(selection.back())
         navigate(selection.browse(MeasurementMode.CALIBRATION))
-        navigate(selection.dismiss())
+        navigate(selection.openModes())
         hidden()
         assertNull(coordinator.state.card)
         assertNull(coordinator.state.pendingMethod)
         assertTrue(seen.ids.isEmpty())
     }
 
-    @Test fun firstActivationWaitsForActualSheetRemovalAndDismissalRecordsStableId() {
+    @Test fun firstActivationWaitsForActualMethodEntranceAndDismissalRecordsStableId() {
         activate()
         assertEquals(method, coordinator.state.pendingMethod)
         assertNull(coordinator.state.card)
@@ -91,22 +91,22 @@ class TutorialCoordinatorTest {
         assertNull(coordinator.state.card)
     }
 
-    @Test fun rapidNavigationCancelsPendingHelpAndRejectsObsoleteSheetCallbacks() {
+    @Test fun rapidNavigationCancelsPendingHelpAndRejectsObsoleteEntranceCallbacks() {
         activate()
         val oldToken = coordinator.state.navigationToken
         navigate(selection.openModes())
-        coordinator.selectorHidden(oldToken)
+        coordinator.methodEntered(oldToken)
         assertNull(coordinator.state.card)
-        navigate(selection.dismiss())
-        assertTrue(coordinator.state.selectorExiting)
-        coordinator.selectorHidden(oldToken)
-        assertTrue(coordinator.state.selectorExiting)
+        navigate(selection.openModes())
+        assertFalse(coordinator.state.methodEntering)
+        coordinator.methodEntered(oldToken)
+        assertFalse(coordinator.state.methodEntering)
         hidden()
-        assertFalse(coordinator.state.selectorExiting)
+        assertFalse(coordinator.state.methodEntering)
         assertNull(coordinator.state.card) // Browsing dismissal must not reopen help.
         assertTrue(seen.ids.isEmpty())
         activate()
-        coordinator.selectorHidden(oldToken)
+        coordinator.methodEntered(oldToken)
         assertNull(coordinator.state.card)
         hidden()
         assertNotNull(coordinator.state.card)
@@ -128,24 +128,24 @@ class TutorialCoordinatorTest {
         assertTrue(seen.ids.isEmpty())
     }
 
-    @Test fun retainedCoordinatorAcceptsRecreatedClosedSelectorOnceAndKeepsCardPage() {
+    @Test fun retainedCoordinatorAcceptsRecreatedMeasurementDestinationOnceAndKeepsCardPage() {
         activate()
         // An Activity recreated during exit starts with a closed selector and acknowledges it.
         val token = coordinator.state.navigationToken
-        coordinator.selectorHidden(token)
+        coordinator.methodEntered(token)
         val id = coordinator.state.card!!.id
         coordinator.changePage(id, TutorialPage.DETAILS)
         val retained = coordinator.state
-        repeat(2) { coordinator.selectorHidden(token) }
+        repeat(2) { coordinator.methodEntered(token) }
         assertEquals(retained, coordinator.state)
         assertEquals(TutorialPage.DETAILS, coordinator.state.card!!.page)
         assertTrue(seen.ids.isEmpty())
         coordinator.dismiss(id)
-        coordinator.selectorHidden(token)
+        coordinator.methodEntered(token)
         assertNull(coordinator.state.card)
     }
 
-    @Test fun recreationWhileSelectorOpenCannotAcknowledgeItAsHidden() {
+    @Test fun recreationWhileHomeVisibleCannotAcknowledgeItAsHidden() {
         activate()
         navigate(selection.openModes())
         hidden()
@@ -167,12 +167,12 @@ class TutorialCoordinatorTest {
         fresh.selectionChanged(browsing)
         fresh.selectionChanged(browsing.activate(method), method)
         assertNull(fresh.state.card)
-        fresh.selectorHidden(fresh.state.navigationToken)
+        fresh.methodEntered(fresh.state.navigationToken)
         assertEquals(TutorialPage.BASIC, fresh.state.card!!.page)
         assertTrue(seen.ids.isEmpty())
     }
 
-    @Test fun manualRequestDuringSheetExitWaitsAndUnsupportedMethodsHaveNoTutorial() {
+    @Test fun manualRequestDuringMethodEntryWaitsAndUnsupportedMethodsHaveNoTutorial() {
         seen.markSeen(method.id)
         activate()
         coordinator.openManually()
@@ -183,7 +183,7 @@ class TutorialCoordinatorTest {
         val browsing = MeasurementSelection().browse(method.mode)
         unsupported.selectionChanged(browsing)
         unsupported.selectionChanged(browsing.activate(method), method)
-        unsupported.selectorHidden(unsupported.state.navigationToken)
+        unsupported.methodEntered(unsupported.state.navigationToken)
         unsupported.openManually()
         assertNull(unsupported.state.card)
     }

@@ -13,7 +13,6 @@
     <string name="restart_measurement">Reiniciar</string>
     <string name="capture_top">Capturar extremo superior</string>
     <string name="capture_bottom">Capturar extremo inferior</string>
-    <string name="mode">Modo</string>
     <string name="long_distance">Larga distancia</string>
     <string name="object_height">Altura del objeto</string>
     <string name="height_instructions">Introduce la distancia vertical entre los dos extremos. Guardar inicia una nueva medición.</string>
@@ -244,4 +243,5 @@
     <string name="zoom_in">Acercar</string>
     <string name="zoom_out">Alejar</string>
     <string name="zoom_ratio">Zoom %1$s</string>
+    <string name="home">Inicio</string>
 </resources>

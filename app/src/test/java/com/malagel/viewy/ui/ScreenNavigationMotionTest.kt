@@ -7,6 +7,13 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ScreenNavigationMotionTest {
+    @Test fun measurementNavigationUsesComplementaryDirectionsOnlyOnDestinationChanges() {
+        assertEquals(MeasurementMotion.ENTER, measurementMotion(false, true))
+        assertEquals(MeasurementMotion.RETURN_HOME, measurementMotion(true, false))
+        assertEquals(MeasurementMotion.NONE, measurementMotion(true, true))
+        assertEquals(MeasurementMotion.NONE, measurementMotion(false, false))
+    }
+
     @Test fun inactiveMeasurementIsInteractiveAndDoesNotRetainAnOldOverlay() {
         val presentation = overlayPresentation(ScreenOverlay.NONE, ScreenOverlay.NONE, false, ScreenOverlay.SETTINGS)
         assertEquals(ScreenOverlay.NONE, presentation.displayed)

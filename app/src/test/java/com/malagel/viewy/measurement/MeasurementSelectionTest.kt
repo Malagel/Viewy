@@ -9,11 +9,11 @@ class MeasurementSelectionTest {
     private val method = MeasurementMethod.KNOWN_OBJECT_HEIGHT
     private val mode = MeasurementMode.LONG_DISTANCE
 
-    @Test fun freshLaunchIsInactiveAndAutomaticallyPresentsModes() {
+    @Test fun freshLaunchStartsAtHome() {
         val initial = MeasurementSelection()
         assertNull(initial.activeMethod)
         assertTrue(initial.isOpen)
-        assertEquals(SelectionDestination.Modes, initial.destination)
+        assertEquals(SelectionDestination.Home, initial.destination)
     }
 
     @Test fun unavailableModesAreVisibleCatalogEntriesWithNoActivationPath() {
@@ -26,45 +26,31 @@ class MeasurementSelectionTest {
         assertEquals(listOf(method), mode.methods)
     }
 
-    @Test fun dismissAndReopenAlwaysStartsAtModesWithoutActivatingAnything() {
-        val dismissed = MeasurementSelection().browse(mode).dismiss()
-        assertFalse(dismissed.isOpen)
-        assertNull(dismissed.activeMethod)
-        assertNull(dismissed.browsingMode)
-        assertEquals(MeasurementSelection(), dismissed.openModes())
-        assertEquals(dismissed, dismissed.dismiss())
-    }
-
-    @Test fun backFromMethodsReturnsToModesThenCloses() {
-        val methods = MeasurementSelection().browse(mode)
+    @Test fun backReturnsHomeFromMethodsAndMeasurementAndIsIdempotentAtHome() {
+        val home = MeasurementSelection()
+        val methods = home.browse(mode)
         assertEquals(SelectionDestination.Methods(mode), methods.destination)
         assertEquals(mode, methods.browsingMode)
-        val modes = methods.back()
-        assertEquals(MeasurementSelection(), modes)
-        assertFalse(modes.back().isOpen)
-        assertEquals(modes.back(), modes.back().back())
-    }
-
-    @Test fun activationRequiresAnOpenCorrespondingMethodList() {
-        val initial = MeasurementSelection()
-        assertEquals(initial, initial.activate(method))
-        assertEquals(initial.dismiss(), initial.dismiss().activate(method))
-        assertEquals(initial.dismiss(), initial.dismiss().browse(mode))
-        val selected = initial.browse(mode).activate(method)
+        assertEquals(home, methods.back())
+        val selected = methods.activate(method)
+        assertEquals(SelectionDestination.Measurement(method), selected.destination)
         assertEquals(method, selected.activeMethod)
         assertFalse(selected.isOpen)
-        assertNull(selected.browsingMode)
-        assertEquals(selected, selected.activate(method)) // queued duplicate selection
+        assertEquals(home, selected.back())
+        assertEquals(home, selected.openModes())
+        assertEquals(home, home.back())
+        assertNull(selected.openModes().activeMethod)
     }
 
-    @Test fun browsingDismissalAndReselectionKeepTheActiveMethod() {
-        val selected = MeasurementSelection().browse(mode).activate(method)
-        val browsing = selected.openModes().browse(mode)
-        assertEquals(method, browsing.activeMethod)
-        assertEquals(selected, browsing.dismiss())
-        assertEquals(selected, browsing.activate(method))
-        assertEquals(selected, browsing.back().back())
-        assertEquals(selected.openModes(), browsing.openModes())
+    @Test fun activationRequiresCorrespondingMethodsAndDuplicateActionsAreHarmless() {
+        val home = MeasurementSelection()
+        assertEquals(home, home.activate(method))
+        val methods = home.browse(mode)
+        assertEquals(methods, methods.browse(mode))
+        val selected = methods.activate(method)
+        assertEquals(selected, selected.activate(method))
+        assertEquals(selected, selected.browse(mode))
+        assertEquals(selected, selected.openModes().browse(mode).activate(method))
     }
 
     @Test fun newSessionDoesNotInheritAnEarlierInMemorySelection() {

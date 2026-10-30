@@ -52,14 +52,14 @@ class SettingsPresentationTest {
 
     @Test fun selectionAndPendingOrVisibleTutorialsExcludeSettings() {
         val method = MeasurementMethod.KNOWN_OBJECT_HEIGHT
-        val inactive = MeasurementUiState(selection = MeasurementSelection().dismiss())
+        val inactive = MeasurementUiState(selection = MeasurementSelection().openModes())
         assertTrue(inactive.canOpenSettings)
-        assertFalse(MeasurementUiState().canOpenSettings)
+        assertTrue(MeasurementUiState().canOpenSettings)
         val active = inactive.copy(selection = inactive.selection.openModes().browse(method.mode).activate(method))
         assertTrue(active.canOpenSettings)
         assertFalse(active.copy(tutorial = TutorialState(pendingMethod = method)).canOpenSettings)
         assertFalse(active.copy(tutorial = TutorialState(card = TutorialCard(1, method))).canOpenSettings)
-        assertFalse(active.copy(selection = active.selection.openModes()).canOpenSettings)
+        assertTrue(active.copy(selection = active.selection.openModes()).canOpenSettings)
     }
 
     @Test fun languageApplicationKeepsTheSelectorVisibleUntilExplicitBack() {

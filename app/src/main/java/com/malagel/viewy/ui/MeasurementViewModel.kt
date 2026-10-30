@@ -43,14 +43,14 @@ data class MeasurementUiState(
     val recoveryVisible: Boolean get() = requiresCamera && heightConfigured && !measurement.completed &&
         (if (!visibility.permissionGranted) viewfinderInteractive
         else acquisitionEligible && (cameraFailureVisible || orientationFailureVisible))
-    val canOpenSettings: Boolean get() = !diagnosticsOpen && !selection.isOpen && !tutorial.selectorExiting && tutorial.card == null && tutorial.pendingMethod == null
-    val canOpenHelp: Boolean get() = selection.activeMethod != null && !selection.isOpen && !tutorial.selectorExiting && tutorial.card == null && tutorial.pendingMethod == null
+    val canOpenSettings: Boolean get() = !diagnosticsOpen && !tutorial.methodEntering && tutorial.card == null && tutorial.pendingMethod == null
+    val canOpenHelp: Boolean get() = selection.activeMethod != null && !selection.isOpen && !tutorial.methodEntering && tutorial.card == null && tutorial.pendingMethod == null
     val requiresCamera: Boolean get() = selection.activeMethod?.requiresCamera == true
     val requiresOrientation: Boolean get() = selection.activeMethod?.requiresOrientation == true
     val heightConfigured: Boolean get() = measurement.heightMeters != null
     val viewfinderInteractive: Boolean get() = resumed && visibility.surfaceVisible && visibility.windowFocused &&
         !visibility.covered && !visibility.heightEditing && !diagnosticsOpen && !selection.isOpen &&
-        !tutorial.selectorExiting && tutorial.card == null && tutorial.pendingMethod == null
+        !tutorial.methodEntering && tutorial.card == null && tutorial.pendingMethod == null
     val acquisitionEligible: Boolean get() = requiresCamera && heightConfigured && !measurement.completed &&
         visibility.permissionGranted && viewfinderInteractive
     val previewVisible: Boolean get() = acquisitionEligible && camera.ready
@@ -61,6 +61,7 @@ data class MeasurementUiState(
 /** Owns ONE foreground acquisition; diagnostics only observes its snapshots. Everything runs on main. */
 class MeasurementViewModel(application: Application) : AndroidViewModel(application) {
     private val workflow = KnownHeightWorkflow()
+    private var workflowMethod: MeasurementMethod? = null
     private val alignmentGuidance = AlignmentGuidance()
     private val guidance = MeasurementGuidance {
         if (Build.VERSION.SDK_INT >= 29) application.getSystemService(AccessibilityManager::class.java)
@@ -126,10 +127,9 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
 
     fun openModes() { if (mutableState.value.canOpenSettings) updateSelection(mutableState.value.selection.openModes()) }
     fun backSelection() = updateSelection(mutableState.value.selection.back())
-    fun dismissSelection() = updateSelection(mutableState.value.selection.dismiss())
     fun browseMode(mode: MeasurementMode) = updateSelection(mutableState.value.selection.browse(mode))
 
-    fun selectionHidden(token: Long) { tutorials.selectorHidden(token); publishTutorial() }
+    fun methodEntered(token: Long) { tutorials.methodEntered(token); publishTutorial() }
     fun help(longPress: Boolean, diagnosticsEnabled: Boolean) {
         when (helpAction(mutableState.value, longPress, diagnosticsEnabled)) {
             HelpAction.TUTORIAL -> { tutorials.openManually(); publishTutorial() }
@@ -146,11 +146,13 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
         if (mutableState.value.diagnosticsOpen) return
         val previous = mutableState.value.selection
         val next = previous.activate(method)
-        if (next.activeMethod != previous.activeMethod) {
+        if (next == previous) return
+        if (method != workflowMethod) {
             // A different workflow must never inherit captures or a hardware session.
             workflow.restart()
             resources.reconcile(false, false, animateRelease = false)
         }
+        workflowMethod = method
         updateSelection(next, activated = method)
     }
 

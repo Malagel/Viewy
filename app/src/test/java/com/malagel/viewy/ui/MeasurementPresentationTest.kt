@@ -75,9 +75,9 @@ class MeasurementPresentationTest {
 
     @Test fun inactiveOrCoveredMeasurementCannotAcquireEvenWithResidualReadyHardware() {
         val hidden = listOf(
-            ready.copy(selection = MeasurementSelection()), ready.copy(selection = MeasurementSelection().dismiss()),
+            ready.copy(selection = MeasurementSelection()), ready.copy(selection = MeasurementSelection().openModes()),
             ready.copy(selection = selected.openModes()),
-            ready.copy(tutorial = com.malagel.viewy.tutorial.TutorialState(selectorExiting = true)),
+            ready.copy(tutorial = com.malagel.viewy.tutorial.TutorialState(methodEntering = true)),
             ready.copy(tutorial = com.malagel.viewy.tutorial.TutorialState(pendingMethod = selected.activeMethod)),
             ready.copy(diagnosticsOpen = true), ready.copy(resumed = false),
             ready.copy(visibility = ready.visibility.copy(surfaceVisible = false)),
@@ -92,13 +92,13 @@ class MeasurementPresentationTest {
         assertTrue(ready.copy(camera = ready.camera.copy(ready = false)).acquisitionEligible)
     }
 
-    @Test fun browsingAndReselectionSuspendUntilSheetRemoval() {
+    @Test fun homeAndMethodsSuspendAcquisitionUntilMeasurementEntry() {
         val method = MeasurementMethod.KNOWN_OBJECT_HEIGHT
         val browsing = selected.openModes().browse(method.mode)
         for (navigation in listOf(selected.openModes(), browsing, browsing.back())) {
             assertFalse(ready.copy(selection = navigation).acquisitionEligible)
         }
-        assertTrue(ready.copy(selection = browsing.dismiss()).acquisitionEligible)
+        assertFalse(ready.copy(selection = browsing.openModes()).acquisitionEligible)
         assertTrue(ready.copy(selection = browsing.activate(method)).acquisitionEligible)
     }
 
@@ -111,7 +111,7 @@ class MeasurementPresentationTest {
         tutorials.selectionChanged(MeasurementSelection().browse(method.mode))
         tutorials.selectionChanged(selected, method)
         assertFalse(ready.copy(tutorial = tutorials.state).acquisitionEligible)
-        tutorials.selectorHidden(tutorials.state.navigationToken)
+        tutorials.methodEntered(tutorials.state.navigationToken)
         repeat(3) {
             assertTrue(ready.copy(tutorial = tutorials.state).acquisitionEligible)
             tutorials.openManually()

@@ -156,11 +156,16 @@ class ResultPresentationTest {
     }
 
     @Test fun revealSequenceKeepsLaterContentHiddenUntilPreviousContentFinishes() {
+        assertFalse(ResultReveal.distanceVisible(0f))
+        assertFalse(ResultReveal.distanceVisible(ResultReveal.entranceMillis - 1f))
+        assertTrue(ResultReveal.distanceVisible(ResultReveal.entranceMillis.toFloat()))
+        assertEquals(0f, ResultReveal.countFraction(ResultReveal.entranceMillis.toFloat()), 0f)
+        assertEquals(0.5f, ResultReveal.countFraction(ResultReveal.entranceMillis + ResultReveal.countMillis / 2f), 0f)
         assertEquals(0f, ResultReveal.countFraction(0f), 0f)
         assertTrue(ResultReveal.countFraction(600f) < 1f)
         (0..2).forEach { assertEquals(0f, ResultReveal.supportingAlpha(600f, it), 0f) }
         for (index in 0..2) {
-            val start = (ResultReveal.countMillis + index * ResultReveal.fadeMillis).toFloat()
+            val start = (ResultReveal.entranceMillis + ResultReveal.countMillis + index * ResultReveal.fadeMillis).toFloat()
             assertEquals(1f, ResultReveal.countFraction(start), 0f)
             assertEquals(0f, ResultReveal.supportingAlpha(start, index), 0f)
             assertEquals(0.5f, ResultReveal.supportingAlpha(start + 90f, index), 0f)

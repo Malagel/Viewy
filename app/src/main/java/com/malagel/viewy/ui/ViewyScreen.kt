@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.provider.Settings
 import androidx.annotation.StringRes
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
@@ -73,6 +74,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.malagel.viewy.R
 import com.malagel.viewy.camera.CameraPreview
+import com.malagel.viewy.domain.KnownHeightResult
 import com.malagel.viewy.measurement.*
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
@@ -108,7 +110,6 @@ fun ViewyScreen(
     LaunchedEffect(state.selection.activeMethod) {
         if (state.selection.activeMethod == null) {
             editHeight = false
-            showWorkspace = false
             showStatus = false
         }
     }
@@ -148,118 +149,144 @@ fun ViewyScreen(
         com.malagel.viewy.measurement.Alignment.TURN_RIGHT -> stringResource(R.string.diag_right)
         else -> null
     }
-    MeasurementSelector(
-        state.selection, model::dismissSelection, model::backSelection, model::browseMode, model::selectMethod,
-        state.tutorial.navigationToken, model::selectionHidden,
-    ) { methodBackdrop ->
-        Scaffold(modifier = methodBackdrop) { insets ->
-            BoxWithConstraints(Modifier.fillMaxSize().padding(insets), contentAlignment = Alignment.TopCenter) {
-                val compact = maxHeight < 500.dp || LocalDensity.current.fontScale > 1.5f || maxWidth < 320.dp
-                val workspace: @Composable (Boolean) -> Unit = { overflow ->
-                    MeasurementVisibilityEffect(model, permission, overlay.blocksMeasurement || showStatus, editHeight)
+    var homeDestination by remember { mutableStateOf<SelectionDestination>(SelectionDestination.Home) }
+    SideEffect { if (state.selection.isOpen) homeDestination = state.selection.destination }
+    val measurementDestination = state.selection.activeMethod != null
+    val destinationTransition = updateTransition(measurementDestination, label = "Home and measurement")
+    val navigating = destinationTransition.currentState != destinationTransition.targetState || destinationTransition.isRunning
+    val navigationToken = state.tutorial.navigationToken
+    LaunchedEffect(measurementDestination, navigating, navigationToken) {
+        if (measurementDestination && !navigating) model.methodEntered(navigationToken)
+    }
+    BackHandler(enabled = !settingsOpen && !diagnosticsOpen && !editHeight && !showStatus && state.tutorial.card == null &&
+        (measurementDestination || state.selection.browsingMode != null || navigating)) {
+        if (!navigating) model.backSelection()
+    }
+    LaunchedEffect(measurementDestination, navigating) {
+        if (!measurementDestination && !navigating) showWorkspace = false
+    }
+    Scaffold { insets ->
+        BoxWithConstraints(Modifier.fillMaxSize().padding(insets), contentAlignment = Alignment.TopCenter) {
+            val compact = maxHeight < 500.dp || LocalDensity.current.fontScale > 1.5f || maxWidth < 320.dp
+            val workspace: @Composable (Boolean) -> Unit = { overflow ->
+                MeasurementVisibilityEffect(model, permission, overlay.blocksMeasurement || showStatus || navigating, editHeight)
 
+                Column(
+                    Modifier.widthIn(max = 600.dp).fillMaxSize().padding(start = if (compact) 12.dp else 20.dp, end = if (compact) 12.dp else 20.dp, top = 8.dp, bottom = if (compact) 16.dp else 32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     Column(
-                        Modifier.widthIn(max = 600.dp).fillMaxSize().padding(start = if (compact) 12.dp else 20.dp, end = if (compact) 12.dp else 20.dp, top = 8.dp, bottom = if (compact) 16.dp else 32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
+                        Modifier.weight(1f).then(if (overflow) Modifier.verticalScroll(rememberScrollState()) else Modifier),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Column(
-                            Modifier.weight(1f).then(if (overflow) Modifier.verticalScroll(rememberScrollState()) else Modifier),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            ViewyHeader(compact, overflow, true, { openHelp(false) }, { showWorkspace = false }, openAppSettings, diagnosticsEnabled, { openHelp(true) })
-                            key(state.selection.activeMethod) {
-                                BoxWithConstraints(
-                                    Modifier.fillMaxWidth().then(if (overflow) Modifier.height(320.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)) else Modifier.weight(1f)).clip(RoundedCornerShape(28.dp))
-                                        .background(if (state.heightConfigured) Color.Black else MaterialTheme.colorScheme.secondaryContainer),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    val hintText = hint?.let { stringResource(it) }
-                                    val hintStyle = MaterialTheme.typography.bodyMedium
-                                    val hintHeight = remember(hintText, hintStyle, maxWidth, density) {
-                                        hintText?.let {
-                                            textMeasurer.measure(it, hintStyle, constraints = Constraints(maxWidth = with(density) { (maxWidth - 52.dp).roundToPx().coerceAtLeast(1) })).size.height
-                                        } ?: 0
-                                    }
-                                    val recoveryNeeded = state.recoveryVisible
-                                    val useStatusDialog = !overflow && ((compact && recoveryNeeded) || hintHeight > with(density) { (maxHeight / 2 - 54.dp).toPx() })
-                                    if (state.heightConfigured) {
-                                        LivePreview(model, state)
-                                        if (!measurement.completed) {
-                                            CameraPreviewControls(state, unit, compact, model::requestZoom, openHeight,
-                                                Modifier.align(Alignment.TopCenter))
-                                            PreviewControlFade(state.previewVisible && state.acquisition.running, Modifier.align(Alignment.Center)) {
-                                                Reticle(Modifier.size(40.dp))
-                                            }
-                                            AlignmentChevrons(state.alignmentCue)
+                        ViewyHeader(compact, overflow, true, { openHelp(false) }, { showWorkspace = false }, openAppSettings, diagnosticsEnabled, { openHelp(true) })
+                        key(Unit) {
+                            BoxWithConstraints(
+                                Modifier.fillMaxWidth().then(if (overflow) Modifier.height(320.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)) else Modifier.weight(1f)).clip(RoundedCornerShape(28.dp))
+                                    .background(if (state.heightConfigured) Color.Black else MaterialTheme.colorScheme.secondaryContainer),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                var resultBackdrop by remember { mutableStateOf<ResultPreviewBackdrop?>(null) }
+                                LaunchedEffect(measurement.result?.let(::ResultIdentity)) {
+                                    if (resultBackdrop?.estimate !== measurement.result) resultBackdrop = null
+                                }
+                                val hintText = hint?.let { stringResource(it) }
+                                val hintStyle = MaterialTheme.typography.bodyMedium
+                                val hintHeight = remember(hintText, hintStyle, maxWidth, density) {
+                                    hintText?.let {
+                                        textMeasurer.measure(it, hintStyle, constraints = Constraints(maxWidth = with(density) { (maxWidth - 52.dp).roundToPx().coerceAtLeast(1) })).size.height
+                                    } ?: 0
+                                }
+                                val recoveryNeeded = state.recoveryVisible
+                                val useStatusDialog = !overflow && ((compact && recoveryNeeded) || hintHeight > with(density) { (maxHeight / 2 - 54.dp).toPx() })
+                                if (state.heightConfigured) {
+                                    LivePreview(model, state) { estimate, bitmap -> resultBackdrop = ResultPreviewBackdrop(estimate, bitmap) }
+                                    if (!measurement.completed) {
+                                        CameraPreviewControls(state, unit, compact, model::requestZoom, openHeight,
+                                            Modifier.align(Alignment.TopCenter))
+                                        PreviewControlFade(state.previewVisible && state.acquisition.running, Modifier.align(Alignment.Center)) {
+                                            Reticle(Modifier.size(40.dp))
                                         }
+                                        AlignmentChevrons(state.alignmentCue)
                                     }
-                                    if (!state.heightConfigured) {
-                                        Button(
-                                            onClick = openHeight,
-                                            modifier = Modifier.padding(20.dp).widthIn(min = 240.dp, max = 320.dp).heightIn(min = 64.dp),
-                                            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
-                                        ) { Text(stringResource(R.string.enter_height), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center) }
+                                }
+                                if (!state.heightConfigured) {
+                                    Button(
+                                        onClick = openHeight,
+                                        modifier = Modifier.padding(20.dp).widthIn(min = 240.dp, max = 320.dp).heightIn(min = 64.dp),
+                                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+                                    ) { Text(stringResource(R.string.enter_height), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center) }
+                                } else {
+                                    // Long recovery text has a scrollable dialog in constrained windows.
+                                    if (measurement.completed) {
+                                        // The result overlay owns all completed-measurement content.
+                                    } else if (useStatusDialog) {
+                                        FilledTonalIconButton(onClick = { statusSnapshot = state; showStatus = true }, modifier = Modifier.align(Alignment.BottomStart).padding(4.dp)
+                                            .semantics { contentDescription = previewStatusLabel }) {
+                                            Text(if (recoveryNeeded || hint != null) "!" else "i")
+                                        }
+                                    } else if (recoveryNeeded) {
+                                        Surface(Modifier.fillMaxWidth().align(Alignment.BottomCenter), color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.95f)) {
+                                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                RecoveryControls(state, permission, requested, requestPermission, openSettings, model::retryCamera, model::restartOrientation)
+                                            }
+                                        }
                                     } else {
-                                        // Long recovery text has a scrollable dialog in constrained windows.
-                                        if (measurement.completed) {
-                                            // The result overlay owns all completed-measurement content.
-                                        } else if (useStatusDialog) {
-                                            FilledTonalIconButton(onClick = { statusSnapshot = state; showStatus = true }, modifier = Modifier.align(Alignment.BottomStart).padding(4.dp)
-                                                .semantics { contentDescription = previewStatusLabel }) {
-                                                Text(if (recoveryNeeded || hint != null) "!" else "i")
-                                            }
-                                        } else if (recoveryNeeded) {
-                                            Surface(Modifier.fillMaxWidth().align(Alignment.BottomCenter), color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.95f)) {
-                                                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                    RecoveryControls(state, permission, requested, requestPermission, openSettings, model::retryCamera, model::restartOrientation)
-                                                }
-                                            }
-                                        } else {
-                                            hint?.let { message ->
-                                                Surface(
-                                                    Modifier.align(Alignment.BottomCenter).padding(12.dp),
-                                                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.9f),
-                                                    shape = RoundedCornerShape(16.dp),
-                                                ) {
-                                                    Text(stringResource(message), Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
-                                                        .semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.bodyMedium)
-                                                }
+                                        hint?.let { message ->
+                                            Surface(
+                                                Modifier.align(Alignment.BottomCenter).padding(12.dp),
+                                                color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.9f),
+                                                shape = RoundedCornerShape(16.dp),
+                                            ) {
+                                                Text(stringResource(message), Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                                                    .semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.bodyMedium)
                                             }
                                         }
                                     }
-                                    MeasurementResultOverlay(measurement, unit, resultEntryMemory, state.viewfinderInteractive, openHeight)
+                                }
+                                resultBackdrop?.takeIf { it.estimate === measurement.result }?.let { (_, bitmap) ->
+                                    Image(bitmap.asImageBitmap(), contentDescription = null, contentScale = ContentScale.FillBounds,
+                                        modifier = Modifier.fillMaxSize())
+                                }
+                                MeasurementResultOverlay(measurement, unit, resultEntryMemory, state.viewfinderInteractive, openHeight) { estimate ->
+                                    if (resultBackdrop?.estimate === estimate) resultBackdrop = null
                                 }
                             }
-                            MeasurementStageArea(
-                                measurement, textMeasurer,
-                                if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
-                            )
                         }
-                        MeasurementControls(
-                            captureTop = measurement.top == null, canCapture = state.canCapture,
-                            compact = compact, onRestart = model::restart, onCapture = model::capture,
-                            captureRestriction = captureRestriction,
-                            modeControl = { ModeControl(model::openModes) },
+                        MeasurementStageArea(
+                            measurement, textMeasurer,
+                            if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
                         )
                     }
+                    MeasurementControls(
+                        captureTop = measurement.top == null, canCapture = state.canCapture,
+                        compact = compact, onRestart = model::restart, onCapture = model::capture,
+                        captureRestriction = captureRestriction,
+                        homeControl = { HomeControl(model::openModes) },
+                    )
                 }
-                // An exceptional window gets a readable, scrollable workspace dialog. Its
-                // capture/navigation row stays fixed; the regular portrait screen never scrolls.
-                val exceptional = maxHeight < 360.dp || maxWidth < 280.dp || LocalDensity.current.fontScale > 2f
-                val workspaceDialogOpen = exceptional && state.selection.activeMethod != null && showWorkspace
-                // Cover the Activity as well as the workspace window: the backdrop
-                // remains visible while Android tears down/recreates that dialog.
-                ScreenOverlayHost(overlayTransition, overlay, backdropOnly = workspaceDialogOpen, overlay = { destination, interactive ->
-                    when (destination) {
-                        ScreenOverlay.SETTINGS -> settingsContent(workspaceDialogOpen, interactive)
-                        ScreenOverlay.DIAGNOSTICS -> DiagnosticsScreen(state, unit, permission, model::dismissDiagnostics, workspaceDialogOpen, interactive)
-                        ScreenOverlay.NONE -> Unit
-                    }
-                }) {
-                    if (state.selection.activeMethod == null) {
+            }
+            // An exceptional window gets a readable, scrollable workspace dialog. Its
+            // capture/navigation row stays fixed; the regular portrait screen never scrolls.
+            val exceptional = maxHeight < 360.dp || maxWidth < 280.dp || LocalDensity.current.fontScale > 2f
+            val workspaceDialogOpen = exceptional && showWorkspace && (measurementDestination || navigating)
+            val home: @Composable (Boolean) -> Unit = { interactive ->
+                HomeScreen(if (state.selection.isOpen) state.selection.destination else homeDestination,
+                    openAppSettings, model::backSelection, model::browseMode, model::selectMethod, interactive)
+            }
+            // Match the dialog's backdrop while it animates back to Home, avoiding a window-removal flash.
+            ScreenOverlayHost(overlayTransition, overlay, backdropOnly = workspaceDialogOpen, overlay = { destination, interactive ->
+                when (destination) {
+                    ScreenOverlay.SETTINGS -> settingsContent(workspaceDialogOpen, interactive)
+                    ScreenOverlay.DIAGNOSTICS -> DiagnosticsScreen(state, unit, permission, model::dismissDiagnostics, workspaceDialogOpen, interactive)
+                    ScreenOverlay.NONE -> Unit
+                }
+            }) {
+                MeasurementDestinationHost(destinationTransition, blocked = overlay.blocksMeasurement || workspaceDialogOpen) { measuring ->
+                    if (!measuring) {
                         SideEffect { model.visibilityChanged(MeasurementVisibility()) }
-                        InactiveMeasurementScreen(compact, openAppSettings) { ModeControl(model::openModes) }
+                        home(!navigating && !measurementDestination && !overlay.blocksMeasurement && !workspaceDialogOpen)
                     } else if (exceptional) {
                         if (!showWorkspace) SideEffect { model.visibilityChanged(MeasurementVisibility()) }
                         Column(Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -268,49 +295,54 @@ fun ViewyScreen(
                                 Text(stringResource(R.string.open_viewfinder))
                             }
                             MeasurementControls(measurement.top == null, state.canCapture, true, model::restart, model::capture,
-                                captureRestriction) {
-                                ModeControl(model::openModes)
-                            }
-                        }
-                        if (showWorkspace) Dialog(
-                            onDismissRequest = { if (!overlay.blocksMeasurement) showWorkspace = false },
-                            properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = !overlay.blocksMeasurement),
-                        ) {
-                            Surface(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout)).then(methodBackdrop)) {
-                                ScreenOverlayHost(overlayTransition, overlay, backdropOnly = false, overlay = { destination, interactive ->
-                                    when (destination) {
-                                        ScreenOverlay.SETTINGS -> settingsContent(false, interactive)
-                                        ScreenOverlay.DIAGNOSTICS -> DiagnosticsScreen(state, unit, permission, model::dismissDiagnostics, interactive = interactive)
-                                        ScreenOverlay.NONE -> Unit
-                                    }
-                                }) { workspace(true) }
-                            }
+                                captureRestriction) { HomeControl(model::openModes) }
                         }
                     } else workspace(false)
                 }
             }
-        }
-        if (editHeight && state.selection.activeMethod != null) HeightDialog(measurement, unit, onDismiss = { editHeight = false }) { meters ->
-            model.setHeight(meters)
-            editHeight = false
-        }
-        if (showStatus && state.selection.activeMethod != null) AlertDialog(
-            onDismissRequest = { showStatus = false }, title = { Text(stringResource(R.string.preview_status)) },
-            text = {
-                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(stringResource(R.string.measurement_method_subtitle))
-                    Text(stageText(measurement))
-                    if (!state.heightConfigured) TextButton(onClick = { showStatus = false; editHeight = true }) { Text(stringResource(R.string.enter_height)) }
-                    else {
-                        // The dialog suspends hardware; retain the failure that prompted it.
-                        RecoveryControls(statusSnapshot ?: state, permission, requested, requestPermission, openSettings,
-                            { showStatus = false }, { showStatus = false })
-                        statusSnapshot?.guidance?.let { Text(stringResource(it)) }
+            if (workspaceDialogOpen) Dialog(
+                onDismissRequest = { if (!overlay.blocksMeasurement && !navigating) showWorkspace = false },
+                properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = false),
+            ) {
+                BackHandler(enabled = !overlay.blocksMeasurement && !editHeight && !showStatus && state.tutorial.card == null) {
+                    if (!navigating) model.backSelection()
+                }
+                Surface(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout))) {
+                    ScreenOverlayHost(overlayTransition, overlay, backdropOnly = false, overlay = { destination, interactive ->
+                        when (destination) {
+                            ScreenOverlay.SETTINGS -> settingsContent(false, interactive)
+                            ScreenOverlay.DIAGNOSTICS -> DiagnosticsScreen(state, unit, permission, model::dismissDiagnostics, interactive = interactive)
+                            ScreenOverlay.NONE -> Unit
+                        }
+                    }) {
+                        MeasurementDestinationHost(destinationTransition, blocked = overlay.blocksMeasurement) { measuring ->
+                            if (measuring) workspace(true) else home(false)
+                        }
                     }
                 }
-            }, confirmButton = { TextButton(onClick = { showStatus = false }) { Text(stringResource(R.string.close)) } },
-        )
+            }
+        }
     }
+    if (editHeight && state.selection.activeMethod != null) HeightDialog(measurement, unit, onDismiss = { editHeight = false }) { meters ->
+        model.setHeight(meters)
+        editHeight = false
+    }
+    if (showStatus && state.selection.activeMethod != null) AlertDialog(
+        onDismissRequest = { showStatus = false }, title = { Text(stringResource(R.string.preview_status)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(stringResource(R.string.measurement_method_subtitle))
+                Text(stageText(measurement))
+                if (!state.heightConfigured) TextButton(onClick = { showStatus = false; editHeight = true }) { Text(stringResource(R.string.enter_height)) }
+                else {
+                    // The dialog suspends hardware; retain the failure that prompted it.
+                    RecoveryControls(statusSnapshot ?: state, permission, requested, requestPermission, openSettings,
+                        { showStatus = false }, { showStatus = false })
+                    statusSnapshot?.guidance?.let { Text(stringResource(it)) }
+                }
+            }
+        }, confirmButton = { TextButton(onClick = { showStatus = false }) { Text(stringResource(R.string.close)) } },
+    )
     state.tutorial.card?.let { MethodTutorialDialog(it, model::dismissTutorial, model::changeTutorialPage) }
 }
 
@@ -348,8 +380,9 @@ private fun MeasurementVisibilityEffect(model: MeasurementViewModel, permission:
     }
 }
 
-private const val CAMERA_FADE_MILLIS = 165
-private const val PREVIEW_CONTROL_FADE_MILLIS = 225
+private data class ResultPreviewBackdrop(val estimate: KnownHeightResult.Estimate, val bitmap: Bitmap)
+
+private const val CAMERA_FADE_MILLIS = 225
 
 /** Retain outgoing controls visually while revoking touch, focus and accessibility immediately. */
 @Composable
@@ -357,8 +390,8 @@ private fun PreviewControlFade(visible: Boolean, modifier: Modifier, content: @C
     val transition = updateTransition(visible, label = "Preview control visibility")
     transition.AnimatedVisibility(
         visible = { it }, modifier = modifier,
-        enter = fadeIn(tween(PREVIEW_CONTROL_FADE_MILLIS)),
-        exit = fadeOut(tween(PREVIEW_CONTROL_FADE_MILLIS)),
+        enter = fadeIn(tween(CAMERA_FADE_MILLIS)),
+        exit = fadeOut(tween(CAMERA_FADE_MILLIS)),
     ) {
         val blocked = !visible || transition.isRunning || transition.currentState != transition.targetState
         Box(Modifier.focusProperties { canFocus = !blocked }
@@ -374,7 +407,10 @@ private fun PreviewControlFade(visible: Boolean, modifier: Modifier, content: @C
 }
 
 @Composable
-private fun LivePreview(model: MeasurementViewModel, state: MeasurementUiState) {
+private fun LivePreview(
+    model: MeasurementViewModel, state: MeasurementUiState,
+    onCompletionFrame: (KnownHeightResult.Estimate, Bitmap) -> Unit,
+) {
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
     val view = remember(context) { PreviewView(context) }
@@ -419,7 +455,11 @@ private fun LivePreview(model: MeasurementViewModel, state: MeasurementUiState) 
         var preview: CameraPreview? = null
         var released = false
         val token = if (state.acquisitionEligible) model.startPreview(requestZoom = { ratio -> preview?.requestZoom(ratio) }) { animate ->
-            // Snapshot only intentional visible suspensions. Never delay unbinding for motion.
+            // Retain pixels beneath the result's color fill, never the camera session.
+            model.state.value.measurement.result?.takeIf { currentAlpha > 0f }?.let { estimate ->
+                runCatching { view.bitmap }.getOrNull()?.let { onCompletionFrame(estimate, it) }
+            }
+            // Other intentional visible suspensions keep their existing fade.
             frozen = if (animate && currentAlpha > 0f) runCatching { view.bitmap }.getOrNull() else null
             released = true
             preview?.close()
@@ -568,7 +608,7 @@ internal fun LabeledIconButton(@StringRes label: Int, symbol: String, onClick: (
 @Composable
 private fun MeasurementControls(
     captureTop: Boolean, canCapture: Boolean, compact: Boolean,
-    onRestart: () -> Unit, onCapture: () -> Unit, captureRestriction: String? = null, modeControl: @Composable () -> Unit,
+    onRestart: () -> Unit, onCapture: () -> Unit, captureRestriction: String? = null, homeControl: @Composable () -> Unit,
 ) {
     Row(Modifier.widthIn(max = 320.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
@@ -595,7 +635,7 @@ private fun MeasurementControls(
             val color = LocalContentColor.current
             Canvas(Modifier.fillMaxSize().padding(6.dp)) { drawCircle(color) }
         }
-        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { modeControl() }
+        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { homeControl() }
     }
 }
 

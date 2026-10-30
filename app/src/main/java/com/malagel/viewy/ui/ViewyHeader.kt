@@ -98,21 +98,3 @@ internal fun ViewyHeader(compact: Boolean, overflow: Boolean, active: Boolean, o
         }
     }
 }
-
-@Composable
-internal fun InactiveMeasurementScreen(compact: Boolean, onSettings: () -> Unit, modeControl: @Composable () -> Unit) {
-    Column(
-        Modifier.widthIn(max = 600.dp).fillMaxSize().padding(
-            start = if (compact) 12.dp else 20.dp, end = if (compact) 12.dp else 20.dp,
-            top = 8.dp, bottom = if (compact) 16.dp else 32.dp,
-        ), horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        ViewyHeader(compact, false, false, {}, {}, onSettings)
-        Spacer(Modifier.weight(1f))
-        Row(Modifier.widthIn(max = 320.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Spacer(Modifier.weight(1f))
-            Spacer(Modifier.size(if (compact) 72.dp else 88.dp))
-            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { modeControl() }
-        }
-    }
-}
