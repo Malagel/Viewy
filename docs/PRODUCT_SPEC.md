@@ -187,7 +187,8 @@ future validated features; they have no selectable methods.
   settling, startup, readiness, missing/stale/unreliable sensor readings, small
   left/right adjustments produce no preview text, even when sustained.
   Near-vertical aiming shows **Cannot align at this angle.** for as long as the aim
-  remains in the restricted range, clearing immediately when it leaves.
+  remains in the restricted range. Preview messages fade in and out over 150 ms;
+  their visibility targets update immediately without changing correction timeouts.
   Sensor quality, freshness, near-vertical and alignment gates
   still block invalid captures immediately. Hardware failures retain recovery
   actions. The camera location must stay fixed and the endpoints must lie on one

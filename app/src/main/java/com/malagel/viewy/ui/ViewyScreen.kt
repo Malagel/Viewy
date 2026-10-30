@@ -231,16 +231,7 @@ fun ViewyScreen(
                                             }
                                         }
                                     } else {
-                                        hint?.let { message ->
-                                            Surface(
-                                                Modifier.align(Alignment.BottomCenter).padding(12.dp),
-                                                color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.9f),
-                                                shape = RoundedCornerShape(16.dp),
-                                            ) {
-                                                Text(stringResource(message), Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
-                                                    .semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.bodyMedium)
-                                            }
-                                        }
+                                        PreviewGuidance(hint, Modifier.align(Alignment.BottomCenter))
                                     }
                                 }
                                 resultBackdrop?.takeIf { it.estimate === measurement.result }?.let { (_, bitmap) ->
@@ -383,6 +374,28 @@ private data class ResultPreviewBackdrop(val estimate: KnownHeightResult.Estimat
 private data class SuspendedPreviewFrame(val bitmap: Bitmap, val alpha: Float)
 
 private const val CAMERA_FADE_MILLIS = 225
+
+/** Fade only presentation; guidance events, expiry and capture gates remain unchanged. */
+@Composable
+private fun PreviewGuidance(@StringRes message: Int?, modifier: Modifier) {
+    var retainedMessage by remember { mutableStateOf(message) }
+    SideEffect { if (message != null) retainedMessage = message }
+    AnimatedVisibility(
+        visible = message != null, modifier = modifier,
+        enter = fadeIn(tween(150)), exit = fadeOut(tween(150)),
+    ) {
+        (message ?: retainedMessage)?.let { displayed ->
+            Surface(
+                Modifier.padding(12.dp).then(if (message == null) Modifier.clearAndSetSemantics {} else Modifier),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.9f),
+                shape = RoundedCornerShape(16.dp),
+            ) {
+                Text(stringResource(displayed), Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                    .semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+    }
+}
 
 /** Retain outgoing controls visually while revoking touch, focus and accessibility immediately. */
 @Composable

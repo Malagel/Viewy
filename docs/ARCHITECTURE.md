@@ -523,7 +523,7 @@ stored reasons remain available to diagnostics after presentation expires.
 Workflow failure events and the current near-vertical restriction produce text;
 movement, settling, freshness, readiness and left/right alignment updates are silent.
 The near-vertical message has priority while the existing angle restriction applies,
-with immediate appearance and clearing and no display timeout. Text has no movement
+with immediate visibility targets and no display timeout. Text has no movement
 tracking, condition hysteresis, debounce or live-hint cooldown. Corrections last
 five seconds, extended by Android's recommended text timeout on API 29+;
 hardware recovery hides them and retains persistent actions. Presentation never
@@ -561,8 +561,10 @@ and results suppress all guidance. Camera readiness loss emits a notice only wit
 a pending top; resource ineligibility identifies intentional suspension separately
 from genuine camera interruption. Retrying orientation without a pending capture
 does not claim lost progress. Compose renders one static preview-edge surface,
-with localized resource lookup at render time, no animation state and no preview
-resize. Text uses a polite accessibility live region; constrained layouts retain
+with localized resource lookup at render time and no preview resize. The message
+surface fades in and out over 150 ms, retaining outgoing text only for exit;
+logical correction timing and capture gates are unchanged. Outgoing text is hidden
+from accessibility immediately. Animation state remains local to Compose. Text uses a polite accessibility live region; constrained layouts retain
 the existing status dialog. Alignment restrictions are
 also exposed through capture accessibility semantics. Permission/orientation
 failures and camera failures requiring user action retain recovery controls. Diagnostics is a read-only full-screen surface in the current host

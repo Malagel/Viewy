@@ -39,7 +39,7 @@ viewfinder visibility, repeated overlay cycles, incomplete-pair invalidation,
 completed-result preservation after shutdown, fresh-session restart, rapid
 suspend/resume ownership, obsolete camera/sensor callbacks and workflow errors;
 silence across live sensor-quality statuses and left/right alignment, persistent
-near-vertical restriction text with immediate clearing and capture gates preserved; one-time correction identities and expiry, clearing across
+near-vertical restriction visibility targets with capture gates preserved; one-time correction identities and expiry, clearing across
 restart/stages/suspension, silent no-capture shutdown and the exact 15-second boundary;
 silent startup/waiting versus actionable failures; three progressive retries,
 exhaustion, manual/new-session/success reset, cancellation and stale retry callbacks;
@@ -62,6 +62,14 @@ one-time recovery identities, threshold chatter without changing capture gates,
 fresh moving/settling readings, invalid/stale observations, session compatibility,
 new top/restart, completion and suspension/resumption. Animation rendering and
 physical correction usefulness remain manual checks.
+Home presentation regression coverage checks direct mode-list return from measurement
+both before height entry and with saved height. Preview suspension and guidance
+changes pass the bounded JVM, debug assembly and lint checks; these checks do not
+render Compose frames. Manually verify that tutorial and Settings openings fade
+from the last camera frame without a dark flash, and that Android Back before
+height entry returns directly to Select mode. Repeat rapid Back during both card
+and measurement transitions, with reduced/disabled system motion.
+
 Source and tests define the individual cases. Mocked deployment tests verify script decisions using
 fictional devices/configuration, not real wireless reliability.
 
@@ -363,7 +371,10 @@ reduced/disabled motion:
   and clear; large text should use the existing status dialog instead of covering
   the reticle. Confirm Android accessibility timeout preferences extend correction
   visibility on API 29+, and language changes cannot restore an old error. Error
-  presentation has no animation and should behave the same with motion disabled.
+  presentation should fade in and out over 150 ms without changing the existing
+  correction interval or accessibility timeout. With motion disabled, messages
+  should appear and clear immediately. Check rapid restriction entry/exit and
+  repeated corrections during a fade; no stale text should reappear.
 
 ## Galaxy S22 camera startup and recovery checks
 
