@@ -17,7 +17,9 @@ future validated features; they have no selectable methods.
 ## Implemented behavior
 
 - Each fresh application session opens Home with Viewy's wordmark and Settings,
-  without an active method, camera preview, capture controls, permission prompt or
+  fading in over 300 ms without vertical movement. In-app returns retain their
+  existing navigation motion; Activity recreation does not replay the launch fade.
+  Home opens without an active method, camera preview, capture controls, permission prompt or
   acquisition. A centered surface-container card with 28 dp corners and a maximum
   width of 480 dp lists modes and descriptions; its contents scroll in constrained
   windows. Unavailable modes remain disabled and labeled **Coming soon**.

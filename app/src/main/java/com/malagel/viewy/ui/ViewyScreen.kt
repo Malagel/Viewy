@@ -86,6 +86,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 fun ViewyScreen(
     state: MeasurementUiState, model: MeasurementViewModel, unit: HeightUnit, onSettings: () -> Unit,
     diagnosticsEnabled: Boolean, settingsOpen: Boolean, settingsContent: @Composable (backdropOnly: Boolean, interactive: Boolean) -> Unit,
+    animateHomeEntry: Boolean = false,
 ) {
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
@@ -150,8 +151,15 @@ fun ViewyScreen(
         else -> null
     }
     val measurementDestination = state.selection.activeMethod != null
+    // Owned by the screen host so returning Home cannot replay the launch fade.
+    // Recreated Activities opt out and render their retained destination settled.
+    val homeEntryAlpha = remember { Animatable(if (animateHomeEntry && !measurementDestination && !settingsOpen) 0f else 1f) }
+    LaunchedEffect(Unit) {
+        if (homeEntryAlpha.value < 1f) homeEntryAlpha.animateTo(1f, tween(300, easing = LinearEasing))
+    }
+    val homeEntering = homeEntryAlpha.value < 1f
     val destinationTransition = updateTransition(state.selection.destination, label = "Home and measurement")
-    val navigating = destinationTransition.currentState != destinationTransition.targetState || destinationTransition.isRunning
+    val navigating = homeEntering || destinationTransition.currentState != destinationTransition.targetState || destinationTransition.isRunning
     val navigationToken = state.tutorial.navigationToken
     LaunchedEffect(measurementDestination, navigating, navigationToken) {
         if (measurementDestination && !navigating) model.methodEntered(navigationToken)
@@ -261,8 +269,10 @@ fun ViewyScreen(
             val exceptional = maxHeight < 360.dp || maxWidth < 280.dp || LocalDensity.current.fontScale > 2f
             val workspaceDialogOpen = exceptional && showWorkspace && (measurementDestination || navigating)
             val home: @Composable (Boolean) -> Unit = { interactive ->
-                HomeScreen(homePresentationDestination(state.selection.destination),
-                    openAppSettings, model::backSelection, model::browseMode, model::selectMethod, interactive)
+                NavigationInputGuard(homeEntering, Modifier.fillMaxSize().graphicsLayer { alpha = homeEntryAlpha.value }) {
+                    HomeScreen(homePresentationDestination(state.selection.destination),
+                        openAppSettings, model::backSelection, model::browseMode, model::selectMethod, interactive)
+                }
             }
             // Match the dialog's backdrop while it animates back to Home, avoiding a window-removal flash.
             ScreenOverlayHost(overlayTransition, overlay, backdropOnly = workspaceDialogOpen, overlay = { destination, interactive ->

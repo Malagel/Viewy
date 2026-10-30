@@ -46,6 +46,7 @@ class MainActivity : AppCompatActivity() {
                             diagnosticsEnabled = loaded.diagnosticsEnabled,
                             settingsOpen = preferences.destination != SettingsDestination.CLOSED,
                             settingsContent = { backdropOnly, interactive -> SettingsScreen(preferences, settings, backdropOnly, interactive) },
+                            animateHomeEntry = savedInstanceState == null,
                         )
                     }
                     else -> Surface(Modifier.fillMaxSize()) {

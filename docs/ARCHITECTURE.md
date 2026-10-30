@@ -82,6 +82,13 @@ navigation, never with retained animation content. An open exceptional workspace
 shares the destination transition in its own window, with a matching inaccessible
 Activity backdrop; returning Home completes before that workspace window is removed.
 
+On fresh Activity creation, the initial Home surface has a separate 300 ms
+opacity-only entrance. Its Animatable belongs to `ViewyScreen`, outside the
+destination content, so returning Home does not replay it. Activity recreation
+opts out; system duration scaling applies and Home input/accessibility remains
+blocked until the fade finishes. The launcher/task window transition remains
+controlled by Android.
+
 Method help uses one centered edge-to-edge Compose Dialog with a bounded-width,
 fixed-height Material 3 card constrained by system bars, cutouts and available
 window size. Close stays accessible above the vertically scrollable content;
