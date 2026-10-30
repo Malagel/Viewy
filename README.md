@@ -12,7 +12,8 @@ two aiming directions. Application ID: `com.malagel.viewy`.
    Mode/method lists slide inside the card; measurement enters and leaves with a
    short fade and vertical motion.
    On first activation, read and dismiss the method tutorial. The **?** button
-   beside the settings gear reopens it; **For nerds** explains the geometry and
+   beside the settings gear reopens it. Advance from **Instructions** with **>**,
+   read the **Important** tips, then tap **How does it work?** for geometry and
    limitations. Tap **Enter object height** and save the vertical distance
    between the object's endpoints in the units selected in Settings (meters by
    default, or decimal feet), then allow camera

@@ -42,13 +42,16 @@ future validated features; they have no selectable methods.
 - Each implemented method has a contextual **?** control immediately left of the
   settings gear. It is absent while no method is active. It opens one
   centered, rounded, scrollable tutorial card over the stationary measurement
-  interface. **For nerds** replaces the practical content with a technical
-  explanation with formatted equations in the same card. **Go back** appears at
-  the top left only in the detailed view, opposite **Close**, and restores the
-  practical content.
-  Switching content starts at the top. Outside tap, Android Back and **Close**
-  dismiss the entire card from either page; every reopening starts with basic
-  content. Help suspends camera and orientation acquisition. Entered height and completed
+  interface. Each card has **Instructions**, **Important**, and **How does it work?**
+  sections. Instructions advances with a circular **>** icon button; Important
+  advances with bold **How does it work?** text at the bottom left. Forward
+  navigation slides the
+  current section left and the next in from the right; **Go back**, at the top
+  left opposite **Close**, returns to the previous section with reversed motion.
+  Card bounds remain fixed and motion follows system animation scaling.
+  Switching sections starts at the top. Outside tap, Android Back and **Close**
+  dismiss the entire card from any section; every reopening starts with Instructions.
+  Help suspends camera and orientation acquisition. Entered height and completed
   results remain available; an incomplete endpoint pair is discarded.
 - The first activation of each method automatically opens its tutorial after the
   measurement entrance has completed. Only tutorial dismissal records completion,
@@ -56,15 +59,16 @@ future validated features; they have no selectable methods.
   before dismissal leaves first-use help eligible on the next activation.
   Manual help remains available after completion. Tutorial completion is
   independent of fresh-session Home startup and method selection.
-- Known Object Height basic help gives a brief usage procedure and describes the
+- Known Object Height Instructions gives a brief usage procedure and describes the
   approximate distance result. Before the numbered instructions, a looping
   illustration shows known height, top and bottom observations from a fixed
   camera position, and horizontal distance. Disabled system motion shows a static
   distance diagram; the illustration has one localized accessible description.
   The three steps are: enter the object height, capture
   the top, then tilt the phone without moving its position and capture the bottom.
-  The detailed view explains the geometry with formatted fractions and endpoint
-  subscripts, then covers sensor/camera/timing limitations and unquantified
+  Important gives four practical tips about fixed position, vertical aiming, zoom
+  and using a known height. How does it work? explains the geometry with formatted
+  fractions and endpoint subscripts, then covers sensor/camera/timing limitations and unquantified
   accuracy. Steadiness is not presented as measurement accuracy.
 - The circular bottom-right **Home** control uses a house icon and returns to
   the initial Home card. Restart and Capture retain their existing behavior.

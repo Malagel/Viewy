@@ -77,19 +77,26 @@ Activity backdrop; returning Home completes before that workspace window is remo
 Method help uses one centered edge-to-edge Compose Dialog with a bounded-width,
 fixed-height Material 3 card constrained by system bars, cutouts and available
 window size. Close stays accessible above the vertically scrollable content;
-the detailed page also has Go back at the opposite end of that fixed control row.
-Basic and detailed pages share the same card bounds and modal window. Outside
+sections after Instructions also have Go back at the opposite end of that fixed
+control row.
+Instructions, Important and How does it work? share the same card bounds and modal
+window. Resource-backed section lists per method use one shared renderer and ordered
+navigation. Full-width 260 ms horizontal slides move forward to the left and
+reverse on Go back, honoring system motion scaling. Moving/outgoing content is
+blocked from input, focus and accessibility. The circular Instructions action stays at
+bottom right; the Important section’s technical-explanation action sits at bottom left.
+Close stays usable during motion. Animation state is local to Compose. Outside
 card taps, dialog Back and Close all dispatch a whole-card dismissal. Page-keyed
 scroll state resets on content changes, while sensor-state publication leaves it
 alone. The measurement surface remains composed in place; pending/visible help
 suspends acquisition through the shared resource policy.
 
-Tutorial content distinguishes resource-backed prose, display equations and the
-Known Object Height illustration. The basic page places the illustration between
+Tutorial content distinguishes resource-backed prose, bullet lists, display
+equations and the Known Object Height illustration. Instructions places it between
 the introduction and steps as an explicit content block. Its transparent 2:1
 Canvas scales uniformly within a centered 400 dp maximum width. One draw-phase
 animation clock runs only while STARTED and is canceled on removal; page/card
-keys restart the sequence on reopening or returning to basic help. Compose system
+keys restart the sequence on reopening or returning to Instructions. Compose system
 duration scaling applies, with a static distance frame when motion is disabled.
 The illustration owns no hardware or measurement state and exposes one localized
 image description without changing announcements.
@@ -102,7 +109,7 @@ fragmented symbol semantics. Equations retain font scaling and can scroll
 horizontally in constrained widths, within the vertically scrollable page.
 
 A pure `TutorialCoordinator`, owned by the ViewModel, retains pending requests,
-card identity and basic/detailed page across Activity recreation. A navigation
+card identity and current section across Activity recreation. A navigation
 token rejects obsolete entrance callbacks; card IDs reject obsolete page/dismissal
 callbacks. Activation schedules eligible first-use help and sets a method-entry
 acquisition gate. The host acknowledges the token only when its actual destination
@@ -138,7 +145,7 @@ Source paths below are relative to `app/src/main/java/com/malagel/viewy/`:
 | `ui/MeasurementSelection.kt` | Reusable animated card lists with scrollable entries, disabled modes and input gates. |
 | `tutorial/TutorialCoordinator.kt` | Pure help coordination, navigation/card callback identity and temporary presentation state; no measurement or hardware access. |
 | `tutorial/LocalTutorialSeenStore.kt` | Small local completion store keyed by stable method ID. |
-| `ui/MethodTutorialContent.kt` and `ui/MethodTutorialDialog.kt` | Resource-based prose/equation blocks and reusable single-card presentation with basic/detailed pages. |
+| `ui/MethodTutorialContent.kt` and `ui/MethodTutorialDialog.kt` | Resource-based prose/equation blocks and reusable single-card presentation with three shared sections. |
 | `ui/TutorialMathNotation.kt` and `ui/TutorialEquation.kt` | Pure authored-notation parsing and native mathematical layout with localized spoken descriptions. |
 | `ui/HeightLabelText.kt` | Locale-aware plain-decimal result formatting/counter frames and six-significant-digit height labels; full-precision editable input is untouched. |
 | `ui/MeasurementResultPanel.kt` and `ui/ResultPresentation.kt` | Result layout, host-local entry identity, deterministic reveal timeline and retained result exit; no measurement or hardware ownership. |
