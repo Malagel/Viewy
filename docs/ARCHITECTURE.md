@@ -407,7 +407,9 @@ display listeners and watchdog callbacks and unbinds only the owned Preview.
 Orientation stop unregisters its listener and removes the freshness timer.
 
 A visible intentional suspension can copy one transient PreviewView bitmap, close
-the camera immediately, and fade that decorative image over 225 ms. No image is
+the camera immediately, and fade that decorative image over 225 ms. The snapshot
+records the live opacity at release; its animation initializes at that opacity
+before its first draw to avoid a transparent frame during the handoff. No image is
 stored or exposed to accessibility. Failure to obtain the bitmap skips the fade;
 backgrounding/disposal does not wait for it. The live preview fades in only after
 OPEN plus STREAMING, over 225 ms. Presentation never extends a hardware session for an animation.

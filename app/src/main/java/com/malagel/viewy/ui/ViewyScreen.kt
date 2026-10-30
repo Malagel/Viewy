@@ -382,6 +382,8 @@ private fun MeasurementVisibilityEffect(model: MeasurementViewModel, permission:
 
 private data class ResultPreviewBackdrop(val estimate: KnownHeightResult.Estimate, val bitmap: Bitmap)
 
+private data class SuspendedPreviewFrame(val bitmap: Bitmap, val alpha: Float)
+
 private const val CAMERA_FADE_MILLIS = 225
 
 /** Retain outgoing controls visually while revoking touch, focus and accessibility immediately. */
@@ -414,21 +416,14 @@ private fun LivePreview(
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
     val view = remember(context) { PreviewView(context) }
-    var frozen by remember { mutableStateOf<Bitmap?>(null) }
-    val frozenAlpha = remember { Animatable(0f) }
+    var frozen by remember { mutableStateOf<SuspendedPreviewFrame?>(null) }
     val liveAlpha by animateFloatAsState(
         if (state.previewVisible) 1f else 0f,
         tween(CAMERA_FADE_MILLIS), label = "Streaming preview",
     )
     val currentAlpha by rememberUpdatedState(liveAlpha)
     val animateSnapshot = state.resumed && state.visibility.surfaceVisible && !state.measurement.completed
-    LaunchedEffect(frozen, animateSnapshot) {
-        if (frozen != null && animateSnapshot) {
-            frozenAlpha.snapTo(currentAlpha)
-            frozenAlpha.animateTo(0f, tween(CAMERA_FADE_MILLIS))
-        }
-        frozen = null
-    }
+    LaunchedEffect(animateSnapshot) { if (!animateSnapshot) frozen = null }
     DisposableEffect(view, model) {
         val detector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
             override fun onScale(detector: ScaleGestureDetector): Boolean {
@@ -447,9 +442,16 @@ private fun LivePreview(
         .focusProperties { canFocus = state.previewVisible }
         .then(if (!state.previewVisible) Modifier.clearAndSetSemantics {} else Modifier)
         .graphicsLayer { alpha = if (state.previewVisible) liveAlpha else 0f })
-    frozen?.takeIf { !state.measurement.completed }?.let { bitmap ->
-        Image(bitmap.asImageBitmap(), contentDescription = null, contentScale = ContentScale.FillBounds,
-            modifier = Modifier.fillMaxSize().graphicsLayer { alpha = frozenAlpha.value })
+    frozen?.takeIf { animateSnapshot }?.let { frame ->
+        // Initialize at the captured opacity during composition, before the first draw.
+        // A LaunchedEffect-only snap would expose a black frame during this handoff.
+        val opacity = remember(frame) { Animatable(frame.alpha) }
+        Image(frame.bitmap.asImageBitmap(), contentDescription = null, contentScale = ContentScale.FillBounds,
+            modifier = Modifier.fillMaxSize().graphicsLayer { alpha = opacity.value })
+        LaunchedEffect(frame) {
+            opacity.animateTo(0f, tween(CAMERA_FADE_MILLIS))
+            if (frozen === frame) frozen = null
+        }
     }
     DisposableEffect(view, owner, model, state.acquisitionEligible, state.previewEpoch) {
         var preview: CameraPreview? = null
@@ -460,7 +462,9 @@ private fun LivePreview(
                 runCatching { view.bitmap }.getOrNull()?.let { onCompletionFrame(estimate, it) }
             }
             // Other intentional visible suspensions keep their existing fade.
-            frozen = if (animate && currentAlpha > 0f) runCatching { view.bitmap }.getOrNull() else null
+            frozen = if (animate && currentAlpha > 0f) {
+                runCatching { view.bitmap }.getOrNull()?.let { SuspendedPreviewFrame(it, currentAlpha) }
+            } else null
             released = true
             preview?.close()
             preview = null
