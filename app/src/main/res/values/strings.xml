@@ -20,6 +20,7 @@
     <string name="result_horizontal_distance">Horizontal distance</string>
     <string name="result_elevation_difference">Elevation difference: %1$s°</string>
     <string name="result_disclaimer">Approximate result. Follow the instructions to get the best results.</string>
+    <string name="guidance_keep_steady">Keep the camera steady.</string>
     <string name="guidance_near_vertical">Cannot align at this angle.</string>
     <string name="guidance_orientation">Orientation sensor unavailable.</string>
     <string name="notice_acquisition_suspended">Capture cleared.</string>

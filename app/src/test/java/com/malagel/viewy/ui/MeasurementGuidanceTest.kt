@@ -18,7 +18,7 @@ class MeasurementGuidanceTest {
         resumed = true,
         visibility = MeasurementVisibility(surfaceVisible = true, windowFocused = true, permissionGranted = true),
         measurement = MeasurementState(heightMeters = 2.0, cameraReady = true, latest = observation),
-        camera = CameraPreviewState(ready = true), acquisition = AcquisitionState(running = true),
+        camera = CameraPreviewState(ready = true, zoom = com.malagel.viewy.camera.PreviewZoom(settled = true)), acquisition = AcquisitionState(running = true),
     )
     private fun status(value: CaptureStatus) = ready.copy(measurement = ready.measurement.copy(
         latest = observation.copy(quality = quality.copy(status = value))))
@@ -27,9 +27,9 @@ class MeasurementGuidanceTest {
     private fun notice(reason: MeasurementNotice, id: Long = 1) = ready.copy(
         measurement = ready.measurement.copy(notice = reason, noticeId = id))
 
-    @Test fun allLiveSensorStatusesRemainSilentRegardlessOfDuration() {
+    @Test fun sensorStatusesOtherThanMovementRemainSilentRegardlessOfDuration() {
         val hints = MeasurementGuidance()
-        for (status in CaptureStatus.entries) {
+        for (status in CaptureStatus.entries.filter { it != CaptureStatus.MOVING }) {
             val live = status(status)
             for (time in listOf(0L, 800L, 2_000L, 30_000L, 60_000L)) {
                 assertNull("$status at $time", hints.update(live, time))
@@ -38,6 +38,72 @@ class MeasurementGuidanceTest {
         val missing = ready.copy(measurement = ready.measurement.copy(latest = null))
         assertNull(hints.update(missing, 60_001))
         assertNull(hints.update(missing, 120_000))
+    }
+
+    @Test fun sixContinuousSecondsOfMovementShowOneNormallyTimedHintPerEpisode() {
+        val hints = MeasurementGuidance()
+        val moving = status(CaptureStatus.MOVING)
+        assertNull(hints.update(moving, 0))
+        assertNull(hints.update(moving, 5_999))
+        assertEquals(R.string.guidance_keep_steady, hints.update(moving, 6_000))
+        assertEquals(R.string.guidance_keep_steady, hints.update(moving, 10_999))
+        assertNull(hints.update(moving, 11_000))
+        assertNull(hints.update(moving, 60_000)) // No repeated popup during the same motion episode.
+        assertNull(hints.update(ready, 60_001))
+        assertNull(hints.update(moving, 60_002))
+        assertEquals(R.string.guidance_keep_steady, hints.update(moving, 66_002))
+    }
+
+    @Test fun movementMustBeContinuousEligibleAndInTheSameSensorFrame() {
+        val moving = status(CaptureStatus.MOVING)
+        val interruptions = CaptureStatus.entries.filter { it != CaptureStatus.MOVING }.map(::status) + listOf(
+            moving.copy(resumed = false),
+            moving.copy(visibility = moving.visibility.copy(covered = true)),
+            moving.copy(heightEditor = HeightDraft.open(2.0, HeightUnit.METERS)),
+            moving.copy(measurement = moving.measurement.copy(latest = null)),
+            moving.copy(cameraFailureVisible = true),
+            moving.copy(camera = moving.camera.copy(ready = false)),
+            moving.copy(camera = moving.camera.copy(zoom = moving.camera.zoom.copy(settled = false))),
+            vertical.copy(measurement = vertical.measurement.copy(latest = vertical.measurement.latest!!.copy(
+                quality = quality.copy(status = CaptureStatus.MOVING)))),
+            moving.copy(measurement = moving.measurement.copy(latest = moving.measurement.latest!!.copy(referenceFrameId = "new"))),
+        )
+        for (interrupted in interruptions) {
+            val hints = MeasurementGuidance()
+            assertNull(hints.update(moving, 0))
+            assertNotEquals(R.string.guidance_keep_steady, hints.update(interrupted, 5_999))
+            assertNull(hints.update(moving, 6_000))
+            assertNull(hints.update(moving, 11_999))
+            assertEquals(R.string.guidance_keep_steady, hints.update(moving, 12_000))
+        }
+    }
+
+    @Test fun movementHintUsesAccessibilityTimeoutAndResetsOnRestartOrCaptureStageChange() {
+        val moving = status(CaptureStatus.MOVING)
+        for (reset in listOf(
+            moving.copy(measurement = moving.measurement.copy(noticeId = 1)),
+            moving.copy(measurement = moving.measurement.copy(stage = MeasurementStage.BOTTOM)),
+        )) {
+            val hints = MeasurementGuidance { 10_000L }
+            assertNull(hints.update(moving, 0))
+            assertEquals(R.string.guidance_keep_steady, hints.update(moving, 6_000))
+            assertEquals(R.string.guidance_keep_steady, hints.update(moving, 15_999))
+            assertNull(hints.update(moving, 16_000))
+            assertNull(hints.update(reset, 16_001))
+            assertNull(hints.update(reset, 22_000))
+            assertEquals(R.string.guidance_keep_steady, hints.update(reset, 22_001))
+        }
+    }
+
+    @Test fun movementHintDoesNotReplaceWorkflowCorrectionsOrNearVerticalRestriction() {
+        val hints = MeasurementGuidance { 10_000L }
+        val failed = status(CaptureStatus.MOVING).let { it.copy(measurement = it.measurement.copy(
+            notice = MeasurementNotice.AIM_BELOW_TOP, noticeId = 1)) }
+        assertEquals(R.string.notice_below_top, hints.update(failed, 0))
+        assertEquals(R.string.notice_below_top, hints.update(failed, 6_000))
+        assertEquals(R.string.guidance_keep_steady, hints.update(failed, 10_000))
+        assertEquals(R.string.guidance_near_vertical, hints.update(vertical, 10_001))
+        assertNull(hints.update(status(CaptureStatus.MOVING), 10_002))
     }
 
     @Test fun nearVerticalMessagePersistsUntilLeavingTheRestrictedRangeAndCaptureRemainsBlocked() {

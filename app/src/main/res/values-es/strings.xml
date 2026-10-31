@@ -20,6 +20,7 @@
     <string name="result_horizontal_distance">Distancia horizontal</string>
     <string name="result_elevation_difference">Diferencia de elevación: %1$s°</string>
     <string name="result_disclaimer">Resultado aproximado. Siga las instrucciones para tener el mejor resultado posible.</string>
+    <string name="guidance_keep_steady">Mantén la cámara fija.</string>
     <string name="guidance_near_vertical">No se puede alinear en este ángulo.</string>
     <string name="guidance_orientation">Sensor de orientación no disponible. Reintenta la orientación para iniciar una nueva sesión.</string>
     <string name="notice_acquisition_suspended">Se descartó la captura.</string>

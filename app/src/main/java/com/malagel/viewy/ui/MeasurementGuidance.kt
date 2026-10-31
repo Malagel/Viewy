@@ -3,15 +3,20 @@ package com.malagel.viewy.ui
 import androidx.annotation.StringRes
 import com.malagel.viewy.R
 import com.malagel.viewy.measurement.*
+import com.malagel.viewy.orientation.CaptureStatus
 import kotlin.math.hypot
 
-/** Presents workflow failures once and the near-vertical restriction while it applies. */
+/** Presents workflow failures, persistent angle restrictions and sustained-movement assistance. */
 internal class MeasurementGuidance(private val correctionTimeoutMillis: () -> Long = { 5_000L }) {
     private var seenNoticeId = 0L
     private var pending: MeasurementNotice? = null
     private var correction: Int? = null
     private var correctionUntil = 0L
     private var stage: MeasurementStage? = null
+    private var movingSince: Long? = null
+    private var movingFrame: String? = null
+    private var steadyShown = false
+    private var steadyUntil = 0L
 
     /** Uses existing state publications for expiry; no presentation timer or sensor work. */
     @StringRes
@@ -19,6 +24,7 @@ internal class MeasurementGuidance(private val correctionTimeoutMillis: () -> Lo
         val measurement = state.measurement
         val newEvent = measurement.noticeId != seenNoticeId
         seenNoticeId = measurement.noticeId
+        if (stage != measurement.stage || (newEvent && measurement.notice == null)) resetMovement()
         if (stage != measurement.stage || measurement.notice == null || measurement.completed) {
             pending = null
             correction = null
@@ -28,6 +34,7 @@ internal class MeasurementGuidance(private val correctionTimeoutMillis: () -> Lo
 
         val active = state.acquisitionEligible && measurement.cameraReady && state.acquisition.running && !state.recoveryVisible
         if (!active) {
+            resetMovement()
             correction = null
             // A newly lost pending capture may be explained on return, but never replayed.
             if (pending !in resetNotices || measurement.completed) pending = null
@@ -42,7 +49,31 @@ internal class MeasurementGuidance(private val correctionTimeoutMillis: () -> Lo
         val nearVertical = measurement.latest?.direction?.let {
             hypot(it.x, it.y) < MeasurementPolicy.minimumHorizontalNorm
         } == true || measurement.alignment == Alignment.NEAR_VERTICAL
-        return if (nearVertical) R.string.guidance_near_vertical else correction
+        val moving = measurement.latest?.quality?.status == CaptureStatus.MOVING && state.camera.ready && state.camera.zoom.settled && !nearVertical
+        if (!moving) resetMovement()
+        else {
+            val frame = measurement.latest.referenceFrameId
+            if (movingFrame != frame) resetMovement()
+            movingFrame = frame
+            val since = movingSince ?: nowMillis.also { movingSince = it }
+            if (!steadyShown && nowMillis - since >= 6_000L && correction == null) {
+                steadyShown = true
+                steadyUntil = nowMillis + correctionTimeoutMillis().coerceAtLeast(5_000L)
+            }
+        }
+        return when {
+            nearVertical -> R.string.guidance_near_vertical
+            correction != null -> correction
+            steadyShown && nowMillis < steadyUntil -> R.string.guidance_keep_steady
+            else -> null
+        }
+    }
+
+    private fun resetMovement() {
+        movingSince = null
+        movingFrame = null
+        steadyShown = false
+        steadyUntil = 0L
     }
 
     private companion object {
