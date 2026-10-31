@@ -127,6 +127,28 @@ class HeightEditorTest {
         assertSame(before, workflow.state)
     }
 
+    @Test fun cancellingCameraHeightEditRetainsSavedHeightAndDoesNotReturnToTheInitialPrompt() {
+        val workflow = KnownHeightWorkflow()
+        val editor = HeightEditor(workflow)
+        editor.open(HeightUnit.METERS)
+        editor.key('2')
+        assertTrue(editor.confirm())
+        workflow.cameraReady(true)
+        editor.open(HeightUnit.METERS)
+        assertEquals(2.0, editor.draft!!.meters!!, 0.0)
+        editor.backspace()
+        editor.key('9')
+        editor.cancel()
+        assertNull(editor.draft)
+        assertEquals(2.0, workflow.state.heightMeters!!, 0.0)
+        assertNull(workflow.state.result)
+        editor.open(HeightUnit.METERS)
+        assertEquals("2", editor.draft!!.text)
+        editor.cancel()
+        assertFalse(editor.confirm())
+        assertEquals(2.0, workflow.state.heightMeters!!, 0.0)
+    }
+
     @Test fun cameraReturnReopensSavedHeightAndPreservesItAcrossSuspensionAndConfirmation() {
         for (unit in HeightUnit.entries) {
             val workflow = KnownHeightWorkflow()

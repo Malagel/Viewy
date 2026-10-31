@@ -168,7 +168,7 @@ fun ViewyScreen(
     }
     BackHandler(enabled = !settingsOpen && !diagnosticsOpen && !editorBlocks && !showStatus && state.tutorial.card == null &&
         (measurementDestination || state.selection.browsingMode != null || navigating)) {
-        if (!navigating) model.systemBack(unit)
+        if (!navigating) model.systemBack()
     }
     LaunchedEffect(measurementDestination, navigating) {
         if (!measurementDestination && !navigating) showWorkspace = false
@@ -329,7 +329,7 @@ fun ViewyScreen(
                 properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = false),
             ) {
                 BackHandler(enabled = !overlay.blocksMeasurement && !editorBlocks && !showStatus && state.tutorial.card == null) {
-                    if (!navigating) model.systemBack(unit)
+                    if (!navigating) model.systemBack()
                 }
                 Surface(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout))) {
                     ScreenOverlayHost(overlayTransition, overlay, backdropOnly = false, overlay = { destination, interactive ->

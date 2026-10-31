@@ -84,28 +84,28 @@ class MeasurementPresentationTest {
         }
         assertFalse(completed.copy(selection = selected.back()).backRestartsMeasurement)
         assertFalse(completed.copy(selection = selected.openModes()).backRestartsMeasurement)
-        // Once Restart clears completion, Back returns to height entry instead.
+        // Once Restart clears completion, Back returns directly to the initial height prompt.
         val workflow = KnownHeightWorkflow().apply { setHeight(2.0); restart() }
         val restarted = completed.copy(measurement = workflow.state)
         assertFalse(restarted.backRestartsMeasurement)
-        assertTrue(restarted.backOpensHeightEditor)
+        assertTrue(restarted.backReturnsToHeightPrompt)
         assertTrue(restarted.acquisitionEligible)
         assertEquals(selected, restarted.selection)
         assertEquals(2.0, restarted.measurement.heightMeters!!, 0.0)
     }
 
-    @Test fun systemBackReturnsConfiguredCameraStagesToHeightEntry() {
+    @Test fun systemBackReturnsConfiguredCameraStagesDirectlyToTheInitialHeightPrompt() {
         for (stage in listOf(MeasurementStage.TOP, MeasurementStage.BOTTOM, MeasurementStage.CORRECTION)) {
             val camera = ready.copy(measurement = ready.measurement.copy(stage = stage))
-            assertTrue(camera.backOpensHeightEditor)
-            assertFalse(camera.copy(selection = selected.back()).backOpensHeightEditor)
-            assertFalse(camera.copy(selection = selected.openModes()).backOpensHeightEditor)
+            assertTrue(camera.backReturnsToHeightPrompt)
+            assertFalse(camera.copy(selection = selected.back()).backReturnsToHeightPrompt)
+            assertFalse(camera.copy(selection = selected.openModes()).backReturnsToHeightPrompt)
         }
-        assertFalse(ready.copy(measurement = MeasurementState()).backOpensHeightEditor)
+        assertFalse(ready.copy(measurement = MeasurementState()).backReturnsToHeightPrompt)
         val result = com.malagel.viewy.domain.KnownHeightDistance.estimate(2.0,
             ViewingDirection(1.0, 0.0, 0.5), observation.direction) as com.malagel.viewy.domain.KnownHeightResult.Estimate
         assertFalse(ready.copy(measurement = ready.measurement.copy(
-            stage = MeasurementStage.RESULT, result = result)).backOpensHeightEditor)
+            stage = MeasurementStage.RESULT, result = result)).backReturnsToHeightPrompt)
     }
 
     @Test fun inactiveOrCoveredMeasurementCannotAcquireEvenWithResidualReadyHardware() {

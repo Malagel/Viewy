@@ -53,7 +53,7 @@ data class MeasurementUiState(
 
     val canCapture: Boolean get() = heightEditor == null && measurement.canCapture && camera.zoom.settled
     internal val backRestartsMeasurement: Boolean get() = selection.activeMethod != null && measurement.completed
-    internal val backOpensHeightEditor: Boolean get() = requiresCamera && heightConfigured && !measurement.completed
+    internal val backReturnsToHeightPrompt: Boolean get() = requiresCamera && heightConfigured && !measurement.completed
     val orientationFailureVisible: Boolean get() = acquisitionEligible && camera.ready &&
         !acquisition.running && acquisition.failure != null
     val recoveryVisible: Boolean get() = requiresCamera && heightConfigured && !measurement.completed &&
@@ -166,11 +166,11 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
     fun openModes() { if (mutableState.value.canOpenSettings) updateSelection(mutableState.value.selection.openModes()) }
     fun backSelection() = updateSelection(mutableState.value.selection.back())
     /** Called only by the uncovered destination's Android Back handlers. */
-    fun systemBack(unit: HeightUnit) {
+    fun systemBack() {
         val state = mutableState.value
         when {
             state.backRestartsMeasurement -> restart()
-            state.backOpensHeightEditor -> openHeightEditor(unit)
+            state.backReturnsToHeightPrompt -> returnToHeightPrompt()
             else -> backSelection()
         }
     }
@@ -220,6 +220,17 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
     fun switchHeightUnit() { if (!mutableState.value.canEditHeight) return; heightEditor.switchUnit(); publish() }
     fun heightPreferenceChanged(unit: HeightUnit) { heightEditor.preferenceChanged(unit); publish() }
     fun cancelHeightEditor() { heightEditor.cancel(); publish(); reconcile() }
+
+    private fun returnToHeightPrompt() {
+        heightEditor.cancel()
+        workflow.clear()
+        // Publish the height gate before synchronous resource-release callbacks.
+        publish()
+        val state = mutableState.value
+        resources.clear(animateRelease = state.resumed && state.visibility.surfaceVisible && state.visibility.windowFocused)
+        acquisition.clear()
+        reconcile()
+    }
     fun confirmHeightEditor() { if (!mutableState.value.canEditHeight) return; heightEditor.confirm(); publish(); reconcile() }
 
     fun restart() { heightEditor.cancel(); workflow.restart(); publish(); reconcile() }

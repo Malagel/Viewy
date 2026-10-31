@@ -56,8 +56,8 @@ internal class MeasurementResources(
     }
 
     /** Complete method exit: revoke ownership/retries and forget previous camera diagnostics/zoom. */
-    fun clear() {
-        reconcile(false, false, animateRelease = false)
+    fun clear(animateRelease: Boolean = false) {
+        reconcile(false, false, animateRelease = animateRelease)
         preview.invalidate()
         previewEpoch++
     }
