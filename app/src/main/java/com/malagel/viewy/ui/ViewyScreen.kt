@@ -310,7 +310,7 @@ fun ViewyScreen(
                         home(!navigating && !measurementDestination && !overlay.blocksMeasurement && !workspaceDialogOpen)
                     } else if (exceptional) {
                         if (!showWorkspace) SideEffect { model.visibilityChanged(MeasurementVisibility()) }
-                        Column(Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Column(Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                             ViewyHeader(compact, false, true, { openHelp(false) }, {}, openAppSettings, diagnosticsEnabled, { openHelp(true) })
                             TextButton(onClick = { showWorkspace = true }, modifier = Modifier.weight(1f)) {
                                 Text(stringResource(R.string.open_viewfinder))

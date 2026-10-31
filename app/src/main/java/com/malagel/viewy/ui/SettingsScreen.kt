@@ -100,14 +100,12 @@ fun SettingsScreen(state: SettingsUiState, model: SettingsViewModel, backdropOnl
 @Composable
 private fun SettingsPage(state: SettingsUiState, model: SettingsViewModel, page: SettingsDestination, interactive: Boolean) {
     Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = { if (interactive) model.back() }, enabled = !state.resetLocked) { Text(stringResource(R.string.back)) }
-            Text(stringResource(when (page) {
+        ScreenHeader(onBack = { if (interactive) model.back() }, enabled = !state.resetLocked,
+            title = stringResource(when (page) {
                 SettingsDestination.DEVELOPER -> R.string.developer_options
                 SettingsDestination.LANGUAGE -> R.string.language
                 else -> R.string.settings
-            }), Modifier.weight(1f).padding(horizontal = 8.dp), style = MaterialTheme.typography.headlineSmall)
-        }
+            }))
         val scroll = remember(page) { ScrollState(0) }
         Column(Modifier.widthIn(max = 600.dp).fillMaxWidth().align(Alignment.CenterHorizontally)
             .weight(1f).verticalScroll(scroll)

@@ -17,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -45,7 +46,9 @@ internal fun ViewyHeader(compact: Boolean, overflow: Boolean, active: Boolean, o
                 fontSize = if (compact) 30.sp else 38.sp,
                 lineHeight = if (compact) 38.sp else 46.sp,
             ))
-            if (active && !compact) Text(stringResource(R.string.measurement_method_subtitle), style = MaterialTheme.typography.bodySmall)
+            if (!compact) Text(stringResource(R.string.measurement_method_subtitle),
+                modifier = if (active) Modifier else Modifier.graphicsLayer { alpha = 0f }.clearAndSetSemantics {},
+                style = MaterialTheme.typography.bodySmall)
         }
         if (overflow) LabeledIconButton(R.string.close, "×", onCloseWorkspace)
         if (active) {
@@ -83,7 +86,7 @@ internal fun ViewyHeader(compact: Boolean, overflow: Boolean, active: Boolean, o
                 }
             }
             Spacer(Modifier.width(8.dp))
-        }
+        } else Spacer(Modifier.width(56.dp))
         val settingsLabel = stringResource(R.string.settings)
         FilledTonalIconButton(
             onClick = onSettings, shape = CircleShape,

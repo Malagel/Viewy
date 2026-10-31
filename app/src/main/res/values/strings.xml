@@ -56,6 +56,7 @@
     <string name="horizontal_result">Approximate horizontal distance: %1$s; uncertainty is not quantified.</string>
     <string name="close">Close</string>
     <string name="open_viewfinder">Open viewfinder</string>
+    <string name="select_method">Select a method</string>
     <string name="select_mode">Select a mode</string>
     <string name="back_to_modes">Back to modes</string>
     <string name="coming_soon">Coming soon</string>

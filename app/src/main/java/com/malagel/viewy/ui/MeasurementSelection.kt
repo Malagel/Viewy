@@ -14,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
@@ -66,11 +67,12 @@ internal fun SelectionLists(
         NavigationInputGuard(!interactive, Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 8.dp)) {
                 if (level is SelectionDestination.Methods) {
-                    TextButton(
-                        onClick = onBack, enabled = interactive,
-                        colors = ButtonDefaults.textButtonColors(disabledContentColor = MaterialTheme.colorScheme.primary),
-                    ) { Text(stringResource(R.string.back_to_modes)) }
-                    Text(stringResource(level.mode.title()), Modifier.padding(8.dp).semantics { heading() }, style = MaterialTheme.typography.headlineSmall)
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        NavigationBackButton(onClick = onBack, label = stringResource(R.string.back_to_modes), enabled = interactive,
+                            dimWhenDisabled = false)
+                        Text(stringResource(R.string.select_method), Modifier.weight(1f).padding(horizontal = 8.dp).semantics { heading() },
+                            style = MaterialTheme.typography.headlineSmall)
+                    }
                     level.mode.methods.forEach { method ->
                         when (method) {
                             MeasurementMethod.KNOWN_OBJECT_HEIGHT -> SelectionEntry(

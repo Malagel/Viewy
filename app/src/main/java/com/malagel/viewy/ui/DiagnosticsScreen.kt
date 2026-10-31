@@ -38,16 +38,13 @@ internal fun DiagnosticsScreen(
         // the Back action, scrolls so even the smallest viewfinder remains usable.
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally) {
+            ScreenHeader(onBack = onBack, title = title)
             Column(Modifier.widthIn(max = 600.dp).fillMaxWidth().padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
-                Column {
-                    Text(title, Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineSmall)
-                    state.selection.activeMethod?.let { method ->
-                        Text(stringResource(when (method) {
-                            MeasurementMethod.KNOWN_OBJECT_HEIGHT -> R.string.known_height_method
-                        }), style = MaterialTheme.typography.titleMedium)
-                    }
+                state.selection.activeMethod?.let { method ->
+                    Text(stringResource(when (method) {
+                        MeasurementMethod.KNOWN_OBJECT_HEIGHT -> R.string.known_height_method
+                    }), style = MaterialTheme.typography.titleMedium)
                 }
                 presentation.sections.forEach { section ->
                     Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = MaterialTheme.shapes.large) {
