@@ -2,6 +2,7 @@ package com.malagel.viewy.ui
 
 import com.malagel.viewy.camera.CameraDirectionMapping
 import com.malagel.viewy.camera.CameraPreviewState
+import com.malagel.viewy.camera.PreviewRelease
 import com.malagel.viewy.domain.MeasurementMethod
 import com.malagel.viewy.domain.ViewingDirection
 import com.malagel.viewy.measurement.*
@@ -72,6 +73,84 @@ class MeasurementResourcesTest {
 
     private class Retry(val delay: Long, val action: () -> Unit, var canceled: Boolean = false)
 
+    @Test fun visibleReleaseKeepsItsImageThroughDisposalBeforeTheFirstAnimationFrame() {
+        for (destination in listOf("editor", "result", "home", "settings", "tutorial", "prompt", "diagnostics")) {
+            val h = Harness()
+            var foreground = "live camera"
+            var copies = 0
+            var closes = 0
+            val release = PreviewRelease { animate ->
+                // Fake native pixels: completion retains an image for the result's own fade.
+                foreground = if (animate || h.workflow.state.completed) {
+                    copies++
+                    "camera image"
+                } else "waiting color"
+                closes++
+            }
+            h.reconcile()
+            val token = h.resources.startPreview(release = release::release)!!
+            assertTrue(h.resources.previewChanged(token, camera))
+            when (destination) {
+                "editor" -> h.ui = h.ui.copy(visibility = h.ui.visibility.copy(heightEditing = true))
+                "result" -> { h.capture(0.5); h.capture(0.0) }
+                "home" -> {
+                    h.workflow.clear()
+                    h.ui = h.ui.copy(selection = h.ui.selection.openModes())
+                    h.resources.clear(animateRelease = true)
+                }
+                "settings" -> h.ui = h.ui.copy(visibility = h.ui.visibility.copy(covered = true))
+                "tutorial" -> h.ui = h.ui.copy(tutorial = TutorialState(card = TutorialCard(1, method)))
+                "prompt" -> { h.workflow.clear(); h.resources.clear(animateRelease = true) }
+                "diagnostics" -> h.ui = h.ui.copy(diagnosticsOpen = true)
+            }
+            h.reconcile()
+            assertTrue(destination, release.released)
+            assertEquals(destination, "camera image", foreground)
+            // Compose disposes the old effect as eligibility/epoch changes, before drawing its copy.
+            release.release(animate = false)
+            h.resources.stopPreview(token)
+            assertEquals(destination, "camera image", foreground)
+            assertEquals(destination, 1, copies)
+            assertEquals(destination, 1, closes)
+            assertFalse(destination, h.resources.camera.ready)
+            assertFalse(destination, h.resources.previewChanged(token, camera))
+        }
+    }
+
+    @Test fun disposalFirstClosesWithoutCopyingAndLaterSuspensionCannotChangeTheDecision() {
+        val h = Harness()
+        val actions = mutableListOf<Boolean>()
+        val release = PreviewRelease { actions += it }
+        h.reconcile()
+        val token = h.resources.startPreview(release = release::release)!!
+        h.resources.previewChanged(token, camera)
+        release.release(animate = false)
+        h.resources.stopPreview(token)
+        h.ui = h.ui.copy(visibility = h.ui.visibility.copy(covered = true))
+        h.reconcile()
+        release.release(animate = true)
+        assertEquals(listOf(false), actions)
+        assertFalse(h.resources.previewChanged(token, camera))
+    }
+
+    @Test fun lateDisposalDoesNotRewritePixelsOrStopAReplacementPreview() {
+        val h = Harness()
+        val actions = mutableListOf<Boolean>()
+        val release = PreviewRelease { actions += it }
+        h.reconcile()
+        val token = h.resources.startPreview(release = release::release)!!
+        h.resources.previewChanged(token, camera)
+        h.ui = h.ui.copy(visibility = h.ui.visibility.copy(covered = true))
+        h.reconcile()
+        h.ui = h.ui.copy(visibility = h.ui.visibility.copy(covered = false))
+        val replacement = h.bind()
+        release.release(animate = false)
+        h.resources.stopPreview(token)
+        assertEquals(listOf(true), actions)
+        assertTrue(h.resources.camera.ready)
+        assertTrue(h.resources.previewChanged(replacement, camera))
+    }
+
     @Test fun homeClearsHeightCapturesResultAndCameraBeforeSameMethodCanBeEnteredFresh() {
         for (completed in listOf(false, true)) {
             val h = Harness()
@@ -114,6 +193,34 @@ class MeasurementResourcesTest {
             h.resources.stopPreview(token)
             assertTrue(h.resources.camera.ready)
             assertEquals(3.0, h.workflow.state.heightMeters!!, 0.0)
+        }
+    }
+
+    @Test fun heightPromptFadeReleasesHardwareSynchronouslyAndRejectsOldReadiness() {
+        for (animate in listOf(false, true)) {
+            val h = Harness()
+            val token = h.bind()
+            val sensor = h.sensorToken
+            h.capture(0.5)
+            h.workflow.clear()
+            h.resources.clear(animateRelease = animate)
+            // Only a decorative snapshot may outlive clear; no callback or resource owns the fade.
+            assertEquals(listOf(animate), h.releases)
+            assertNull(h.workflow.state.heightMeters)
+            assertNull(h.workflow.state.top)
+            assertFalse(h.resources.camera.ready)
+            assertFalse(h.resources.previewChanged(token, camera))
+            assertFalse(h.registration.accepts(sensor))
+            assertNull(h.resources.startPreview { fail("Height prompt acquired a camera") })
+            h.reconcile()
+            assertEquals(listOf(animate), h.releases)
+            h.workflow.setHeight(3.0)
+            h.reconcile()
+            val fresh = h.resources.startPreview { h.releases += it }!!
+            assertNotEquals(token, fresh)
+            assertFalse(h.resources.camera.ready)
+            assertFalse(h.resources.previewChanged(token, camera))
+            assertTrue(h.resources.previewChanged(fresh, camera))
         }
     }
 

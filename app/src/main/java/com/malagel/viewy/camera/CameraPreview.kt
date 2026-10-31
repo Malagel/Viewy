@@ -71,6 +71,8 @@ class CameraPreview(
     private var open = false
     private var streaming = false
     private var failed = false
+    private val presentation = PreviewPresentationGate()
+    private var cancelPreviewDraw: (() -> Unit)? = null
     private val watchdog = PreviewWatchdog()
     private val timeout = Runnable {
         if (!disposed && !failed && owner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED) &&
@@ -245,7 +247,20 @@ class CameraPreview(
 
     private fun publish() {
         if (disposed || failed) return
-        val ready = open && streaming && (!identityRequired || identityVerified)
+        val drawToken = presentation.update(open && streaming && (!identityRequired || identityVerified), zoom.state.settled)
+        if (!presentation.awaitingFrame) {
+            cancelPreviewDraw?.invoke()
+            cancelPreviewDraw = null
+        }
+        drawToken?.let { token ->
+            cancelPreviewDraw = afterPreviewDraw(view) {
+                if (!disposed && !failed && presentation.presented(token)) {
+                    cancelPreviewDraw = null
+                    publish()
+                }
+            }
+        }
+        val ready = presentation.ready
         scheduleWatchdog(ready)
         description = description.copy(zoom = zoom.state, ready = ready, open = open, streaming = streaming, messageRes = if (ready) R.string.camera_ready else R.string.camera_waiting)
         onState(description)
@@ -322,6 +337,9 @@ class CameraPreview(
 
     private fun clearZoom() {
         bindingEpoch++
+        presentation.reset()
+        cancelPreviewDraw?.invoke()
+        cancelPreviewDraw = null
         identityVerified = false
         lastFrameNumber = -1L
         acknowledgedZoomToken = null

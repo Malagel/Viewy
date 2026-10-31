@@ -148,7 +148,8 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
         if (leavingMethod) workflow.clear()
         mutableState.value = mutableState.value.navigateTo(next, tutorials.state, workflow.state)
         if (leavingMethod) {
-            resources.clear()
+            val state = mutableState.value
+            resources.clear(animateRelease = state.resumed && state.visibility.surfaceVisible && state.visibility.windowFocused)
             acquisition.clear()
         }
         reconcile()
