@@ -61,13 +61,13 @@ class TutorialCoordinatorTest {
         activate()
         hidden()
         val first = coordinator.state.card!!
-        coordinator.changePage(first.id, TutorialPage.HOW_IT_WORKS)
-        assertEquals(first.copy(page = TutorialPage.HOW_IT_WORKS), coordinator.state.card)
+        coordinator.changePage(first.id, TutorialPage.IMPORTANT)
+        assertEquals(first.copy(page = TutorialPage.IMPORTANT), coordinator.state.card)
         assertTrue(seen.ids.isEmpty())
         coordinator.changePage(first.id, TutorialPage.INSTRUCTIONS)
         assertEquals(first, coordinator.state.card)
-        coordinator.changePage(first.id, TutorialPage.HOW_IT_WORKS)
-        coordinator.dismiss(first.id) // Close/outside/Back use the same whole-card action.
+        coordinator.changePage(first.id, TutorialPage.IMPORTANT)
+        coordinator.dismiss(first.id) // Explicit Close and outside taps dismiss the whole card.
         coordinator.openManually()
         val reopened = coordinator.state.card!!
         assertNotEquals(first.id, reopened.id)
@@ -77,20 +77,18 @@ class TutorialCoordinatorTest {
         assertNull(coordinator.state.card)
     }
 
-    @Test fun threeSectionsNavigateInOrderWithoutCompletingUntilDismissal() {
+    @Test fun twoSectionsNavigateWithoutCompletingUntilDismissal() {
         activate()
         hidden()
         val card = coordinator.state.card!!
         assertNull(TutorialPage.INSTRUCTIONS.previous)
         assertEquals(TutorialPage.IMPORTANT, TutorialPage.INSTRUCTIONS.next)
-        assertEquals(TutorialPage.HOW_IT_WORKS, TutorialPage.IMPORTANT.next)
-        assertNull(TutorialPage.HOW_IT_WORKS.next)
+        assertNull(TutorialPage.IMPORTANT.next)
         for (page in TutorialPage.entries) {
             coordinator.changePage(card.id, page)
             assertEquals(card.copy(page = page), coordinator.state.card)
             assertTrue(seen.ids.isEmpty())
         }
-        assertEquals(TutorialPage.IMPORTANT, TutorialPage.HOW_IT_WORKS.previous)
         assertEquals(TutorialPage.INSTRUCTIONS, TutorialPage.IMPORTANT.previous)
         for (page in TutorialPage.entries) {
             val id = coordinator.state.card!!.id
@@ -114,6 +112,35 @@ class TutorialCoordinatorTest {
         coordinator.dismiss(first!!.id)
         hidden()
         assertNull(coordinator.state.card)
+    }
+
+    @Test fun documentationBackReturnsToImportantWithoutCompletingTheTutorial() {
+        activate()
+        hidden()
+        val card = coordinator.state.card!!
+        coordinator.openDocumentation(card.id) // Only Important owns this destination.
+        assertEquals(card, coordinator.state.card)
+        coordinator.changePage(card.id, TutorialPage.IMPORTANT)
+        val important = coordinator.state.card!!
+        coordinator.openDocumentation(card.id)
+        assertEquals(important.copy(documentationOpen = true), coordinator.state.card)
+        coordinator.changePage(card.id, TutorialPage.INSTRUCTIONS) // Covered page cannot change.
+        assertEquals(important.copy(documentationOpen = true), coordinator.state.card)
+        assertTrue(seen.ids.isEmpty())
+        coordinator.back(card.id)
+        assertEquals(important, coordinator.state.card)
+        assertTrue(seen.ids.isEmpty())
+        coordinator.back(card.id)
+        assertEquals(card, coordinator.state.card)
+        assertTrue(seen.ids.isEmpty())
+        coordinator.back(card.id)
+        assertNull(coordinator.state.card)
+        assertTrue(seen.hasSeen(method.id))
+        coordinator.openManually()
+        val reopened = coordinator.state.card!!
+        coordinator.back(card.id)
+        coordinator.openDocumentation(card.id)
+        assertEquals(reopened, coordinator.state.card)
     }
 
     @Test fun rapidNavigationCancelsPendingHelpAndRejectsObsoleteEntranceCallbacks() {
@@ -148,7 +175,7 @@ class TutorialCoordinatorTest {
         hidden()
         val current = coordinator.state.card
         coordinator.dismiss(oldId)
-        coordinator.changePage(oldId, TutorialPage.HOW_IT_WORKS)
+        coordinator.changePage(oldId, TutorialPage.IMPORTANT)
         assertSame(current, coordinator.state.card)
         assertTrue(seen.ids.isEmpty())
     }
@@ -159,11 +186,13 @@ class TutorialCoordinatorTest {
         val token = coordinator.state.navigationToken
         coordinator.methodEntered(token)
         val id = coordinator.state.card!!.id
-        coordinator.changePage(id, TutorialPage.HOW_IT_WORKS)
+        coordinator.changePage(id, TutorialPage.IMPORTANT)
+        coordinator.openDocumentation(id)
         val retained = coordinator.state
         repeat(2) { coordinator.methodEntered(token) }
         assertEquals(retained, coordinator.state)
-        assertEquals(TutorialPage.HOW_IT_WORKS, coordinator.state.card!!.page)
+        assertEquals(TutorialPage.IMPORTANT, coordinator.state.card!!.page)
+        assertTrue(coordinator.state.card!!.documentationOpen)
         assertTrue(seen.ids.isEmpty())
         coordinator.dismiss(id)
         coordinator.methodEntered(token)
@@ -186,7 +215,7 @@ class TutorialCoordinatorTest {
     @Test fun processDeathBeforeDismissalLeavesTutorialEligibleOnNextActivation() {
         activate()
         hidden()
-        coordinator.changePage(coordinator.state.card!!.id, TutorialPage.HOW_IT_WORKS)
+        coordinator.changePage(coordinator.state.card!!.id, TutorialPage.IMPORTANT)
         val fresh = TutorialCoordinator(seen, setOf(method))
         val browsing = MeasurementSelection().browse(method.mode)
         fresh.selectionChanged(browsing)

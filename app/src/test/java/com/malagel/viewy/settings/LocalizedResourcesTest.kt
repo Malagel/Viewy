@@ -17,19 +17,16 @@ class LocalizedResourcesTest {
         }
     }
 
-    @Test fun spanishCoversAllProseAndPreservesFormatArgumentsAndEquations() {
+    @Test fun spanishCoversAllProseAndPreservesFormatArguments() {
         val english = strings("values/strings.xml")
         val spanish = strings("values-es/strings.xml")
-        val sharedNames = setOf("language_english", "language_spanish")
+        val sharedNames = setOf("language_english", "language_spanish", "documentation_wip")
         assertEquals(english.keys - sharedNames, spanish.keys)
         val placeholders = Regex("%[0-9]+\\\$[a-z]")
         spanish.forEach { (key, text) ->
             assertTrue("Empty Spanish resource: $key", text.isNotBlank())
             assertEquals("Arguments: $key", placeholders.findAll(english.getValue(key)).map { it.value }.toList(),
                 placeholders.findAll(text).map { it.value }.toList())
-        }
-        for (key in listOf("tutorial_known_height_equation", "tutorial_known_height_height_equation")) {
-            assertEquals(english.getValue(key), spanish.getValue(key))
         }
         assertEquals("Ajustes", spanish.getValue("settings"))
         assertEquals("Use device language", english.getValue("language_device"))

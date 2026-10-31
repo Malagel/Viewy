@@ -192,6 +192,8 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
     }
     fun dismissDiagnostics() { mutableState.value = mutableState.value.withDiagnostics(open = false); reconcile() }
     fun dismissTutorial(cardId: Long) { tutorials.dismiss(cardId); publishTutorial() }
+    fun openTutorialDocumentation(cardId: Long) { tutorials.openDocumentation(cardId); publishTutorial() }
+    fun backTutorial(cardId: Long) { tutorials.back(cardId); publishTutorial() }
     fun changeTutorialPage(cardId: Long, page: TutorialPage) { tutorials.changePage(cardId, page); publishTutorial() }
     private fun publishTutorial() { mutableState.value = mutableState.value.copy(tutorial = tutorials.state, heightEditor = heightEditor.draft); reconcile() }
 

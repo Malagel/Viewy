@@ -363,7 +363,7 @@ fun ViewyScreen(
             }
         }, confirmButton = { TextButton(onClick = { showStatus = false }) { Text(stringResource(R.string.close)) } },
     )
-    state.tutorial.card?.let { MethodTutorialDialog(it, model::dismissTutorial, model::changeTutorialPage) }
+    state.tutorial.card?.let { MethodTutorialDialog(it, model::dismissTutorial, model::changeTutorialPage, model::backTutorial, model::openTutorialDocumentation) }
 }
 
 @Composable

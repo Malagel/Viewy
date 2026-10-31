@@ -78,11 +78,6 @@
     <string name="tutorial_known_height_tip_4">Lo ideal es usar un objeto cuya altura conozcas de antemano.</string>
     <string name="tutorial_go_back">Volver</string>
     <string name="tutorial_steps">Realizar una medición</string>
-    <string name="tutorial_geometry">De la altura a la distancia</string>
-    <string name="tutorial_directions">Cómo mide Viewy los ángulos</string>
-    <string name="tutorial_sensitivity">Cuándo aumentan los errores</string>
-    <string name="tutorial_camera_timing">Cámara y tiempos</string>
-    <string name="tutorial_steadiness">La estabilidad no garantiza exactitud</string>
     <string name="tutorial_known_height_intro">Obtén la distancia aproximada a un objeto cuya altura conoces.</string>
     <string name="tutorial_known_height_animation_description">Usa la altura conocida del objeto. Mantén la cámara en una posición fija, apunta al extremo superior y registra su dirección. Gira el teléfono hacia abajo alrededor de la cámara y registra el extremo inferior. Viewy usa la altura y ambas direcciones para estimar la distancia horizontal al eje vertical del objeto, no la distancia inclinada a ninguno de los extremos. La base del objeto no tiene que estar al mismo nivel que la persona.</string>
 
@@ -90,21 +85,6 @@
     <string name="tutorial_known_height_step_2">2. Apunta la cámara a la parte superior del objeto y pulsa el botón de captura.</string>
     <string name="tutorial_known_height_step_3">3. Finalmente, apunta a la parte inferior y vuelve a capturar.</string>
     
-    <string name="tutorial_known_height_geometry">Imagina dos triángulos rectángulos que comparten la misma distancia horizontal d. Con una elevación θ, un extremo se encuentra d × tan(θ) por encima de la cámara. Resta el desplazamiento inferior del superior para obtener la altura H:</string>
-    <string name="tutorial_known_height_equation">d = \\frac{H}{\\tan(\\theta_{top}) − \\tan(\\theta_{bottom})}</string>
-    <string name="tutorial_known_height_variables">d — distancia horizontal a la línea vertical del objeto, en metros.\nH — altura vertical conocida entre los extremos, en metros.\nθ (theta) — ángulo de observación sobre el plano horizontal. Los subíndices top y bottom identifican los extremos superior e inferior; los ángulos por debajo de la horizontal son negativos.\ntan — función tangente; el cálculo usa radianes.</string>
-    <string name="tutorial_known_height_horizontal">El resultado es la distancia horizontal, no la distancia inclinada en la línea de visión a ninguno de los extremos. La cámara puede estar por encima o por debajo del extremo inferior; su altura se cancela al restar los desplazamientos.</string>
-    <string name="tutorial_known_height_directions">Viewy combina la orientación del teléfono con un eje de cámara trasera mapeado para obtener cada dirección de observación respecto a la gravedad. La elevación es su ángulo sobre el plano horizontal, no simplemente la inclinación del teléfono. La captura registra la última dirección del sensor aceptada, no una dirección promediada ni una foto.</string>
-    <string name="tutorial_known_height_alignment">Ambos extremos deben compartir una posición horizontal. Viewy comprueba sus ángulos de dirección horizontal y bloquea las capturas desalineadas; cerca de la vertical, ese ángulo no es fiable y se bloquea la captura. Estas comprobaciones no detectan el desplazamiento del teléfono ni demuestran que el objeto sea vertical.</string>
-    <string name="tutorial_known_height_sessions">Las capturas deben compartir fuente de sensor, marco de referencia y mapeo de cámara, con marcas de tiempo del sensor crecientes y separadas por un máximo de 15 segundos. Las interrupciones borran las capturas incompatibles. El sensor preferido Game Rotation Vector puede presentar deriva; la alternativa Rotation Vector puede responder a interferencias magnéticas. El límite de tiempo no acota la deriva ni el error de distancia.</string>
-    <string name="tutorial_known_height_sensitivity">Cuando las dos elevaciones casi coinciden, el denominador puede ser pequeño. Entonces, pequeños errores angulares pueden causar grandes errores de distancia. Una altura incorrecta también escala el resultado directamente. Viewy rechaza una separación insuficiente y una geometría no utilizable, pero superar esas comprobaciones no garantiza exactitud.</string>
-    <string name="tutorial_known_height_camera">El eje de la cámara trasera usa metadatos adecuados de la orientación de la lente o, cuando no están disponibles, una suposición no calibrada del eje trasero. Ninguna opción calibra la retícula central. La distorsión de la lente, el enfoque, la estabilización y el procesamiento de la cámara pueden afectar la puntería.</string>
-    <string name="tutorial_known_height_timing">El fotograma de vista previa y la lectura del sensor no están sincronizados. La captura usa la última dirección del sensor aceptada, no el instante de exposición de la imagen que ves. Mantén el teléfono quieto antes y brevemente después de capturar para reducir los efectos del movimiento; los retrasos de la vista previa, sobre todo con poca luz, siguen sin medirse.</string>
-    <string name="tutorial_known_height_steadiness">Las comprobaciones de disponibilidad evalúan la variación reciente y la antigüedad de la lectura. Una lectura estable aún puede tener sesgo del sensor, deriva lenta o error en el eje de la cámara. Viewy no convierte la estabilidad ni las etiquetas de exactitud del sistema en un intervalo de incertidumbre.</string>
-    <string name="tutorial_known_height_height_equation">H = d \\cdot (\\tan(\\theta_{top}) − \\tan(\\theta_{bottom}))</string>
-    <string name="tutorial_known_height_height_equation_spoken">La altura es igual a la distancia horizontal multiplicada por la diferencia entre las tangentes de los ángulos de elevación superior e inferior.</string>
-    <string name="tutorial_known_height_solve">Al despejar se obtiene la distancia horizontal:</string>
-    <string name="tutorial_known_height_equation_spoken">La distancia horizontal es igual a la altura dividida por la diferencia entre las tangentes de los ángulos de elevación superior e inferior.</string>
     <string name="settings">Ajustes</string>
     <string name="measurement_units">Unidades de medida</string>
     <string name="metric">Métricas</string>
