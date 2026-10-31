@@ -32,18 +32,20 @@ future validated features; they have no selectable methods.
   Back on Home follows normal Android exit behavior.
 - Selecting Known Object Height fades and subtly moves the entire measurement
   destination in from the right over 270 ms. The outgoing method list stays in
-  place while fading out. Android Back from measurement returns to that mode's
+  place while fading out. Before a height is saved, Android Back returns to that mode's
   method list, with measurement sliding right and the list sliding in from the
   left over a 270 ms fade/slide transition shared by all methods. Home returns
   directly to the initial mode list with the existing 280 ms fade and vertical motion.
   Outgoing content is immediately blocked from input and accessibility. Motion
   follows system animation scaling and does not replay on sensor or preference
   updates; recreated destinations appear settled.
-- Returning Home immediately releases camera and orientation ownership and
-  discards unfinished endpoint pairs, independently of animation completion.
-  Configured height and completed results survive within the session; entering
-  the same method displays its retained result without restarting acquisition.
-  A different method cannot inherit captures or results.
+- Returning Home immediately releases camera and orientation ownership and clears
+  the entire method session: height, keypad draft, captures, results, notices and
+  camera/sensor diagnostics. Reentering the method starts at **Enter object height**
+  without acquisition. Leaving measurement for the method list also ends the session.
+  Global settings, permissions and completed tutorials are unaffected. Temporary
+  Settings and Help surfaces preserve saved height, draft and completed results;
+  unfinished captures still clear on acquisition interruption.
 - Each implemented method has a contextual **?** control immediately left of the
   settings gear. It is absent while no method is active. It opens one
   centered, rounded, scrollable tutorial card over the stationary measurement
@@ -53,7 +55,9 @@ future validated features; they have no selectable methods.
   navigation slides the
   current section left and the next in from the right; **Go back**, at the top
   left opposite **Close**, returns to the previous section with reversed motion.
-  Card bounds remain fixed and motion follows system animation scaling.
+  Go back keeps its normal color while temporarily disabled during page motion,
+  and appears/disappears with a short fade. Important uses larger, font-scaled
+  bullet markers. Card bounds remain fixed and motion follows system animation scaling.
   Switching sections starts at the top. Outside tap, Android Back and **Close**
   dismiss the entire card from any section; every reopening starts with Instructions.
   Help suspends camera and orientation acquisition. Entered height and completed
@@ -76,7 +80,14 @@ future validated features; they have no selectable methods.
   fractions and endpoint subscripts, then covers sensor/camera/timing limitations and unquantified
   accuracy. Steadiness is not presented as measurement accuracy.
 - The circular bottom-right **Home** control uses a house icon and returns to
-  the initial Home card. Restart and Capture retain their existing behavior.
+  the initial Home card and clears the method completely. Restart retains height
+  while clearing captures/results. Android Back while the distance result is displayed
+  performs the same Restart action, retaining height and prompting a fresh top capture.
+  From the unfinished camera workspace with a saved height, Android Back instead
+  reopens the keypad with that height in the current global units. Acquisition stops
+  and unfinished captures clear under the usual editing interruption rules.
+  Back from the height keypad or a covering surface still cancels/closes that surface.
+  Capture retains its existing behavior.
 - A circular Settings control with a standard rounded gear sits at top right,
   using a slightly richer purple than the other tonal controls.
   It opens full-screen dark Material 3 settings with or without an active method.
@@ -96,7 +107,8 @@ future validated features; they have no selectable methods.
 - Units default to Metric (meters); Imperial uses decimal feet for heights and
   short distances; long results automatically use kilometers or miles as described
   below. Tapping the units row switches immediately, including existing
-  results. Height entry follows this preference without an independent selector.
+  results. Height entry defaults to meters or decimal feet and offers a local
+  m/cm or ft/in toggle without changing the global preference.
   Stored physical values remain in meters; changing units neither edits height nor
   recalculates geometry or resets captures. Presentation rounding never changes stored values.
 - Language defaults to **Use device language**, with **English** and **Español**
@@ -144,14 +156,46 @@ future validated features; they have no selectable methods.
   unchanged. Zoom and height share a row with a 16 dp gap. The height action is
   limited to the remaining width; where its full label cannot fit, it shows the
   height cue, a single-line value with ellipsis when needed, and the unit. Its
-  accessible edit description retains the complete display value. Both height actions focus the decimal field and request
-  its keyboard automatically. The height-entry card fades in 20 dp above the
-  keyboard’s initially observed maximum height and keeps that position for the
-  entire opening, including when the keyboard is hidden or reopened. It waits
-  briefly for stable keyboard placement; if unavailable, it fades in after about
-  one second near the bottom inset and keeps that fallback position. Save, Cancel,
-  outside tap and Back fade the card out before closing it. Its contents handle
-  keyboard space without moving the measurement screen.
+  accessible edit description retains the complete display value. All three height actions open the same embedded keypad in the rounded
+  camera/result container, retaining its ordinary size and placement. The initial
+  **Enter object height** button is unchanged and never opens the editor automatically.
+  A new height starts empty; existing heights open in meters or decimal feet
+  according to Settings, with converted text truncated to four fractional digits.
+  Unchanged confirmation still retains the exact stored physical value. Local m/cm and ft/in toggles convert the
+  physical height without cumulative rounding or changing global units. Imperial
+  entry uses decimal feet or inches, never combined feet-and-inches. A neutral
+  surface-colored rounded rectangle slides between the two unit labels. Unit
+  buttons have rounded rectangular visuals and larger hit targets, without touch
+  ripple or pressed-state feedback. Numeric entry accepts up
+  to ten digits, excluding the decimal separator; another digit leaves the value
+  unchanged and briefly shakes the number, with localized accessibility feedback.
+  Conversion-generated values may exceed ten digits without losing physical precision.
+  Digits, the localized decimal separator and backspace edit a temporary draft;
+  **Enter** confirms only supported positive finite heights. The back arrow and
+  Android Back cancel without changing saved height or results. No text field,
+  separate height dialog or software keyboard is used. Hardware digits, point/comma,
+  Backspace, Enter and Escape are supported. Smaller rounded rectangular number
+  keys keep the same colors when disabled. Invalid input, including empty or zero,
+  disables **Enter** immediately and dims it through a short 150 ms fade; valid
+  input fades it back to full emphasis. The complete keypad adapts proportionally
+  to the rounded workspace and remains static, without scrolling or overscroll
+  stretching. Numbers fit a clipped slot with reserved shake travel, separate from
+  the stationary unit label, so rejection feedback cannot pass beneath that label.
+  Exceptionally small converted values show <0.0001 rather than a misleading zero.
+  Camera controls immediately lose input and accessibility on editor opening.
+  Camera and editor share a restrained 225 ms opacity transition over an opaque
+  themed surface; returning waits on existing streaming readiness before fading
+  the live preview in. Results remain underneath the editor, so cancellation or
+  correction returns directly without replaying the result entrance. Motion follows
+  system animation scaling. The draft survives Activity recreation within the session.
+  Settings, Help, Home and enabled diagnostics remain available during editing.
+  Settings, Help and diagnostics preserve the unconfirmed draft and its selected
+  entry unit, saved height and completed result while acquisition stays stopped.
+  Changing global units converts a retained draft into that system's base unit
+  without committing it. Home discards the draft and clears the entire method.
+  Restart also discards the draft and starts a new measurement with saved height.
+  The reserved shutter-caption area fades its instruction out during editing;
+  normal top/bottom instruction changes also crossfade.
 - Camera and orientation acquisition run only with valid height, permission and
   an unfinished measurement in the focused, resumed viewfinder. Settings, diagnostics,
   tutorials (including pending first-use help), mode/method selection, height editing
@@ -159,7 +203,7 @@ future validated features; they have no selectable methods.
   not acquire. Intentional visible suspension briefly fades the last preview image
   after releasing hardware; streaming fades back in on recovery. Activity inactivity
   releases resources immediately. Completed results keep acquisition stopped until
-  Restart or saving height.
+  Restart. Correcting a completed height keeps acquisition stopped.
 - Rear-camera preview in a rounded rectangle with a thin, centered plus-shaped
   aiming reticle with rounded white strokes and a black outline. Workflow failures
   and near-vertical restrictions receive preview-edge messages; normal aiming
@@ -247,7 +291,11 @@ future validated features; they have no selectable methods.
   editable object height, captured elevation difference in degrees, then a short
   approximation disclaimer near the bottom. This is horizontal distance to the
   object’s vertical line, not slant range; individual endpoint angles remain in
-  Diagnostics. The height row is an accessible edit action; saving restarts.
+  Diagnostics. The height row is an accessible edit action. Confirming a changed
+  height recalculates distance and diagnostics from the original observations,
+  retaining their metadata and completed state without recapture or a new count-up.
+  Unchanged confirmation and cancellation preserve the result; unusable corrections
+  keep the previous measurement and allow the draft to be corrected or cancelled.
 - Result distances use meters below 10,000 m and kilometers at or above that
   threshold. Imperial results use decimal feet below one mile (5,280 ft) and miles
   at or above it. The unit is chosen from the unrounded final distance and remains
@@ -267,6 +315,8 @@ future validated features; they have no selectable methods.
   completed result directly. System animation scaling applies; disabled motion
   shows final distance and supporting information together. Screen readers receive
   the final approximate horizontal distance, never intermediate counter values.
+  The distance number grows up to 96 sp where it fits; the approximation sign,
+  value and smaller unit are measured together to stay within the result width.
   The panel can scroll in constrained windows or at large text sizes; exceptional
   magnitudes can scroll horizontally without reducing readability. Restart remains
   the existing bottom-left action: it resets immediately with height retained,
@@ -275,11 +325,13 @@ future validated features; they have no selectable methods.
   slow camera cannot expose an old frame as live.
 - Explicit unquantified uncertainty for nominal captures. There is no validated
   angular-error input or automatic uncertainty range.
-- Restart and reset when saving height. The result has no separate retry control.
+- Restart clears captures/results while retaining height. Height changes during an
+  unfinished measurement reset captures; completed corrections retain evidence.
+  The result has no separate retry control.
   An incomplete pair is cleared by acquisition interruptions or incompatible
   camera/sensor sessions. Completed results retain their captured geometry after
-  shutdown, overlays, backgrounding and Activity recreation until Restart or
-  saving height; measurements are not persisted across process death.
+  shutdown, overlays, backgrounding, Activity recreation and height correction
+  until Restart or method exit; measurements are not persisted across process death.
 - Camera permission explanation, retry/settings access, and visible camera or
   orientation unavailability with captures blocked.
 - Material 3 baseline dark colors across the app, launch window and system bars,

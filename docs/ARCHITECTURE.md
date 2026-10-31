@@ -21,39 +21,70 @@ portrait for the Activity; large-screen Android policies may override this. Prod
 The complete [Material 3 baseline dark scheme](https://m3.material.io/styles/color/the-color-system/key-colors-tones)
 supplies all Compose color roles;
 platform launch colors and system-bar icon styles match it. The Activity uses
-`adjustNothing` and measurement content excludes IME padding. Height input owns
-an edge-to-edge dialog with scrollable fields and fixed save/cancel actions, so
-keyboard presentation does not resize or pan the preview. `HeightDialogPlacement`
-records the largest current/target keyboard bottom inset during initial opening.
-Reveal waits for positive inset reports to settle briefly, with a one-second
-fallback for missing/floating/hardware keyboards, then freezes the observed peak.
-The card is bottom-aligned 20 dp above that frozen keyboard boundary. No live IME
-padding affects its visible position: hiding, reopening or resizing the keyboard
-leaves the card at the same position until dismissal. A new opening measures
-again; no keyboard height persists across openings.
+`adjustNothing` and measurement content excludes IME padding. `EmbeddedHeightEditor`
+occupies the existing rounded workspace without a new window, text field or input
+connection. `HeightEditorViewport` measures the compact rectangular keypad at a
+bounded reference width, then centers and proportionally scales the whole layout
+to fit the actual workspace. It has no scroll or overscroll owner. Reference keys
+are 56 dp high; bounds and font scale determine the final proportional size.
+The exceptional workspace's parent also stops scrolling while the editor owns its
+remaining height. Disabled number/unit controls retain their colors; Enter instead
+animates to 40% opacity over 150 ms for an invalid draft, with logical eligibility
+changing immediately. All controls retain correct disabled semantics. The value
+uses fitted tabular text in a clipped numeric slot with 8 dp internal margins for
+its 6 dp rejection motion; the fixed unit slot cannot receive displaced digits. Buttons,
+unit selection, display and decimal/backspace actions expose localized semantics;
+a focused non-text container handles hardware digits, decimal, Backspace, Enter
+and Escape while Tab/directional navigation remains with Compose.
 
-The field stays composed/focusable with zero opacity while placement is pending.
-One dialog-owned animation effect drives graphics-layer opacity after the frozen
-layout is applied: entry is 175 ms and exit is 170 ms, with linear exit opacity. There
-are no position or size transitions. Save, Cancel, outside tap and dialog Back
-record one pending close action. This cancels entry and fades out from the current
-opacity, retaining the modal window and frozen position until exit finishes.
-Closing explicitly requests keyboard hiding while the decimal field remains
-focused and attached. After the fade, it waits for both hidden IME visibility and
-zero animated bottom inset, with a 750 ms bound for missing/unreliable IME reports.
-It then clears focus and allows one frame of input cleanup before the caller
-removes the dialog or applies the captured height. This avoids disposing a numeric
-editor while its keyboard is still visibly closing; the ordering addresses a
-possible input-connection restart flash, whose actual device/IME behavior still
-requires manual verification.
-The pending action rejects duplicate requests and cancels reveal/focus work.
-Closing before the card is visible skips the opacity animation but still performs
-keyboard/focus cleanup. Hidden/closing content is excluded from accessibility and its
-save/cancel controls are disabled. On constrained displays the fields scroll while
-actions remain available. Each opening requests decimal-field focus and keyboard
-once after the dialog gains focus, without reopening a deliberately dismissed
-keyboard during sensor-state recompositions. Actual Activity/window destruction
-can still dispose a dialog immediately; pending animation work is cancelled.
+`measurement/HeightEditor` owns one nullable `HeightDraft`, published by the
+ViewModel and retained across Activity recreation, never process death. Opening
+publishes the acquisition gate before synchronous resource release; camera and
+orientation stay suspended through the host's 225 ms editor exit. Covered camera
+and result controls lose touch, focus and accessibility immediately. Header, Home
+and Restart remain available; Capture stays disabled. Settings, Help and diagnostics
+retain the same draft object, physical anchor and local unit; coverage blocks
+editing, Back and acquisition until return. Their existing capture-interruption
+rules still discard unfinished pairs. Method exit cancels the draft and clears
+saved inputs/evidence. Settings marks coverage before changing destination;
+Help/diagnostics use their existing coverage gates. The covered editor cannot
+consume overlay Back. Restart cancels the draft and resets measurement with height retained. Input callbacks also check
+current ViewModel coverage, rejecting stale actions after navigation.
+Back and the editor arrow cancel the same session. Confirmation consumes the draft
+once; failed correction retains it with an inline error and preserves saved evidence.
+Method navigation cancels an outstanding draft. First-use tutorials retain their existing gate.
+
+`HeightEntryUnit` separates local m/cm and ft/in entry from global meters/feet
+presentation. Each opening defaults to the global base unit. Drafts keep canonical
+point-decimal text and independent decimal meters; unit switches format from that
+anchor with at most four fractional digits (DOWN), never reparsing converted text.
+Each new opening follows the current global Metric/Imperial preference. Global
+preference changes while Settings covers a draft convert its anchor into the new
+system's base unit without committing it; unchanged preferences keep its local unit.
+A sub-0.0001 positive converted value displays an explicit less-than value.
+Only a numeric edit changes the anchor; untouched/unit-only confirmation restores
+exact stored Double meters. Decimal multiplication uses exact international
+foot/inch and centimeter factors. Positive finite meter validation shares the
+existing supported global-unit range; display localization never changes parsing.
+Input accepts ten numeric digits, excluding the separator. Rejected digits retain
+text and physical meters while incrementing a feedback identity consumed by the
+number's short Compose shake. Recreated/covered editors do not replay old rejection
+feedback; animation scaling applies. Legacy and conversion-generated values remain
+representable even when they exceed the typing limit. The local unit selector
+moves a neutral 44 × 40 dp rounded rectangle between stable accessible labels over
+180 ms. Each 56 × 48 dp target retains radio-button semantics and has no touch
+indication; the selected position remains visible without pressed feedback.
+
+A single host transition fades the editor over the existing preview/result using
+225 ms opacity, matching preview suspension. The editor and waiting workspace use
+opaque Material surface colors; live pixels appear only at existing OPEN/STREAMING
+readiness. Camera startup waits until the editor exit completes. Results stay
+composed beneath the editor and settle their reveal when editing begins, returning
+directly on cancellation/correction. The initial action's presentation is retained;
+its backing color transitions to/from the editor surface. Compose duration scaling
+handles disabled motion, and recreated editors appear settled. The reserved stage
+caption crossfades top/bottom/empty targets over 150 ms and is empty during editing;
+outgoing captions lose semantics immediately.
 
 `HomeScreen` presents the existing header without contextual Help and a centered,
 480 dp maximum-width, 28 dp rounded selection card. The card has stable bounded
@@ -64,12 +95,19 @@ The destination host owns Android Back navigation for both the card and measurem
 the card only consumes repeated Back while its own transition is running. During
 measurement entry, the outgoing Home presentation maps the active method to its
 method list so the card does not navigate while fading out. Android Back from
-measurement requests that mode's method list; Home requests the mode list directly.
+measurement before height confirmation requests that mode's method list; Home requests the mode list directly.
+Both regular and exceptional-workspace Android Back handlers dispatch through the
+ViewModel's `systemBack`: an active completed result invokes the existing `restart`
+action without navigating, retaining height and reconciling acquisition immediately.
+An unfinished camera workspace with configured height calls `openHeightEditor` in
+the current global units, using the same atomic acquisition gate and draft lifecycle
+as the height edit control. No separate navigation history or copy of the height is stored.
+Editor and overlay Back handlers retain priority and their existing cancellation/dismissal behavior.
 
 `MeasurementDestinationHost` animates Home and the entire measurement presentation
 with fades and 20 dp movement: measurement enters from the right over 270 ms
-while the method menu fades in place. Android Back uses the shared method-return
-transition: measurement exits right and the method list enters from the left over
+while the method menu fades in place. Android Back leaving measurement before
+height confirmation uses the shared method-return transition: measurement exits right and the method list enters from the left over
 270 ms. Both destinations belong to the transition segment, so retained Compose
 callbacks distinguish Android Back from Home without captured navigation state.
 Returning Home retains its 280 ms vertical entrance and the measurement's downward
@@ -93,7 +131,10 @@ Method help uses one centered edge-to-edge Compose Dialog with a bounded-width,
 fixed-height Material 3 card constrained by system bars, cutouts and available
 window size. Close stays accessible above the vertically scrollable content;
 sections after Instructions also have Go back at the opposite end of that fixed
-control row.
+control row. Go back fades in/out over 150 ms, retaining its normal theme color
+while page-transition input locks apply; outgoing navigation has no accessibility
+action. Important's decorative 6 sp bullet markers scale with text and align with
+the first body-text line without adding separate accessibility targets.
 Instructions, Important and How does it work? share the same card bounds and modal
 window. Resource-backed section lists per method use one shared renderer and ordered
 navigation. Full-width 260 ms horizontal slides move forward to the left and
@@ -154,7 +195,8 @@ Source paths below are relative to `app/src/main/java/com/malagel/viewy/`:
 | `camera/CameraPreview.kt` | CameraX logical preview, active-lens mapping, zoom, stream/errors and unbinding. |
 | `ui/MeasurementResources.kt`, `orientation/OrientationRegistration.kt` | Shared resource reconciliation, synchronous preview release and sensor registration ownership. |
 | `camera/PreviewSession.kt` | Ownership tokens reject callbacks/disposal from obsolete previews and clear readiness on release. |
-| `measurement/HeightInput.kt` | Decimal validation and meters/feet conversion without presentation rounding. |
+| `measurement/HeightInput.kt`, `measurement/HeightEditor.kt` | Supported-height validation, temporary keypad drafts, precise local unit conversion and atomic confirmation/cancellation. |
+| `ui/EmbeddedHeightEditor.kt` | Embedded responsive keypad, local unit selector, accessibility and hardware-key input without IME. |
 | `measurement/MeasurementSelection.kt` | Pure Home/Methods/Measurement destination transitions and derived active method. |
 | `ui/HomeScreen.kt` | Home header, centered selection card and shared Home control. |
 | `ui/MeasurementSelection.kt` | Reusable animated card lists with scrollable entries, disabled modes and input gates. |
@@ -472,12 +514,22 @@ Selection is held in the ViewModel separately from the workflow.
 active method derived only from Measurement. A new ViewModel starts at Home;
 legacy persisted selection is ignored. Tutorial completion cannot activate a method.
 Activity recreation retains navigation, height and completed results in memory;
-process death starts at Home. The ViewModel separately tracks the workflow's owning
-method, so Home clears the active destination without losing completed evidence.
-Returning to either selection list invalidates incomplete pairs immediately via resource reconciliation.
-Reselecting the owner preserves height/results; selecting a different method restarts
-the workflow and revokes prior hardware ownership. Unavailable modes have no
-activation path.
+process death starts at Home. Leaving Measurement for Home or Methods immediately
+calls `KnownHeightWorkflow.clear`, removes the height editor, revokes resources and
+clears camera/orientation diagnostics. `restart` retains height; `clear` removes all
+physical inputs, observations, result identity and live readiness while keeping
+notice IDs monotonic. `MeasurementResources.clear` additionally drops camera
+metadata/zoom and pending retry ownership; the orientation adapter clears discovery
+snapshots after stopping. Reentry is height-gated from a fresh state. Outgoing
+measurement content may retain only its presentation through navigation motion.
+Camera labels receive the retained snapshot's non-null height explicitly, while
+visibility, interaction and resource eligibility use the current cleared state.
+`MeasurementUiState.methodActivationId` increments on method entry, stays stable
+through overlays and exit, and keys the workspace composition, retained draft,
+measurement snapshot and result-entry memory. A subsequent activation cannot
+reuse an outgoing result panel or its exit animation; its first frame is fresh. Global preferences,
+permission grants and tutorial completion do not belong to a method session.
+Unavailable modes have no activation path.
 
 Known Object Height requires a positive finite saved height before offering camera
 permission recovery. Orientation additionally requires the method's orientation
@@ -486,12 +538,13 @@ its frame and an incomplete pair; source/frame/mapping changes and pair expiry
 still invalidate incomplete captures. Completed top/bottom observations and the
 stored estimate are immutable measurement evidence, independent of current
 hardware readiness. Camera loss, sensor shutdown and later frame changes never
-clear them. Acquisition stays stopped behind the result; Restart or saving height
-clears it and allows a fresh eligible session while preserving the entered height.
+clear them while the method remains active; method exit clears them explicitly.
+Acquisition stays stopped behind results, including height corrections.
+Restart clears the result and allows a fresh eligible session with entered height retained.
 No hardware session or measurement survives process death.
 
 `MeasurementResultOverlay` reads RESULT plus the stored estimate, retaining only
-that estimate and its saved height through a 225 ms fade on Restart or height save.
+that estimate and its saved height through a 225 ms fade on Restart.
 The existing LivePreview remains the only PreviewView/binding owner, outside the
 animated result subtree. Workflow reset and acquisition reconciliation run
 immediately; result exit never gates startup. Live imagery is rendered only for
@@ -502,10 +555,13 @@ identity checks also discard it on replacement or Restart. It is presentation-on
 never persisted and never used for measurement. Existing suspension snapshots
 and recovery fades are preserved.
 
-`ResultEntryMemory` is local to the screen host and compares estimate references;
+`MeasurementState.resultOrigin` retains the original successful estimate as the
+completion identity across corrections; Restart clears it and a new capture replaces it.
+`ResultEntryMemory` is local to the screen host and compares these original references;
 ordinary publications, units, locale and overlay navigation cannot claim a second
-entry. Composition keys use the same reference identity, so a new equal-valued
-estimate replaces even an unfinished exit at long system animation scales. It initializes with an existing estimate as already presented, including
+entry. Composition keys compare current estimate references, so corrections
+replace value content directly while a new equal-valued measurement can replace
+even an unfinished exit at long system animation scales. It initializes with an existing completion identity as already presented, including
 Activity recreation, and retains consumed identity across exceptional-workspace
 remounts. No animation state enters the workflow or process-death persistence.
 The result surface enters with a 450 ms fade before the distance appears;
@@ -519,6 +575,10 @@ exposes only its final localized approximate horizontal-distance description.
 The object-height button has a localized edit action. Exit revokes result input,
 focus and semantics while retaining its visual section. Scrollable content and a
 minimum readable distance font handle constrained bounds without resizing the host.
+Distance fitting measures the final number, approximation glyph and unit at their
+actual separate font sizes, including gaps and a glyph-edge allowance. It selects
+up to 96 sp, with proportional line heights; the 28 sp minimum and horizontal
+scroll fallback retain very long values without drawing outside the result area.
 
 Result distance units are chosen once per destination: meters below 10,000 m,
 kilometers at or above it; feet below 1,609.344 m (one mile), miles at or above it.
@@ -538,9 +598,18 @@ retain their six-significant-digit cap in plain decimal form. Editable input
 retains its independent full-precision, ungrouped representation.
 
 The workflow owns top/bottom/correction/result transitions, finite height,
-compatibility checks and retry. Saving height restarts. The workflow retains
+compatibility checks and retry. `setHeight` restarts unfinished measurements.
+`correctCompletedHeight` validates the stored compatible pair and calls the existing
+`KnownHeightDistance.estimate` with new meters and original viewing directions.
+Success atomically replaces height, estimate and diagnostics while preserving stage,
+observations, metadata, completion identity and notice identity. Equal height is a
+no-op; invalid height/geometry/arithmetic leaves the entire state untouched.
+No capture/completion event or acquisition restart is emitted. Nominal uncertainty
+remains unavailable. Editing after a pending top still invalidates that pair on
+suspension and reuses the existing capture-cleared notice on return, including
+changed-height confirmation. The workflow retains
 bottom-recapture support with frame/time checks; the measurement UI exposes
-Restart as its only retry action. Alignment works independently of height
+Restart (also invoked by Android Back from results) as its only retry action. Alignment works independently of height
 or distance geometry: positive **current minus top** wrapped bearing means turn
 physically right (decrease bearing), negative means left. Screen orientation and
 roll do not change that gravity-relative meaning. Gates cannot establish fixed
@@ -641,8 +710,8 @@ are independent of tutorial completion. Language is never copied into DataStore.
 The global presentation unit is passed into height/result rendering; the workflow
 owns only physical height in meters. Unit changes have no workflow/reconciliation
 call, preserving capture/result identity and internal precision. Editable height
-uses the display decimal separator, full plain-decimal precision and the existing
-point/comma parser. Saving untouched input reuses the exact stored meter value.
+uses the display decimal separator and full plain-decimal precision with point/comma
+key input. Saving untouched input reuses the exact stored meter value.
 
 Settings uses an opaque full-screen Compose surface with Main/Language/Developer
 navigation retained in the ViewModel. It renders in the current host window (the

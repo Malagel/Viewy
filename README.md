@@ -8,20 +8,21 @@ two aiming directions. Application ID: `com.malagel.viewy`.
 ## Basic usage
 
 1. Viewy opens Home with no active measurement. Tap **Long Distance**,
-   then **Known Object Height**. Android Back returns to the method list;
+   then **Known Object Height**. Before height entry, Android Back returns to the method list;
    **Home** returns directly to all modes.
    Mode/method lists slide inside the card. Measurement fades in from the right;
-   Android Back reverses the horizontal motion, while Home uses a vertical fade/slide.
+   Back to the method list reverses the horizontal motion; Home uses a vertical fade/slide.
+   Android Back from the camera reopens the height keypad with saved height;
+   from a distance result it restarts measurement, retaining height.
    On first activation, read and dismiss the method tutorial. The **?** button
    beside the settings gear reopens it. Advance from **Instructions** with **>**,
    read the **Important** tips, then tap **How does it work?** for geometry and
    limitations. Tap **Enter object height** and save the vertical distance
-   between the object's endpoints in the units selected in Settings (meters by
-   default, or decimal feet), then allow camera
-   access when prompted by the viewfinder controls. Height entry and editing
-   automatically focus the input and open the decimal keyboard. The card fades
-   in above it and keeps its position when the keyboard is hidden; closing fades
-   the card out.
+   between the object's endpoints with the embedded keypad. Metric offers m/cm;
+   Imperial offers decimal ft/in, following Settings without changing global units.
+   Tap **Enter** to confirm, or Back to cancel. Then allow camera access when
+   prompted by the viewfinder controls. Editing stays inside the rounded workspace
+   without opening the software keyboard.
 2. Keep the camera location fixed. Aim the centered reticle at the top, stop for
    about one second, then capture while still.
 3. Aim at the bottom on the same vertical line, settle, and capture within 15 s
@@ -31,12 +32,14 @@ two aiming directions. Application ID: `com.malagel.viewy`.
    The distance counts up, followed by editable object height, elevation difference
    and an approximation disclaimer. Use the circular **Restart** arrow at bottom
    left to try again; the result fades out as acquisition resumes. Tap the height
-   row to edit it; saving starts a new measurement. Camera and orientation
+   row to correct it; confirmation recalculates from the same captured directions
+   without another capture or count-up. Camera and orientation
    acquisition stop immediately on completion.
 
 The app uses Material 3's baseline dark palette. The normal portrait screen keeps
-capture/navigation visible without scrolling; the input dialog handles the
-keyboard without shifting the measurement screen.
+capture/navigation visible without scrolling; the static embedded keypad fits
+proportionally inside the measurement container. Settings and Help preserve a
+height draft; Home clears the method completely so its next opening starts fresh.
 Small windows or large text offer status/details dialogs; **Open viewfinder**
 opens a scrollable workspace in exceptionally constrained layouts. Help stays
 scrollable in its centered card. The top-right gear opens Settings at any time
@@ -44,7 +47,10 @@ outside another modal. Tap **Measurement units** to switch Metric/Imperial, or
 **Language** to select **English**, **Español**, or **Use device language** (default).
 Changes save automatically. Settings, diagnostics, tutorials, selection and height
 editing suspend camera/sensor work and discard incomplete endpoint pairs. Entered
-height and completed results remain available, including after Home navigation or backgrounding.
+height, keypad draft and completed results remain available through Settings and
+Help. Backgrounding retains saved height/results but invalidates unfinished captures.
+Home clears the method, including height/results, while keeping app preferences and
+tutorial completion.
 Language and unit changes update the current screen in place. **Developer Options** contains
 a persistent **Enable diagnostics** preference (off by default) and **Erase all app data**.
 When enabled, hold **?** to open read-only method diagnostics; a normal tap always
