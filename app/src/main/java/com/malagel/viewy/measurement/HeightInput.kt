@@ -11,6 +11,9 @@ fun heightInMeters(text: String, unit: HeightUnit): Double? {
     val decimal = text.trim().replace(',', '.')
     if (!decimal.matches(Regex("[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+"))) return null
     return decimal.toDoubleOrNull()?.times(unit.metersPerUnit)?.takeIf {
-        it.isFinite() && it > 0.0 && HeightUnit.entries.all { unit -> unit.fromMeters(it).isFinite() }
+        isSupportedHeight(it)
     }
 }
+
+internal fun isSupportedHeight(meters: Double): Boolean = meters.isFinite() && meters > 0.0 &&
+    HeightUnit.entries.all { it.fromMeters(meters).isFinite() }

@@ -329,4 +329,19 @@ class KnownHeightWorkflowTest {
         assertNull(w.state.top)
         assertNull(w.state.notice)
     }
+    @Test fun leavingMethodClearsAllPhysicalInputsEvidenceAndReadiness() {
+        for (completed in listOf(false, true)) {
+            val w = workflow()
+            top(w)
+            if (completed) bottom(w)
+            val previousNoticeId = w.state.noticeId
+            w.clear()
+            assertEquals(MeasurementState(noticeId = previousNoticeId + 1), w.state)
+            assertFalse(w.state.canCapture)
+            w.cameraReady(true)
+            w.update(observation(30.0), "frame", true, base)
+            top(w)
+            assertNull(w.state.top) // A fresh session needs height confirmation again.
+        }
+    }
 }

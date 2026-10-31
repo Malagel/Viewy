@@ -42,6 +42,8 @@ data class MeasurementState(
     val top: OrientationObservation? = null,
     val bottom: OrientationObservation? = null,
     val result: KnownHeightResult.Estimate? = null,
+    /** Original completion identity; height corrections replace the estimate, not this identity. */
+    val resultOrigin: KnownHeightResult.Estimate? = null,
     val latest: OrientationObservation? = null,
     val frameId: String? = null,
     val notice: MeasurementNotice? = null,
@@ -62,10 +64,31 @@ class KnownHeightWorkflow(private val policy: AcquisitionPolicy = AcquisitionPol
         private set
     private var lastTapNanos: Long? = null
 
-    fun setHeight(meters: Double) {
-        require(meters.isFinite() && meters > 0.0 && HeightUnit.entries.all { it.fromMeters(meters).isFinite() })
-        restart()
+    /** Leaving a method removes its physical inputs and evidence, independently of UI exit motion. */
+    fun clear() {
+        state = MeasurementState(noticeId = state.noticeId + 1)
+        lastTapNanos = null
+    }
+
+    fun setHeight(meters: Double, notice: MeasurementNotice? = null) {
+        require(isSupportedHeight(meters))
+        restart(notice)
         state = state.copy(heightMeters = meters)
+    }
+
+    /** Atomic correction of completed evidence. Failure leaves the entire measurement untouched. */
+    fun correctCompletedHeight(meters: Double): Boolean {
+        if (!isSupportedHeight(meters) || state.stage != MeasurementStage.RESULT || state.result == null) return false
+        if (meters == state.heightMeters) return true
+        val top = state.top ?: return false
+        val bottom = state.bottom ?: return false
+        if (compareObservations(top, bottom, policy) !is ObservationComparison.Comparable ||
+            alignment(top.direction, bottom.direction) != Alignment.ALIGNED) return false
+        val result = KnownHeightDistance.estimate(meters, top.direction, bottom.direction) as? KnownHeightResult.Estimate
+            ?: return false
+        if (result.diagnostics.elevationSeparationRadians < MeasurementPolicy.minimumSeparationRadians) return false
+        state = state.copy(heightMeters = meters, result = result)
+        return true
     }
 
     fun cameraReady(ready: Boolean, intentionalSuspension: Boolean = false) {
@@ -87,13 +110,13 @@ class KnownHeightWorkflow(private val policy: AcquisitionPolicy = AcquisitionPol
     }
 
     fun restart(message: MeasurementNotice? = null) {
-        state = state.copy(stage = MeasurementStage.TOP, top = null, bottom = null, result = null, latest = null, frameId = null, notice = message, noticeId = state.noticeId + 1)
+        state = state.copy(stage = MeasurementStage.TOP, top = null, bottom = null, result = null, resultOrigin = null, latest = null, frameId = null, notice = message, noticeId = state.noticeId + 1)
         lastTapNanos = null
     }
 
     fun recaptureBottom() {
         if (state.top == null) return
-        state = state.copy(stage = MeasurementStage.BOTTOM, bottom = null, result = null, notice = null)
+        state = state.copy(stage = MeasurementStage.BOTTOM, bottom = null, result = null, resultOrigin = null, notice = null)
         lastTapNanos = null
     }
 
@@ -146,7 +169,7 @@ class KnownHeightWorkflow(private val policy: AcquisitionPolicy = AcquisitionPol
                 if (result.diagnostics.elevationSeparationRadians < MeasurementPolicy.minimumSeparationRadians) {
                     state = state.copy(stage = MeasurementStage.CORRECTION, notice = MeasurementNotice.SMALL_SEPARATION, noticeId = state.noticeId + 1)
                 } else {
-                    state = state.copy(stage = MeasurementStage.RESULT, bottom = observation, result = result, notice = null)
+                    state = state.copy(stage = MeasurementStage.RESULT, bottom = observation, result = result, resultOrigin = result, notice = null)
                     lastTapNanos = nowNanos
                 }
             }
