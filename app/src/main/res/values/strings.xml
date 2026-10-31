@@ -19,7 +19,7 @@
     <string name="height_edit">Object height: %1$s %2$s · Edit</string>
     <string name="result_horizontal_distance">Horizontal distance</string>
     <string name="result_elevation_difference">Elevation difference: %1$s°</string>
-    <string name="result_disclaimer">Approximate result. Depends on object height and stable positioning.</string>
+    <string name="result_disclaimer">Approximate result. Follow the instructions to get the best results.</string>
     <string name="guidance_near_vertical">Cannot align at this angle.</string>
     <string name="guidance_orientation">Orientation sensor unavailable.</string>
     <string name="notice_acquisition_suspended">Capture cleared.</string>
@@ -64,7 +64,7 @@
     <string name="short_distance_description">Measure nearby distances.</string>
     <string name="height_description">Estimate an object\'s height.</string>
     <string name="calibration_description">Validated measurement calibration.</string>
-    <string name="known_height_description">Estimate distance using a known object height and two viewing angles.</string>
+    <string name="known_height_description">Estimate the distance to a distant object knowing only it\'s height.</string>
     <string name="how_to_use">How to use</string>
     <string name="tutorial_instructions">Instructions</string>
     <string name="tutorial_important">Important</string>

@@ -19,7 +19,7 @@
     <string name="height_edit">Altura del objeto: %1$s %2$s · Editar</string>
     <string name="result_horizontal_distance">Distancia horizontal</string>
     <string name="result_elevation_difference">Diferencia de elevación: %1$s°</string>
-    <string name="result_disclaimer">Resultado aproximado. Depende de la altura del objeto y de mantener una posición estable.</string>
+    <string name="result_disclaimer">Resultado aproximado. Siga las instrucciones para tener el mejor resultado posible.</string>
     <string name="guidance_near_vertical">No se puede alinear en este ángulo.</string>
     <string name="guidance_orientation">Sensor de orientación no disponible. Reintenta la orientación para iniciar una nueva sesión.</string>
     <string name="notice_acquisition_suspended">Se descartó la captura.</string>
@@ -64,7 +64,7 @@
     <string name="short_distance_description">Mide distancias cercanas.</string>
     <string name="height_description">Estima la altura de un objeto.</string>
     <string name="calibration_description">Calibración de mediciones validada.</string>
-    <string name="known_height_description">Estima la distancia usando una altura conocida del objeto y dos ángulos de observación.</string>
+    <string name="known_height_description">Estima la distancia a un objeto lejano usando solo su altura.</string>
     <string name="how_to_use">Cómo usar</string>
     <string name="tutorial_instructions">Instrucciones</string>
     <string name="tutorial_important">Importante</string>
