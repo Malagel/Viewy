@@ -1,16 +1,21 @@
 package com.malagel.viewy.ui
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
@@ -25,12 +30,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.malagel.viewy.R
@@ -49,6 +56,7 @@ internal fun MethodTutorialDialog(
     val dismiss = { onDismiss(card.id) }
     val pages = key(card.id) { updateTransition(card.page, label = "Tutorial section") }
     val settled = pages.currentState == pages.targetState && !pages.isRunning
+    val previous = card.page.previous
     Dialog(
         onDismissRequest = dismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
@@ -72,8 +80,12 @@ internal fun MethodTutorialDialog(
                 Column {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.weight(1f)) {
-                            card.page.previous?.let { previous ->
-                                TextButton(onClick = { if (settled) onPage(card.id, previous) }, enabled = settled) {
+                            androidx.compose.animation.AnimatedVisibility(visible = previous != null,
+                                enter = fadeIn(tween(150)), exit = fadeOut(tween(150))) {
+                                TextButton(onClick = { if (settled) previous?.let { onPage(card.id, it) } },
+                                    enabled = settled && previous != null,
+                                    modifier = if (previous == null) Modifier.clearAndSetSemantics {} else Modifier,
+                                    colors = ButtonDefaults.textButtonColors(disabledContentColor = MaterialTheme.colorScheme.primary)) {
                                     Text(stringResource(R.string.tutorial_go_back))
                                 }
                             }
@@ -131,7 +143,13 @@ private fun TutorialPageContent(content: MethodTutorialContent, page: TutorialPa
                         is TutorialBlock.BulletList -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             block.items.forEach { item ->
                                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.semantics(mergeDescendants = true) {}) {
-                                    Text("•", Modifier.clearAndSetSemantics {}, style = MaterialTheme.typography.bodyLarge)
+                                    val color = LocalContentColor.current
+                                    val density = LocalDensity.current
+                                    val dotSize = with(density) { 6.sp.toDp() }
+                                    val firstLineHeight = with(density) { MaterialTheme.typography.bodyLarge.lineHeight.toDp() }
+                                    Box(Modifier.width(dotSize).height(firstLineHeight).clearAndSetSemantics {}, contentAlignment = Alignment.Center) {
+                                        Canvas(Modifier.size(dotSize)) { drawCircle(color) }
+                                    }
                                     Text(stringResource(item), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
                                 }
                             }

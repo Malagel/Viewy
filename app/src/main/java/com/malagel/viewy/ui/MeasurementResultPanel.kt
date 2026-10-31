@@ -161,17 +161,23 @@ private fun ResultDistance(number: String, layoutNumber: String, unit: String) {
     BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         val available = constraints.maxWidth
         val style = remember(base, layoutNumber, unit, available, density) {
-            (64 downTo 28 step 2).map { base.copy(fontSize = it.sp) }.firstOrNull {
-                measurer.measure("≈ $layoutNumber $unit", it, softWrap = false).size.width + with(density) { 16.dp.roundToPx() } <= available
-            } ?: base.copy(fontSize = 28.sp)
+            (96 downTo 28 step 2).map { base.copy(fontSize = it.sp, lineHeight = (it * 1.15f).sp) }.firstOrNull { candidate ->
+                val approximation = candidate.copy(fontSize = candidate.fontSize * 0.6f, lineHeight = candidate.lineHeight * 0.6f)
+                val unitStyle = candidate.copy(fontSize = candidate.fontSize * 0.5f, lineHeight = candidate.lineHeight * 0.5f)
+                val width = measurer.measure(layoutNumber, candidate, softWrap = false).size.width +
+                    measurer.measure("≈", approximation, softWrap = false).size.width +
+                    measurer.measure(unit, unitStyle, softWrap = false).size.width
+                // Measure the actual three text styles, their two gaps and a small glyph-edge allowance.
+                width + with(density) { 18.dp.roundToPx() } <= available
+            } ?: base.copy(fontSize = 28.sp, lineHeight = (28 * 1.15f).sp)
         }
         val numberWidth = with(density) { measurer.measure(layoutNumber, style, softWrap = false).size.width.toDp() }
         // Exceptional magnitudes remain fully readable by scrolling, without shrinking below 28 sp.
         Row(Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("≈", style = style.copy(fontSize = style.fontSize * 0.6f), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("≈", style = style.copy(fontSize = style.fontSize * 0.6f, lineHeight = style.lineHeight * 0.6f), color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(number, Modifier.width(numberWidth), style = style, textAlign = TextAlign.End, softWrap = false)
-            Text(unit, style = style.copy(fontSize = style.fontSize * 0.5f), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(unit, style = style.copy(fontSize = style.fontSize * 0.5f, lineHeight = style.lineHeight * 0.5f), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
