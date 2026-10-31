@@ -50,7 +50,10 @@ saved inputs/evidence. Settings marks coverage before changing destination;
 Help/diagnostics use their existing coverage gates. The covered editor cannot
 consume overlay Back. Restart cancels the draft and resets measurement with height retained. Input callbacks also check
 current ViewModel coverage, rejecting stale actions after navigation.
-Back and the editor arrow cancel the same session. Confirmation consumes the draft
+Back and the editor arrow call the draft-only `HeightEditor.cancel`, preserving
+saved height and completed evidence. Camera editing returns to acquisition after
+editor exit; initial-entry cancellation returns to the height prompt. Restart also
+cancels only the draft before resetting captures with height retained. Confirmation consumes the draft
 once; failed correction retains it with an inline error and preserves saved evidence.
 Method navigation cancels an outstanding draft. First-use tutorials retain their existing gate.
 
@@ -75,22 +78,56 @@ moves a neutral 44 × 40 dp rounded rectangle between stable accessible labels o
 180 ms. Each 56 × 48 dp target retains radio-button semantics and has no touch
 indication; the selected position remains visible without pressed feedback.
 
-A single host transition fades the editor over the existing preview/result using
-225 ms opacity, matching preview suspension. The editor and waiting workspace use
-opaque Material surface colors; live pixels appear only at existing OPEN/STREAMING
-readiness. Camera startup waits until the editor exit completes. Results stay
-composed beneath the editor and settle their reveal when editing begins, returning
-directly on cancellation/correction. The initial action's presentation is retained;
-its backing color transitions to/from the editor surface. Compose duration scaling
-handles disabled motion, and recreated editors appear settled. The reserved stage
-caption crossfades top/bottom/empty targets over 150 ms and is empty during editing;
-outgoing captions lose semantics immediately.
+`MeasurementWorkspaceMotion` selects one cover: height prompt, height editor or
+none over camera/results. One destination-keyed 225 ms opacity transition owns
+both the surface and its controls; the camera/result layer stays mounted outside
+it. The base waiting color is constant. Confirming the initial keypad goes directly
+from editor to no cover, without an independently exiting height-prompt button.
+Prompt return retains the last display height only through the incoming cover.
+Moving covers block workspace input and acquisition, including a reversed editor
+entrance whose initial/target states are both uncovered. Editor Back/arrow still
+cancel the draft; camera Back clears height, result Back restarts, and overlays keep
+their own Back priority. Method exit retains its outgoing cover for the existing
+whole-screen navigation instead of also navigating the local workspace.
+
+`LivePreview` keeps one native FrameLayout for the workspace lifetime. It owns
+the preview child, reveal cover and decorative bitmap foreground together. A
+preview-epoch change can stop/retry acquisition without replacing that host. Only
+an actual new binding creates a fresh PreviewView child, beneath the same cover
+and any retained image. Camera stop never inserts a new opaque waiting hierarchy.
+The release callback captures and installs the image synchronously before covering
+and unbinding the texture; no image crosses from a native view to a Compose Image.
+
+Prompt/editor entry retains native pixels until its cover is opaque. Result entry
+retains them until the result overlay acknowledges actual fade completion. Reversing
+either transition fades the retained image instead. Settings/Help/diagnostics fade
+the native foreground to the waiting color. Home keeps it for the destination's
+existing whole-screen exit, without a second image fade. Incoming Home's inactive
+workspace publication cannot clear this outgoing decorative image; Activity pause
+still clears it immediately. Result count/reveal
+identity and editor Back rules are independent of these decorative pixels.
+Background cleanup does not allocate a bitmap. No image is stored, and no animation
+extends hardware ownership.
+
+Camera startup waits until the editor exit completes. Preview reveal and camera
+controls wait for OPEN/STREAMING, physical-lens identity, initial zoom settling and
+a subsequent native draw confirmation. Motion follows Compose duration scaling,
+and recreated covers appear settled. The reserved stage caption retains its
+150 ms top/bottom/empty crossfade and is empty during editing; outgoing captions
+lose semantics immediately.
+
+Home and measurement use the same compact predicate, maximum width, outer top/side
+padding and header geometry. `ViewyHeader` reserves the same help slot and noncompact
+subtitle line on Home while hiding them from drawing/accessibility. This keeps the
+wordmark and Settings anchored identically when a method becomes active.
 
 `HomeScreen` presents the existing header without contextual Help and a centered,
 480 dp maximum-width, 28 dp rounded selection card. The card has stable bounded
 height and independently scrollable mode/method lists. Destination-keyed Compose
 `AnimatedContent` slides forward left and backward right over 220 ms. Moving and
 outgoing lists cannot receive input; repeated Back is consumed during motion.
+The method-list header places the localized Select a method heading beside Back
+and does not repeat the mode name.
 The destination host owns Android Back navigation for both the card and measurement;
 the card only consumes repeated Back while its own transition is running. During
 measurement entry, the outgoing Home presentation maps the active method to its
@@ -99,9 +136,12 @@ measurement before height confirmation requests that mode's method list; Home re
 Both regular and exceptional-workspace Android Back handlers dispatch through the
 ViewModel's `systemBack`: an active completed result invokes the existing `restart`
 action without navigating, retaining height and reconciling acquisition immediately.
-An unfinished camera workspace with configured height calls `openHeightEditor` in
-the current global units, using the same atomic acquisition gate and draft lifecycle
-as the height edit control. No separate navigation history or copy of the height is stored.
+Back from unfinished camera acquisition calls `returnToHeightPrompt`: it cancels
+any draft, clears the workflow and publishes the height gate before clearing camera
+and orientation resources. The method selection stays active until the next Back.
+The explicit Edit height button still opens the ordinary draft editor; cancelling
+that draft retains height and returns to acquisition. No navigation-history flag or
+copy of the height is stored.
 Editor and overlay Back handlers retain priority and their existing cancellation/dismissal behavior.
 
 `MeasurementDestinationHost` animates Home and the entire measurement presentation
@@ -129,40 +169,79 @@ controlled by Android.
 
 Method help uses one centered edge-to-edge Compose Dialog with a bounded-width,
 fixed-height Material 3 card constrained by system bars, cutouts and available
-window size. Close stays accessible above the vertically scrollable content;
-sections after Instructions also have Go back at the opposite end of that fixed
-control row. Go back fades in/out over 150 ms, retaining its normal theme color
-while page-transition input locks apply; outgoing navigation has no accessibility
-action. Important's decorative 6 sp bullet markers scale with text and align with
-the first body-text line without adding separate accessibility targets.
-Instructions, Important and How does it work? share the same card bounds and modal
-window. Resource-backed section lists per method use one shared renderer and ordered
-navigation. Full-width 260 ms horizontal slides move forward to the left and
-reverse on Go back, honoring system motion scaling. Moving/outgoing content is
-blocked from input, focus and accessibility. The circular Instructions action stays at
-bottom right; the Important section’s technical-explanation action sits at bottom left.
-Close stays usable during motion. Animation state is local to Compose. Outside
-card taps, dialog Back and Close all dispatch a whole-card dismissal. Page-keyed
-scroll state resets on content changes, while sensor-state publication leaves it
-alone. The measurement surface remains composed in place; pending/visible help
-suspends acquisition through the shared resource policy.
+window size. One shared page renderer and footer serve every registered method.
+A Foundation `HorizontalPager` owns finger tracking, velocity handling, snapping and
+programmatic navigation between Instructions and Important. A 10% positional threshold
+makes slow drags easier to complete while standard fling behavior handles faster gestures.
+Only settled pages publish to the coordinator. Buttons animate that pager locally,
+without publishing a destination through the ViewModel before motion starts; Android
+Back also animates it before publishing. Both small pages are composed ahead of the
+slide, with the illustration clock stopped when Instructions is offscreen and settled.
+Programmatic page movement uses a 360 ms FastOutSlowIn tween; touch fling behavior is
+unchanged. Boolean interaction gates use derived state to avoid recomposing the card
+on every entrance-opacity frame. No touch-consuming overlay is inserted during a drag. Moving pages
+lose semantics/focus and their callbacks cannot act. Vertical prose scrolling remains
+independent; the larger centered headline and fixed bottom actions remain outside it.
+Instructions has a 56 dp circular Next; Important has matching bottom-right back/close
+controls and a 14 sp documentation link aligned near the bottom-left corner.
+The link keeps a 48 dp touch target and button semantics; a null indication
+removes hover/press brightness changes without changing its normal theme color. Its decorative
+6 sp bullet markers align with the first body-text line.
 
-Tutorial content distinguishes resource-backed prose, bullet lists, display
-equations and the Known Object Height illustration. Instructions places it between
+The documentation link opens an opaque full-screen WIP surface in the existing modal
+host. The tutorial stays mounted with its page and scroll position, hidden from input,
+focus and accessibility. `TutorialCard.documentationOpen` is retained in the ViewModel;
+only Important can open it. The coordinator rejects covered page changes and obsolete
+card IDs. Android Back or the placeholder's `NavigationBackButton` closes only that
+surface, retaining Important and leaving completion unwritten. The shared back-arrow
+component reserves a 48 dp touch target around a 44 × 32 dp rounded visual and a
+20 dp arrow, with localized destination labels. The method selector preserves both
+container and icon colors while disabled; interaction stays blocked. No documentation prose or equation-rendering code remains.
+
+A full-window pointer ancestor reserves Android-reported left/right system-gesture
+insets before content padding. For a touch starting in either physical edge region,
+it consumes movement in the Initial event pass before the pager sees it, continuing
+through release/cancellation. Interior starts retain normal paging, including when
+the finger later crosses an edge. Zero insets reserve no space, and mouse/stylus
+input is unaffected. Stationary taps remain available. No hardcoded edge width or
+system-gesture exclusion is used. This prevents the pre-callback page displacement
+that aligning the pager only after Android recognizes Back cannot prevent.
+
+The Dialog disables default Back dismissal and owns a `PredictiveBackHandler`.
+A system Back starting on either tutorial page captures the settled source page,
+suspends pager input/publication and acquires scrolling with `PreventUserInput`.
+Within that mutation it aligns the source page at zero offset and collects the
+platform gesture, so a stopped partial drag cannot drift during dismissal. The
+same path handles Back from either screen edge, without requiring idle paging.
+Committed Back dismisses Instructions or animates Important to Instructions before
+publishing that destination. Cancellation realigns and restores the captured source
+before pager ownership returns. Pager overscroll is disabled so boundary stretching
+cannot leave an independent visual rebound. WIP Back returns to Important. Explicit close
+and outside taps request tutorial dismissal; the WIP surface blocks outside hits.
+
+The transient dialog window disables platform window animations and native dimming.
+A decorative Compose scrim uses the original theme dim amount and animates opacity
+over 240 ms in both directions, covering the complete window including system insets.
+This avoids a native dim layer disappearing abruptly when the dialog window is removed.
+One local Animatable
+fades and translates the card from 24 dp below over 240 ms on entry, and back down
+over 180 ms on dismissal. Input and accessibility are revoked immediately on closing;
+the retained coordinator card continues suspending acquisition until both the card
+exit and scrim fade finish, then the ID-checked dismissal runs. Recreated visible cards appear settled;
+a retained closing request completes its exit. Motion follows system duration scaling.
+The underlying measurement stays composed; pending/visible help suspends acquisition
+through the shared resource policy.
+
+Tutorial content distinguishes resource-backed prose, bullet lists and the Known
+Object Height illustration. Instructions places it between
 the introduction and steps as an explicit content block. Its transparent 2:1
-Canvas scales uniformly within a centered 400 dp maximum width. One draw-phase
+Canvas scales uniformly within a centered 440 dp maximum width, with 12 dp
+horizontal illustration margins while prose retains 24 dp margins. One draw-phase
 animation clock runs only while STARTED and is canceled on removal; page/card
 keys restart the sequence on reopening or returning to Instructions. Compose system
 duration scaling applies, with a static distance frame when motion is disabled.
 The illustration owns no hardware or measurement state and exposes one localized
 image description without changing announcements.
-
-A small, pure TeX-style notation parser feeds native Compose fraction and
-subscript/superscript layout; this supports authored equations without a WebView,
-network access or rendering dependency. Unsupported/malformed notation falls
-back to its source. Each equation has a localized spoken description instead of
-fragmented symbol semantics. Equations retain font scaling and can scroll
-horizontally in constrained widths, within the vertically scrollable page.
 
 A pure `TutorialCoordinator`, owned by the ViewModel, retains pending requests,
 card identity and current section across Activity recreation. A navigation
@@ -192,11 +271,12 @@ Source paths below are relative to `app/src/main/java/com/malagel/viewy/`:
 | `orientation/OrientationSession.kt` | Pure bounded recent-ray statistics, frame/time validity, captures and pair compatibility. |
 | `orientation/AndroidOrientationAcquisition.kt` | Sensor discovery/registration, callback isolation, freshness publication and cleanup. |
 | `camera/CameraDirectionMapping.kt` | Pure policy mapping the selected optical axis into native device axes. |
-| `camera/CameraPreview.kt` | CameraX logical preview, active-lens mapping, zoom, stream/errors and unbinding. |
+| `camera/CameraPreview.kt`, `camera/PreviewPresentationGate.kt`, `camera/PreviewDraw.kt` | CameraX preview, lens mapping, zoom, startup presentation readiness, cancelable draw confirmation and unbinding. |
 | `ui/MeasurementResources.kt`, `orientation/OrientationRegistration.kt` | Shared resource reconciliation, synchronous preview release and sensor registration ownership. |
 | `camera/PreviewSession.kt` | Ownership tokens reject callbacks/disposal from obsolete previews and clear readiness on release. |
 | `measurement/HeightInput.kt`, `measurement/HeightEditor.kt` | Supported-height validation, temporary keypad drafts, precise local unit conversion and atomic confirmation/cancellation. |
 | `ui/EmbeddedHeightEditor.kt` | Embedded responsive keypad, local unit selector, accessibility and hardware-key input without IME. |
+| `ui/LivePreview.kt`, `ui/MeasurementWorkspaceMotion.kt` | Native preview/reveal cover, synchronous image handoff and typed prompt/editor cover motion with input/acquisition gates. |
 | `measurement/MeasurementSelection.kt` | Pure Home/Methods/Measurement destination transitions and derived active method. |
 | `ui/HomeScreen.kt` | Home header, centered selection card and shared Home control. |
 | `ui/MeasurementSelection.kt` | Reusable animated card lists with scrollable entries, disabled modes and input gates. |
@@ -400,8 +480,9 @@ callbacks and orientation mapping reconciliation. The ViewModel applies the same
 eligibility policy to preview startup, callbacks and capture. Suspension revokes
 preview ownership before closing CameraX, stopping orientation and publishing
 unready state. Last-known camera metadata/failure details remain diagnostic
-snapshots, with OPEN/STREAMING/readiness cleared; a new binding clears them. A preview epoch forces replacement even if an overlay opens and
-closes between compositions. Stable effect keys avoid rebinding on ordinary
+snapshots, with OPEN/STREAMING/readiness cleared; a new binding clears them. A
+preview epoch forces a new binding and camera child even if an overlay opens and
+closes between compositions; it does not replace the visible native host. Stable effect keys avoid rebinding on ordinary
 sensor publications or recomposition. Disposal/retry callbacks from an older
 owner cannot stop or revive its replacement; asynchronous CameraX provider work
 also checks disposal/failure. Sensor registration tokens reject queued data and
@@ -446,8 +527,8 @@ zoom before capture can resume. Fixed 1× cameras remain usable
 with disabled zoom controls; invalid capability ranges fail closed. The localized
 ratio label stays visible with the controls, using nearly opaque surfaces.
 
-Capture requires OPEN plus STREAMING, a verified active ID on multi-camera
-devices and current orientation readiness. Permission
+Capture requires a presented OPEN/STREAMING preview, a verified active ID on
+multi-camera devices, settled zoom and current orientation readiness. Permission
 is rechecked on resume; denial retains permission recovery controls. Camera readiness
 alone never requests recovery UI. `CameraRecovery` distinguishes quiet binding/retry
 waiting from a failure requiring user action. `MeasurementResources` owns one
@@ -482,13 +563,37 @@ without waiting for Compose disposal or motion. Cleanup removes observers,
 display listeners and watchdog callbacks and unbinds only the owned Preview.
 Orientation stop unregisters its listener and removes the freshness timer.
 
-A visible intentional suspension can copy one transient PreviewView bitmap, close
-the camera immediately, and fade that decorative image over 225 ms. The snapshot
-records the live opacity at release; its animation initializes at that opacity
-before its first draw to avoid a transparent frame during the handoff. No image is
-stored or exposed to accessibility. Failure to obtain the bitmap skips the fade;
-backgrounding/disposal does not wait for it. The live preview fades in only after
-OPEN plus STREAMING, over 225 ms. Presentation never extends a hardware session for an animation.
+A visible intentional suspension can copy one transient PreviewView bitmap and
+close the camera immediately. `LivePreview` installs it as the stable host's native
+foreground before unbind can clear pixels, sampling the live reveal opacity. It
+remains in that same native hierarchy for its entire hold/fade; neither acquisition
+ineligibility nor a preview-epoch change replaces it with a waiting view. New
+bindings replace only the closed camera child beneath the cover. Snapshot identity
+rejects stale alpha/clear callbacks, including when a rapid reversal reuses the same
+bitmap. An old reveal coroutine also cannot uncover a stopped or replacement child.
+Failure to copy skips the image; backgrounding/disposal never waits for it.
+
+`PreviewFrameMotion` distinguishes a local workspace cover, result cover, ordinary
+suspension and destination exit. The result overlay's settled callback releases
+its native backdrop; Restart before that callback fades it instead. Native drawable
+alpha uses Compose animation scaling. The waiting cover stays drawable and opaque
+until readiness, then its alpha reveals the stream over 225 ms. No presentation
+callback delays binding or resource release.
+
+`PreviewRelease` runs snapshot publication and camera close once per owner. Resource
+suspension and Compose disposal share it, so late disposal cannot overwrite retained
+pixels or change the release decision. Disposal-first cleanup closes immediately
+without an animated snapshot.
+
+`PreviewPresentationGate` keeps readiness false through initial zoom acknowledgement
+and the existing settling interval, then requests a draw confirmation. API 29+
+hardware rendering uses a frame-commit callback; older/software rendering posts
+completion after draw dispatch. Generations reject confirmation after readiness
+loss, closure or rebinding. This is a presentation fence, not an exposure timestamp
+or a brightness/exposure-quality test; dark scenes remain valid. Once presented,
+ordinary user zooms retain the image while the independent zoom-settled capture
+gate remains in force. Cleanup cancels pending draw callbacks. No arbitrary startup
+sleep or image-brightness heuristic is used.
 
 `MeasurementUiState.previewVisible` supplies the same eligible-and-ready target
 for the live camera and zoom controls. The preview-edge height editor shares that
@@ -501,7 +606,8 @@ ellipsized single-line number and separate unit when constrained; accessibility
 retains the complete formatted height/edit description. This does not change
 height storage or editable input. Common viewfinder interaction
 gates hide both controls for overlays, height editing, focus loss and inactivity.
-The controls and preview share one 225 ms duration for both fade-in and fade-out. Outgoing zoom retains its last visible ratio and
+The controls and preview reveal share a 225 ms duration. Local opaque covers own
+image exit; independent visible suspensions fade the snapshot over the same duration. Outgoing zoom retains its last visible ratio and
 button appearance until exit completes, even when camera snapshots reset.
 Transitioning controls exclude touch, focus and accessibility immediately and
 become interactive after entry settles. Interrupted fades reverse in place;
@@ -545,13 +651,13 @@ No hardware session or measurement survives process death.
 
 `MeasurementResultOverlay` reads RESULT plus the stored estimate, retaining only
 that estimate and its saved height through a 225 ms fade on Restart.
-The existing LivePreview remains the only PreviewView/binding owner, outside the
+The existing LivePreview remains the only native-preview/binding owner, outside the
 animated result subtree. Workflow reset and acquisition reconciliation run
 immediately; result exit never gates startup. Live imagery is rendered only for
-eligible OPEN plus STREAMING readiness. Completion retains a best-effort last-frame
-bitmap beneath the incoming result color, while releasing hardware immediately.
-The actual result entrance transition discards that bitmap once opaque; result
-identity checks also discard it on replacement or Restart. It is presentation-only,
+eligible, presented camera readiness. Completion retains a best-effort native last-frame
+foreground beneath the incoming result color, while releasing hardware immediately.
+The actual result entrance transition acknowledges when opaque and releases that
+foreground; Restart before coverage fades it with the outgoing result. It is presentation-only,
 never persisted and never used for measurement. Existing suspension snapshots
 and recovery fades are preserved.
 
@@ -621,10 +727,15 @@ including the orientation adapter's freshness tick; it adds no timer or sensor
 work. Workflow notice IDs identify new events even when the reason repeats, while
 stored reasons remain available to diagnostics after presentation expires.
 Workflow failure events and the current near-vertical restriction produce text;
-movement, settling, freshness, readiness and left/right alignment updates are silent.
-The near-vertical message has priority while the existing angle restriction applies,
-with immediate visibility targets and no display timeout. Text has no movement
-tracking, condition hysteresis, debounce or live-hint cooldown. Corrections last
+settling, freshness, readiness and left/right alignment updates are silent.
+MOVING observations in one sensor frame accumulate six continuous seconds only
+while acquisition/preview and zoom are ready. One Keep the camera steady hint then
+uses the same correction timeout and renderer, without repeating within the same
+movement episode. Any other quality status, suspension, frame change, near-vertical
+restriction, restart or capture-stage change resets it. Workflow corrections take
+priority and can defer its first display. No extra timer or sensor registration is
+introduced. The near-vertical message has priority while the existing angle
+restriction applies, with immediate visibility targets and no display timeout. Corrections last
 five seconds, extended by Android's recommended text timeout on API 29+;
 hardware recovery hides them and retains persistent actions. Presentation never
 changes capture eligibility or sensor quality assessment.
@@ -699,6 +810,16 @@ sensor timestamp identifies the displayed frame's exposure. Rendering, processin
 exposure and scheduling add unmeasured latency, potentially worse in low light.
 No constant latency correction or extrapolation is applied. Settling before and
 remaining still after capture is a mitigation, not a latency bound.
+
+Capture renders its shutter and border with one 150 ms animated color, using the
+same enabled/disabled theme colors as before. Both Button color states read that
+animated value so the availability gate changes immediately without a color jump;
+the container, dimensions, semantics and capture mathematics are unchanged.
+
+`ScreenHeader` gives Settings and its Language/Developer pages, WIP and Diagnostics
+one shared title/back layout: 16 dp top, 8 dp bottom/horizontal spacing below the
+host-owned system insets. It keeps the existing full back-button touch target;
+Diagnostics retains its intentionally scrollable header in constrained workspaces.
 
 ## Settings, locales and application-data reset
 

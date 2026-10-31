@@ -28,7 +28,9 @@ future validated features; they have no selectable methods.
   Legacy saved method IDs are ignored. Activity recreation retains in-memory
   navigation; process death starts at Home again.
 - Long Distance slides the card contents left to reveal Known Object Height and
-  its description. Card Back and Android Back reverse the 220 ms slide to modes.
+  its description. The methods header says **Select a method** beside the back
+  button, without repeating the mode name. Card Back and Android Back reverse the
+  220 ms slide to modes.
   Back on Home follows normal Android exit behavior.
 - Selecting Known Object Height fades and subtly moves the entire measurement
   destination in from the right over 270 ms. The outgoing method list stays in
@@ -49,17 +51,31 @@ future validated features; they have no selectable methods.
 - Each implemented method has a contextual **?** control immediately left of the
   settings gear. It is absent while no method is active. It opens one
   centered, rounded, scrollable tutorial card over the stationary measurement
-  interface. Each card has **Instructions**, **Important**, and **How does it work?**
-  sections. Instructions advances with a circular **>** icon button; Important
-  advances with bold **How does it work?** text at the bottom left. Forward
-  navigation slides the
-  current section left and the next in from the right; **Go back**, at the top
-  left opposite **Close**, returns to the previous section with reversed motion.
-  Go back keeps its normal color while temporarily disabled during page motion,
-  and appears/disappears with a short fade. Important uses larger, font-scaled
-  bullet markers. Card bounds remain fixed and motion follows system animation scaling.
-  Switching sections starts at the top. Outside tap, Android Back and **Close**
-  dismiss the entire card from any section; every reopening starts with Instructions.
+  interface. Each card has **Instructions** and **Important** pages, with larger,
+  centered titles fixed at the top. Instructions has a circular **>** at bottom right;
+  Important has matching **<** and **X** controls for returning and closing. Its compact
+  **How does it work?** link sits near the bottom-left corner, without hover or press
+  brightening, and opens a full-screen **WIP**
+  placeholder. The placeholder has a tonal back-arrow button at top left; it and
+  Android Back return to Important without dismissing help. No technical explanation
+  text is included in this destination yet.
+  Horizontal swipes track the finger between Instructions and Important, then settle
+  to a page using distance and fling velocity. Short drags can return to the same page;
+  vertical scrolling remains independent. Buttons use a slower 360 ms page slide;
+  touch-driven drags and flings retain normal pager behavior. Android Back takes
+  priority over the pager on both pages, from either screen edge. Touches starting
+  in Android's back-gesture edge regions cannot move the pager, including before
+  the system recognizes Back; swipes starting inside the card still track normally.
+  Any interrupted prior drag is aligned before Back proceeds;
+  cancellation restores the source page. Boundary swipes do not stretch the pages. The card enters upward with a fade and dismisses downward with
+  a fade, blocking controls immediately on dismissal. The backdrop dims and clears
+  with matching 240 ms fades, returning fully to the underlying screen before the
+  dialog is removed.
+  Important retains larger, font-scaled bullet markers. Card bounds stay fixed and
+  motion follows system animation scaling. Android Back from Important returns to
+  Instructions and dismisses from Instructions; outside taps and **X** close the
+  tutorial. Every reopening starts with Instructions. Page or placeholder navigation
+  alone never records tutorial completion.
   Help suspends camera and orientation acquisition. Entered height and completed
   results remain available; an incomplete endpoint pair is discarded.
 - The first activation of each method automatically opens its tutorial after the
@@ -76,21 +92,29 @@ future validated features; they have no selectable methods.
   The three steps are: enter the object height, capture
   the top, then tilt the phone without moving its position and capture the bottom.
   Important gives four practical tips about fixed position, vertical aiming, zoom
-  and using a known height. How does it work? explains the geometry with formatted
-  fractions and endpoint subscripts, then covers sensor/camera/timing limitations and unquantified
-  accuracy. Steadiness is not presented as measurement accuracy.
+  and using a known height. Steadiness is not presented as measurement accuracy.
 - The circular bottom-right **Home** control uses a house icon and returns to
   the initial Home card and clears the method completely. Restart retains height
   while clearing captures/results. Android Back while the distance result is displayed
   performs the same Restart action, retaining height and prompting a fresh top capture.
-  From the unfinished camera workspace with a saved height, Android Back instead
-  reopens the keypad with that height in the current global units. Acquisition stops
-  and unfinished captures clear under the usual editing interruption rules.
-  Back from the height keypad or a covering surface still cancels/closes that surface.
+  From the unfinished camera workspace, Android Back clears height/captures and
+  returns directly to **Enter object height** with acquisition stopped; the next
+  Back exits the method. The last available camera image and controls fade into
+  the height prompt over 225 ms; acquisition stops immediately. Without an
+  available image, the prompt fades over the themed waiting surface. The camera's Edit height button opens a draft keypad;
+  Back from that editor discards draft changes and returns to the camera with the
+  saved height retained. Initial-entry cancellation returns to Enter object height;
+  completed-result editor cancellation preserves the result. Covering
+  surfaces keep their existing Back hierarchy.
   Capture retains its existing behavior.
 - A circular Settings control with a standard rounded gear sits at top right,
   using a slightly richer purple than the other tonal controls.
   It opens full-screen dark Material 3 settings with or without an active method.
+  Settings and the method selector use the same compact, wide tonal back-arrow
+  button as the WIP screen, with a 48 dp touch target. Temporary method-selector
+  navigation locks preserve its normal colors.
+  Full-screen Settings, Language, Developer Options, WIP and Diagnostics share
+  header spacing below the system insets, with a modest top gap above navigation.
   Settings provides global Metric/Imperial units, language selection and a separate
   Developer Options destination. Changes save automatically. Back from a child
   destination returns to Settings; Back from Settings restores the underlying
@@ -142,7 +166,8 @@ future validated features; they have no selectable methods.
   Metric, diagnostics off, device language and first-use help eligible.
 - Restart is a circular
   arrow control matching Home on the left of capture; the control row is raised
-  above the navigation inset for easier thumb access. Restart and Home sit
+  above the navigation inset for easier thumb access. Capture availability changes
+  fade its existing shutter/border colors over 150 ms; capture is disabled immediately. Restart and Home sit
   symmetrically closer to the large, solid shutter-style Capture button.
 - After method selection, until a positive finite height is saved, a tonal rounded
   rectangle offers
@@ -172,7 +197,8 @@ future validated features; they have no selectable methods.
   Conversion-generated values may exceed ten digits without losing physical precision.
   Digits, the localized decimal separator and backspace edit a temporary draft;
   **Enter** confirms only supported positive finite heights. The back arrow and
-  Android Back cancel without changing saved height or results. No text field,
+  Android Back discard the draft and return to its underlying camera, result or
+  initial height prompt, preserving any previously saved height/result. No text field,
   separate height dialog or software keyboard is used. Hardware digits, point/comma,
   Backspace, Enter and Escape are supported. Smaller rounded rectangular number
   keys keep the same colors when disabled. Invalid input, including empty or zero,
@@ -184,8 +210,16 @@ future validated features; they have no selectable methods.
   Exceptionally small converted values show <0.0001 rather than a misleading zero.
   Camera controls immediately lose input and accessibility on editor opening.
   Camera and editor share a restrained 225 ms opacity transition over an opaque
-  themed surface; returning waits on existing streaming readiness before fading
-  the live preview in. Results remain underneath the editor, so cancellation or
+  themed surface. The prompt and keypad share one cover transition, so initial
+  confirmation fades directly from keypad to the waiting camera without showing
+  Enter object height again. Opening the camera's editor retains the last image
+  beneath the incoming keypad instead of replacing it with a solid color first.
+  On return from the keypad, Settings or Help, the preview draws beneath its native
+  themed cover until streaming, initial zoom settling and a subsequent draw
+  confirmation, then the cover fades away over 225 ms to reveal live imagery.
+  The native preview host stays in place through suspension; the retained image
+  remains inside it until its fade or the incoming opaque surface finishes.
+  Results remain underneath the editor, so cancellation or
   correction returns directly without replaying the result entrance. Motion follows
   system animation scaling. The draft survives Activity recreation within the session.
   Settings, Help, Home and enabled diagnostics remain available during editing.
@@ -264,6 +298,13 @@ future validated features; they have no selectable methods.
   leaves static directional cues. Chevrons add no text or accessibility focus
   targets; Capture semantics retain the correction direction without a live
   announcement on each reading.
+- Six uninterrupted seconds of movement-blocked capture show **Keep the camera
+  steady.** (**Mantén la cámara fija.** in Spanish), once per movement episode.
+  The hint uses the existing popup, 150 ms fades and five-second readable interval
+  with accessibility timeout extension. Becoming ready, settling, missing/stale or
+  unreliable readings, zoom settling, frame changes, overlays, restart and stage
+  changes reset the interval. Existing corrections and near-vertical restrictions
+  have priority; the hint never changes capture eligibility.
 - New rejected captures and lost pending captures receive concise, event-driven
   corrections. Each failure is shown once for a readable interval, extended by
   Android accessibility timeout preferences where supported; sensor updates do
@@ -336,6 +377,9 @@ future validated features; they have no selectable methods.
   orientation unavailability with captures blocked.
 - Material 3 baseline dark colors across the app, launch window and system bars,
   independent of the system theme. Neutral surfaces use restrained lavender accents.
+- Home and methods share exact wordmark/Settings positions: common compact sizing
+  and outer padding, with subtitle and help space reserved on Home without showing
+  or exposing those method-only elements to accessibility.
 - A larger, bold, rounded Viewy wordmark has a more spacious header above the
   flexible preview. The rounded font is bundled for offline use.
 - Portrait Activity request, compact header, flexible preview and fixed bottom

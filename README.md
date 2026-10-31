@@ -12,15 +12,19 @@ two aiming directions. Application ID: `com.malagel.viewy`.
    **Home** returns directly to all modes.
    Mode/method lists slide inside the card. Measurement fades in from the right;
    Back to the method list reverses the horizontal motion; Home uses a vertical fade/slide.
-   Android Back from the camera reopens the height keypad with saved height;
+   Android Back from the camera returns directly to Enter object height;
    from a distance result it restarts measurement, retaining height.
    On first activation, read and dismiss the method tutorial. The **?** button
    beside the settings gear reopens it. Advance from **Instructions** with **>**,
-   read the **Important** tips, then tap **How does it work?** for geometry and
-   limitations. Tap **Enter object height** and save the vertical distance
+   or swipe left; swipe right from **Important** to return. Read the tips and use
+   the bottom-right **<** to go back or **X** to close. Android Back returns one
+   tutorial page at a time and closes from Instructions. **How does it work?** opens
+   a WIP screen; its top-left back arrow or Android Back returns to Important. Tap **Enter object height** and save the vertical distance
    between the object's endpoints with the embedded keypad. Metric offers m/cm;
    Imperial offers decimal ft/in, following Settings without changing global units.
-   Tap **Enter** to confirm, or Back to cancel. Then allow camera access when
+   Tap **Enter** to confirm. Back from the camera returns to **Enter object height**;
+   the next Back exits the method. Back from the camera's height editor instead
+   discards the draft and returns to the camera with saved height. Then allow camera access when
    prompted by the viewfinder controls. Editing stays inside the rounded workspace
    without opening the software keyboard.
 2. Keep the camera location fixed. Aim the centered reticle at the top, stop for

@@ -27,7 +27,7 @@ spherical steadiness statistics, timestamps, discontinuities, reliability and
 source/frame/mapping isolation; inverse camera-pose mapping and fallbacks; height
 conversion; global unit presentation without workflow mutation; real Preferences
 DataStore defaults, edits and file reopening; language tag selection, Spanish
-resource completeness/placeholders/equations and locale formatting; the manifest
+resource completeness/placeholders and locale formatting; the manifest
 contract for cold default-language changes without suppressing orientation/size/density
 recreation; settings Back
 hierarchy/loading/write gates; embedded keypad drafts, decimal/zero/backspace
@@ -49,13 +49,26 @@ precision and decimal-only notation; selection availability, inactive startup,
 Home mode presentation, mode/method navigation, Back, disabled modes,
 activation, Home return and reselection; tutorial first-use eligibility and stable-ID
 preference keys, store/coordinator reconstruction, dismissal and manual reopening,
-three-section navigation, retained presentation, settled method-entry acknowledgement,
-duplicate/stale callbacks, rapid navigation and acquisition gating through method entry; tutorial equation parsing, grouping, scripts and malformed-notation fallback; and acquisition observations through workflow/calculator transitions,
+two-page navigation and retained WIP coverage, retained presentation, settled method-entry acknowledgement,
+duplicate/stale callbacks, rapid navigation and acquisition gating through method entry; acquisition observations through workflow/calculator transitions,
 alignment/wraparound, interruption, correction and retry; diagnostics tap/hold
 routing against persisted preference snapshots, modal gates, retained navigation
 without result mutation, stopped acquisition versus discovery/failure,
 quality/readiness reasons, invalid/stale/incompatible endpoint suppression, stored
 geometry, degree-based sensitivities and Metric/Imperial diagnostic conversion.
+Resource tests cover synchronous height-prompt cleanup with and without a
+requested decorative fade, rejecting obsolete preview/sensor callbacks and requiring
+fresh readiness on reentry. Preview-presentation tests reject streaming before
+startup controls settle and reject obsolete draw callbacks after loss/closure/rebind;
+later user zooms retain presentation. Workspace tests cover direct initial
+confirmation, draft cancellation, prompt return, reversed transitions and restored
+cover/acquisition gates. Release-order tests cover image retention through
+suspension followed by disposal for height editing, completion, Home, Settings,
+tutorial, prompt return and diagnostics; disposal-first cleanup without copying;
+and late disposal after a replacement owner starts. These checks do not execute
+native preview rendering. Frame-retention tests cover workspace/result coverage,
+interrupted entry, ordinary suspensions and Home's destination-owned exit, including
+incoming Home inactivity versus actual app backgrounding.
 Navigation motion tests cover destination retention, distinct method-list/Home
 return segments, card-only navigation, input gates through exit or canceled entry,
 settings forward/Back direction and settled restored destinations. These JVM tests
@@ -68,7 +81,7 @@ physical correction usefulness remain manual checks.
 Home presentation regression coverage checks a stable outgoing method list on
 measurement entry, Android Back returning to methods before height entry, and Home
 returning directly to modes with or without saved height. Configured camera stages
-route Back to the height editor; completed results route it to Restart. Preview suspension and guidance
+route Back to the height prompt; completed results route it to Restart. Preview suspension and guidance
 changes pass the bounded JVM, debug assembly and lint checks; these checks do not
 render Compose frames. Manually verify that tutorial and Settings openings fade
 from the last camera frame without a dark flash, and that Android Back before
@@ -76,7 +89,7 @@ height entry returns to the method list, a second Back returns to Select mode,
 and Home returns directly to Select mode. Repeat rapid Back during both card
 and measurement transitions, with reduced/disabled system motion.
 
-The three-section tutorial passed JVM tests, debug Kotlin/resource compilation and
+The shared tutorial passed JVM tests, debug Kotlin/resource compilation and
 Android lint with `:app:testDebugUnitTest :app:lintDebug`. No device or emulator
 was used; rendered slides, constrained layouts and TalkBack remain manual checks
 in the method-help row below.
@@ -97,9 +110,10 @@ checks do not verify rendered frames, lifecycle frame work or TalkBack behavior;
 visual and runtime validation remain unverified.
 
 Manually check the illustration appears after the introduction and before the
-numbered steps only on Instructions. Inspect narrow widths and large text with
+numbered steps only on Instructions. Its enlarged container should use more of the
+card width without clipping or changing proportions; prose retains its usual margins. Inspect narrow widths and large text with
 scrolling; watch several loops for clipping and a fixed lens position during
-phone rotation. Close mid-loop, reopen, advance through Important and How does it work?, then use Go back, and
+phone rotation. Close mid-loop, reopen, advance to Important, open/return from WIP, then use the back chevron, and
 background/foreground the app: the Instructions sequence should restart. Verify no frame
 work below STARTED or after dismissal with a developer-owned profiler. With system
 motion disabled, including a live toggle, expect a stable distance diagram;
@@ -125,7 +139,37 @@ metadata/zoom removal, pending retry cancellation and height-gated reentry. Resu
 identity checks distinguish a new completion from height correction, including host
 restoration. These checks do not render Compose or prove hardware cleanup.
 
-Manual validation remains required; do not infer device results from JVM/build checks:
+Manual validation remains required; do not infer device results from JVM/build checks.
+The camera flash remains a device-reported issue until these rendered paths are
+rechecked; successful JVM/lint results alone cannot confirm its resolution.
+
+| Transition | Expected presentation and retained state |
+| --- | --- |
+| Prompt → keypad → confirm | One cover transition at each step; no prompt button between keypad and camera. Fresh camera image and controls fade in together after startup readiness. |
+| Camera → Edit height → cancel/confirm | Last available image remains beneath the incoming keypad until opaque; no immediate solid-color replacement. Saved height survives cancellation; confirmation updates it. Return uses a fresh preview reveal. |
+| Camera → Android Back → prompt | Acquisition releases immediately; prompt fades over the last image. Height/captures clear; the next Back returns to methods. |
+| Result → keypad → cancel/correct | Result stays composed and returns directly, without another result reveal/count or camera binding. |
+| Result → Restart/Android Back | Height remains; result fades out and a fresh camera starts. A subsequent camera Back returns to the prompt. |
+| Camera/keypad/result → Settings/Help/diagnostics → return | Covering surface keeps its existing navigation/Back priority. Draft/saved height/result survive; camera resumes only when eligible, with a fresh reveal. |
+| Any method state → Home/method exit → reentry | Whole-screen exit retains its outgoing workspace appearance; resources release immediately. Reentry starts with the prompt and no old image/draft/result. |
+| Cancel/reverse during entry; background/recreate mid-fade | No stuck snapshot/cover, exposed prompt button or double navigation. Recreated covers/results appear settled; preview startup still waits for readiness. |
+
+Repeat the matrix at normal, slow and disabled system animation scales, in the
+normal and exceptional workspaces, including rapid repeated Back, English/Spanish,
+permission denial/retry, bright/dim/fully dark scenes and camera recovery. Dark
+scenes must not remain hidden behind a brightness-based readiness rule. Use a
+frame recording and developer-owned profiling to assess actual image/control
+fades and frame pacing; these are unverified by local compilation.
+
+For release handoffs, compare a quick tap with pressing and holding before release
+on Edit height, Home, Settings and Help while camera acquisition is active. Complete
+a valid second capture as well. Inspect the first frames before each destination's
+fade: no one-frame waiting/keypad/result-color fill may replace the retained camera
+image. The native preview host should remain attached during stop, completion and
+cover transitions; only a new binding replaces its camera child. Use Layout Inspector
+or developer-owned tracing to check this separately from visible frame recording. Repeat after camera startup has fully settled and during repeated entries,
+at normal and slow motion scales. Repeat the controls from the height prompt,
+keypad and completed result to distinguish live-preview teardown from button feedback.
 
 1. On first use, dismiss the tutorial and tap the unchanged **Enter object height**
    action. Expect an empty embedded keypad and no permission prompt, camera or IME.
@@ -166,19 +210,31 @@ Manual validation remains required; do not infer device results from JVM/build c
    must clear height, draft, captures, result and camera diagnostics. Reenter with
    no acquisition and an empty first height entry. Global preferences and tutorial
    completion must remain. Restart clears the draft/captures/result but keeps height.
-   From live camera, use Android gesture Back before and after top capture: reopen
-   the keypad with saved height in the current global units, release acquisition,
-   and clear any unfinished capture. Cancel to retain height or confirm an edit;
-   return to fresh top capture without leaving the method. Repeat in both unit systems
-   and during camera startup/recovery. Home must still clear the entire method,
-   without crashes or null-height labels.
+   From live camera, use Android gesture Back before and after top capture: return
+   directly to Enter object height, clear height/captures and release acquisition.
+   Watch frame-by-frame for the 225 ms prompt cover over the last available image,
+   with controls fading out and no immediate solid-color replacement or black flash.
+   Without an available image, expect the prompt over a themed waiting surface. Repeat
+   during startup, slow/disabled animations,
+   repeated reentry and alternative developer theme palettes. A new preview must
+   not retain the shutdown cover. The next Back exits to the method list. Separately open the camera's Edit height
+   keypad, change the draft and use Back/arrow: retain saved height and return to
+   fresh camera acquisition, without the initial prompt. Initial-entry cancellation
+   returns to its prompt; result editor cancellation retains its result. Repeat in
+   both units, during startup/recovery and after Settings/Help or Activity recreation.
+   Home still clears the entire method without crashes or null-height labels.
    Repeat Home after a result, including during its entrance, then reenter rapidly: the
    first frame must be fresh height entry, with no brief old distance or result exit.
    Repeat in the exceptional workspace and with slow/disabled system motion.
    Check rapid taps, late callbacks and overlay returns retain their existing state.
 6. Watch camera ↔ keypad and result ↔ keypad transitions at normal, slow and
-   disabled animation scale. Expect stable bounds, opaque themed waiting surfaces,
-   smooth streaming recovery and no black flash, stale frame or intermediate screen.
+   disabled animation scale. Repeat initial height confirmation and camera Edit
+   height cancellation/confirmation, including rapid reopenings and slow startup.
+   Expect stable bounds and an opaque native themed cover while waiting for the camera;
+   image and controls must fade in after startup readiness (including zoom settling), without a black flash or
+   an abrupt image replacement. No previous preview may appear as a new live stream.
+   Background or open Help/Settings during the fade, then return; check that no
+   cover or snapshot remains stuck. These rendered frame checks require a device.
 7. Repeat in small/split windows, landscape, large text, cutouts/system insets and
    the exceptional workspace. The keypad must adapt proportionally, remain fully
    visible and never move or stretch under finger swipes. All keys and Enter must
@@ -232,7 +288,7 @@ normal/compact/exceptional windows and large system fonts:
 2. Tap Restart or use Android gesture Back during the counter, during each reveal
    and after completion. Both must retain the method and saved height, clear the result
    and prompt a new top capture. A subsequent Back from acquisition reopens the
-   height keypad. Home from results still clears the whole method.
+   height prompt. Home from results still clears the whole method.
    Repeat in the exceptional workspace. With Settings, Help, Diagnostics or the height
    keypad open over a result, Back must close/cancel that surface and preserve the result.
    When restarting, the entire visible result must fade out together over about 225 ms while a single
@@ -430,19 +486,19 @@ Keep records externally; the app has no history/export feature.
 | Endpoint geometry and controls | Use a measured plumb height; fix camera position and capture top then bottom. Try reversed/same endpoints, very small separation, near-vertical aim and duplicate taps: expect correction/blocking. Test Restart, height editing and unit changes; results should have no separate bottom-recapture action. Diagnostics should show the production top/bottom elevations and stored geometry; unavailable endpoints must remain pending or unavailable. |
 | Handheld readiness | Repeat supported/unsupported handheld captures with ordinary aiming, tremor and taps. Observe moving/settling/ready and blocked attempts. Near straight up/down, elevation/ray should remain finite and bearing should be suppressed; production can block before the numerical pole. Provisional gates are not calibrated acceptance thresholds. |
 | Interruptions and resources | Capture top, then lock/unlock, display rotation, camera retry, normal camera privacy/access interruption and orientation recovery retry. Check incomplete pairs clear, entered height remains, fresh preview/settling restores readiness and stale captures cannot finish. Repeat after a completed result: its value and captured diagnostics must remain available and acquisition must stay stopped until Restart, including after correcting height. Home separately clears height, captures/results and hardware metadata; reenter through fresh height entry. Repeat pause/resume and inspect for listener/lifecycle errors. Wait past 15 s before bottom and check restart guidance. |
-| Foreground visibility and resource fades | On Galaxy S22, repeatedly open/close Settings, diagnostics, all three tutorial sections, selection and height editing, including rapid reversal during startup or fades. Verify a subtle last-image fade after immediate camera release and fade-in only when streaming resumes, without preview resizing, duplicate binds or a late obsolete preview. Use the Android camera privacy indicator and developer-owned profiler/registration tracing to verify camera closure and listener/timer removal; diagnostic flags alone cannot prove physical cleanup. Home, lock, task switching, notification shade/focus loss and unrelated Activity recreation must release immediately without waiting for animation. Return while an overlay or completed result remains visible: acquisition must stay stopped. Repeat in multiwindow, with reduced/disabled animation scale, and in the exceptional workspace: collapsed means stopped, its focused open dialog may acquire, and its overlays suspend. Permission denial/revocation/settings recovery and camera/orientation retry must still work; fresh observations/settling must precede capture after recovery. Confirm TalkBack cannot reach covered controls or decorative frozen images. |
+| Foreground visibility and resource fades | On Galaxy S22, repeatedly open/close Settings, diagnostics, both tutorial pages and WIP, selection and height editing, including rapid reversal during startup or fades. Verify a subtle last-image fade after immediate camera release and fade-in only when streaming resumes, without preview resizing, duplicate binds or a late obsolete preview. Use the Android camera privacy indicator and developer-owned profiler/registration tracing to verify camera closure and listener/timer removal; diagnostic flags alone cannot prove physical cleanup. Home, lock, task switching, notification shade/focus loss and unrelated Activity recreation must release immediately without waiting for animation. Return while an overlay or completed result remains visible: acquisition must stay stopped. Repeat in multiwindow, with reduced/disabled animation scale, and in the exceptional workspace: collapsed means stopped, its focused open dialog may acquire, and its overlays suspend. Permission denial/revocation/settings recovery and camera/orientation retry must still work; fresh observations/settling must precede capture after recovery. Confirm TalkBack cannot reach covered controls or decorative frozen images. |
 | Delivery failure | In a disposable emulator/fault harness stop sensor delivery beyond the freshness limit, then resume. Expect STALE and blocked capture, followed by a new frame and settling. An already configured Sensors Off tile can help; configuring it is not required. JVM rules do not prove platform callback behavior. |
 | Missing hardware and registration | On sensor-/camera-limited hardware or a harness, test no rear camera, game-sensor absence with rotation-vector fallback, neither sensor available, and failed registration. A running source must not silently switch on stalls. Timestamp/registration fault injection needs a harness; use pure tests only as evidence for rejection logic. |
 | Repeatability and return | Use a separately authorized external harness to record fixed-aim differences over 5/10/15 s and return-to-aim comparisons for each available source. The read-only app has no A/B or source-selection controls; no measurement pair may span sources. Initial rotation-vector runs should avoid magnetic objects; record controlled magnetic disturbance separately. Differences combine return, fixture and sensor effects, not independently measured drift. |
 | Reference distances and repetition | Independently measure horizontal lens-to-target-line distance with tape/range instrument at several safe distances/heights and positive/negative endpoint elevations. Collect multiple full measurements with independent re-aims (for example ten per setup), recording every result/rejection, signed/absolute relative error and spread. Compare short/long capture durations and fixture/handheld results. Viewy output must not define its own reference. |
 | Lighting and focus | Repeat bright/dim/backlit scenes. Observe autofocus, lens breathing, center movement and preview delay. Wait for a clear stationary image; no claim ties the captured orientation to an earlier displayed frame. |
-| Home and method navigation | Start a new process, including an upgrade with a legacy saved method ID: expect Home, wordmark, Settings and a centered rounded card fading in over 300 ms without vertical movement. Returning from measurement with Home retains the existing vertical slide/fade; Android Back before height entry slides measurement right while the method list fades and slides in from the left over 270 ms. Confirm the launch fade does not replay on Activity recreation, background/resume or in-app returns; check normal, slow and disabled system animation scales. Android controls the separate launcher/task window transition. No camera placeholder, capture controls, permission request or acquisition. Long Distance slides left to Known Object Height; card Back and Android Back reverse to modes. Back on Home exits normally. Unavailable modes stay visible, disabled and labeled Coming soon. Select the method: the outgoing method list stays in place and fades without switching to modes; the entire workspace fades and subtly enters from the right over 270 ms; Home fades it out and restores all modes. Android Back before height entry restores the method list; another Back restores modes. With saved height, camera Back reopens the keypad; result Back restarts measurement; the height editor and status/tutorial dialogs must dismiss first. Capture a top endpoint, return Home and reenter: height and all captures are cleared, and camera remains stopped until fresh height confirmation. Repeat after completion and while editing: no old result or draft may return. Android Back leaving the method also clears its session. Settings and tutorial returns preserve saved height/results and a draft; incomplete pairs still clear on suspension. Open/close Settings from Home, Methods and Measurement: restore the correct destination without flashing another screen. Exercise rapid taps/Back, interrupted navigation, Activity recreation at each level and mid-transition, background/resume, compact/split windows, large text, English/Spanish and TalkBack. Moving/outgoing destinations must reject touch, keyboard and accessibility actions; lists must scroll within stable card bounds. Sensor/unit/locale updates must not replay navigation. Recreated destinations appear settled; reduced/disabled animation scale remains functional. Use privacy indicators and developer-owned tracing to verify immediate physical camera/listener release before exit finishes, no duplicate bindings and no stale callback revival. After process death, launch Home again. JVM tests verify state/resource policies, not rendered smoothness, frame pacing or physical cleanup. |
-| Method help and completion | On fresh app data, activate Known Object Height: exactly one Instructions card appears after measurement entrance. Tap **>** to reach Important with its header and four bullets, then the bold bottom-left **How does it work?** action to reach the unchanged technical explanation. Forward transitions move text left as new content enters from the right; Go back returns one section with reversed motion. Go back should fade in/out without disabled-color dimming; rapid taps during page motion must still be blocked. Check enlarged Important bullet markers align with the first text line and remain decorative in TalkBack. Card bounds stay fixed; each section starts at the top. Close remains reachable and moving/outgoing controls reject pointer, keyboard and TalkBack input. Verify narrow windows, large text, English/Spanish, normal/slow/disabled system animation scales, rapid taps and dismissal during motion. Outside tap, Android Back and Close dismiss the whole card from every section. Reopening always starts at Instructions; dismissal persists completion across process restart, while termination before dismissal leaves first-use help eligible. Activity recreation retains the section without replaying motion. Confirm suspended acquisition, preserved height/results and discarded incomplete pairs. JVM checks cover coordination and localization, not rendered motion, TalkBack or preference-file durability on Android. |
-| Help layout and measurement preservation | Confirm **?** immediately left of the settings gear, with the existing spacing, a smaller visible circle, a 48 dp touch target and a TalkBack **How to use** click label. A normal tap always opens help regardless of diagnostics preference; disabled holds open neither help nor diagnostics. With valid height and a live preview, open/read/dismiss manual help: preview bounds, header, stage and bottom controls must stay stationary; the Home control stays composed in its usual position. Repeat with a top capture and result: preserve height and completed results, discard incomplete pairs immediately, and verify acquisition stays stopped on both help pages. Dismissal starts a fresh camera/sensor session only for an unfinished measurement. Pending first-use help must prevent camera initialization. Test small/split windows, large fonts/display scale, TalkBack, cutouts and gesture/three-button insets; content must scroll, Close remain reachable, math remain readable and all pages use the same card/window. Confirm stacked fractions and lowered endpoint subscripts, no raw TeX commands, natural spoken equation descriptions, and horizontal equation scrolling when large text exceeds the card width. Repeat from the exceptional viewfinder workspace and its collapsed presentation. JVM state checks do not establish these rendering or physical-session properties. |
+| Home and method navigation | Start a new process, including an upgrade with a legacy saved method ID: expect Home, wordmark, Settings and a centered rounded card fading in over 300 ms without vertical movement. Returning from measurement with Home retains the existing vertical slide/fade; Android Back before height entry slides measurement right while the method list fades and slides in from the left over 270 ms. Confirm the launch fade does not replay on Activity recreation, background/resume or in-app returns; check normal, slow and disabled system animation scales. Android controls the separate launcher/task window transition. No camera placeholder, capture controls, permission request or acquisition. Long Distance slides left to Known Object Height; card Back and Android Back reverse to modes. Compare frame pacing on repeated forward/Back taps; the menu slide remains 220 ms and its reported unevenness requires device profiling. Back on Home exits normally. Unavailable modes stay visible, disabled and labeled Coming soon. Select the method: the outgoing method list stays in place and fades without switching to modes; the entire workspace fades and subtly enters from the right over 270 ms; Home fades it out and restores all modes. Android Back before height entry restores the method list; another Back restores modes. With saved height, camera Back clears height and returns directly to Enter object height; Back from Edit height cancels the draft and returns to camera; result Back restarts measurement; the height editor and status dialogs must dismiss first and tutorial Back must retrace its pages. Capture a top endpoint, return Home and reenter: height and all captures are cleared, and camera remains stopped until fresh height confirmation. Repeat after completion and while editing: no old result or draft may return. Android Back leaving the method also clears its session. Settings and tutorial returns preserve saved height/results and a draft; incomplete pairs still clear on suspension. Open/close Settings from Home, Methods and Measurement: restore the correct destination without flashing another screen. Exercise rapid taps/Back, interrupted navigation, Activity recreation at each level and mid-transition, background/resume, compact/split windows, large text, English/Spanish and TalkBack. Moving/outgoing destinations must reject touch, keyboard and accessibility actions; lists must scroll within stable card bounds. Sensor/unit/locale updates must not replay navigation. Recreated destinations appear settled; reduced/disabled animation scale remains functional. Use privacy indicators and developer-owned tracing to verify immediate physical camera/listener release before exit finishes, no duplicate bindings and no stale callback revival. After process death, launch Home again. JVM tests verify state/resource policies, not rendered smoothness, frame pacing or physical cleanup. |
+| Method help and completion | On fresh data, the two-page tutorial opens only after method entry. Compare the 360 ms button slide with finger-driven motion after reopening and on repeated visits; both pages should be ready when movement starts and offscreen Instructions should stop its illustration clock once settled. Follow the tutorial navigation checks below, including interactive drags, settled page retention, WIP coverage and completion only on dismissal. Reopening starts at Instructions. Check English/Spanish, normal/reduced/disabled motion, narrow windows, large text, TalkBack, rapid input and Activity recreation. Camera/sensor acquisition stays stopped, saved height/results remain and unfinished captures clear. |
+| Help layout and measurement preservation | Confirm **?** immediately left of the settings gear, with the existing spacing, a smaller visible circle, a 48 dp touch target and a TalkBack **How to use** click label. A normal tap always opens help regardless of diagnostics preference; disabled holds open neither help nor diagnostics. With valid height and a live preview, open/read/dismiss manual help: preview bounds, header, stage and bottom controls must stay stationary; the Home control stays composed in its usual position. Repeat with a top capture and result: preserve height and completed results, discard incomplete pairs immediately, and verify acquisition stays stopped on both help pages. Dismissal starts a fresh camera/sensor session only for an unfinished measurement. Pending first-use help must prevent camera initialization. Test small/split windows, large fonts/display scale, TalkBack, cutouts and gesture/three-button insets; content must scroll, page navigation remain reachable, titles remain centered and the two pages use the same card/window. The separate documentation screen must show only WIP and its top-left back control, with no old explanatory prose. Repeat from the exceptional viewfinder workspace and its collapsed presentation. JVM state checks do not establish these rendering or physical-session properties. |
 | Diagnostics access, state and layout | With diagnostics off, hold and release **?**: no tutorial, diagnostics or haptic. Enable it in Settings: tap still opens Instructions; hold opens exactly one dark full-screen Diagnostics surface with method name and Back, a haptic and a separate TalkBack long-click action. Repeat quick taps/holds and after relaunch; tutorials, Settings and mode selection must never stack with diagnostics. Before height entry, inspect inactive prerequisites and undiscovered sources without a permission prompt or acquisition. With live preview, top capture, correction and result, open/close repeatedly: verify unchanged preview bounds, stopped camera/sensor work, preserved height/completed result, immediate incomplete-pair invalidation and blocked background controls. Background/recreate with diagnostics open: navigation and completed results remain while acquisition stays stopped. Completed endpoint geometry must stay readable without a live frame. Disable the preference and verify access is removed. Check all four sections, missing values, unavailable physical IDs, mapping evidence, stale/moving/unreliable versus failure, platform accuracy and poles. Verify stored geometry and degree-based derivatives in Metric/Imperial and English/Spanish. Repeat in compact and exceptional workspace layouts, large fonts, TalkBack, small/split windows, cutouts and system navigation insets; Back and all rows must be reachable by scrolling. No recording, source selection, restart, export or threshold controls should appear. JVM checks exercise routing and retained snapshots, not physical gesture arbitration, haptics, TalkBack, actual Activity retention or camera composition. |
 | Screen navigation motion | Open and close Settings and diagnostics from inactive/height-gated/live measurement as applicable: check a smooth short fade/vertical movement, stationary preview and no blank exit frame. Enter Language and Developer Options, then use in-app and Android Back: check opposite horizontal motion, stable bounds and no measurement flash. Rapid taps, repeated Back and taps on outgoing/background controls must not navigate twice, edit preferences or dismiss the exceptional workspace. Check the same transitions from the exceptional viewfinder with its matching Activity backdrop. Change units, diagnostics preference and language in place: these updates must not replay navigation. Recreate with a destination open: it should appear settled while normal hardware interruption rules still apply. Repeat with animation scale disabled/reduced, large fonts, small/split windows, TalkBack and system insets; input and accessibility must recover after completion. Rendering, frame pacing and actual input/Back arbitration require manual validation; JVM tests verify the presentation policy only. |
 | Settings and units | Open Settings from Home, before height entry, with live preview, after top capture and after a result. Confirm the full-screen dark surface, Back hierarchy through Developer Options/language selection, suspended camera/sensor work and no overlapping help/selector interaction. Repeat from the exceptional workspace dialog. Toggle units repeatedly: all height/result labels and the next height entry use meters or decimal feet; saved physical height and completed results survive; an incomplete pair was invalidated on Settings entry. Local m/cm or ft/in entry controls must not change Settings. Check point/comma input and the decimal result presentation policy. Restart the process to verify saved units/diagnostics and inactive startup. Check slow initial preference loading does not flash incorrect units. |
-| Language and recreation | First test a cold launch with Use device language saved: remove the task through Recents, reopen, visit Language, and select Español for the first time in that process. Confirm no black frame, window replacement or Activity recreation, and that the Language page remains open. Repeat after a developer-performed data reset; saved English → Español and saved Español cold launch are comparison cases. Then on API 23–32 and 33+, choose English, Español and Use device language repeatedly, both inactive and with a selected method. The language selector must update in place without Activity recreation, a black/blank frame or flashing the method/main Settings; Back must then return to main Settings. Repeat in the exceptional workspace. With device language English, switch between English and Use device language and confirm the radio choice updates when the effective display language stays the same. Reopen Settings after process restart. Check tutorials (including math explanations and spoken equations), mode navigation, permissions, guidance, height input, errors and accessibility. Change the app language through Android 13+ system settings and confirm the in-app selection follows. Device Spanish uses Spanish; an unsupported device language with no override falls back to English. Verify Spanish decimal commas and decimal feet independent of language. Using the in-app selector, change language with a top capture and a result: retain the method, height, settings destination and completed result while acquisition stays stopped; incomplete pairs were invalidated on Settings entry. Separately recreate for an unrelated configuration change: retain navigation and height, while a real hardware interruption still clears incomplete pairs and preserves completed results. Return/background with Settings open, rapid Back and large text must not restore invalid sessions or stack modals. |
+| Language and recreation | First test a cold launch with Use device language saved: remove the task through Recents, reopen, visit Language, and select Español for the first time in that process. Confirm no black frame, window replacement or Activity recreation, and that the Language page remains open. Repeat after a developer-performed data reset; saved English → Español and saved Español cold launch are comparison cases. Then on API 23–32 and 33+, choose English, Español and Use device language repeatedly, both inactive and with a selected method. The language selector must update in place without Activity recreation, a black/blank frame or flashing the method/main Settings; Back must then return to main Settings. Repeat in the exceptional workspace. With device language English, switch between English and Use device language and confirm the radio choice updates when the effective display language stays the same. Reopen Settings after process restart. Check tutorials (including the WIP destination and its back label), mode navigation, permissions, guidance, height input, errors and accessibility. Change the app language through Android 13+ system settings and confirm the in-app selection follows. Device Spanish uses Spanish; an unsupported device language with no override falls back to English. Verify Spanish decimal commas and decimal feet independent of language. Using the in-app selector, change language with a top capture and a result: retain the method, height, settings destination and completed result while acquisition stays stopped; incomplete pairs were invalidated on Settings entry. Separately recreate for an unrelated configuration change: retain navigation and height, while a real hardware interruption still clears incomplete pairs and preserves completed results. Return/background with Settings open, rapid Back and large text must not restore invalid sessions or stack modals. |
 | Developer Options and full reset | On a disposable test installation, set Imperial, Spanish, diagnostics enabled and tutorial completion; grant camera access and create app-private test files/cache if a harness is available. Open Erase all app data, cancel/outside-dismiss/Back and confirm all data, language and permissions remain. Only an explicit Erase all data confirmation may request deletion; duplicate taps must be blocked. Confirm Android closes the process without relaunching or a success claim and leaves the app installed. Manually reopen: Home, Metric, diagnostics off, device language, tutorials eligible and camera permission requested only after valid height. Verify app-private files/cache are gone and permissions revoked in system settings. Repeat on pre-33 AppCompat storage and 33+ system-managed locales with a device language different from the override. Platform rejection/error behavior is covered by injected JVM fakes; do not invoke the real deletion API in automated tests. |
 | Layout and accessibility | Check the consistent dark palette under both system themes, large font/display sizes, TalkBack labels, small/split windows, platform-overridden orientations, proportionally fitted static keypad and navigation insets. On the normal screen, capture/navigation and the stage area must stay visible without scrolling the screen; constrained result content can scroll inside its container. Workflow errors should remain readable near the preview edge without moving controls or covering the reticle; moving/settling/alignment changes must remain silent. Verify persistent recovery actions and status dialogs in compact layouts. Exceptional windows/text scaling offer **Open viewfinder** with scrollable details and fixed controls. Check centered stage instructions and the in-container ≈ horizontal result in both units, a blank reserved caption area before height entry and unchanged preview bounds as top/bottom instructions appear or switch (also with large text), closer symmetric Restart/Home placement, the solid shutter disc, enlarged initial height action, the rounded borderless height editor and the raised control row. Check the larger circular gear retains its size and position, uses a subtly richer purple than other tonal buttons, looks enabled and opens Settings. Whole heights should display one decimal, fractional heights should retain meaningful digits up to the existing precision cap, and opening height editing should cap converted text at four decimals while preserving the exact stored physical value. Check the bold rounded Viewy header and reduced preview at normal/large text sizes. No separate result-retry action should appear. Diagnostics must not push Capture offscreen. |
 
@@ -508,7 +564,7 @@ CameraX callback timing, actual binding, hardware cleanup or rendered fades.
 - Cold-start an unfinished measurement with valid height and permission. Wait for
   preview frames: no Starting/Waiting text, warning icon or camera Retry should
   appear. Confirm a smooth streaming fade-in and no avoidable black flash.
-- Open and return from Settings and all three tutorial sections; repeat rapidly, then
+- Open and return from Settings and both tutorial pages and WIP; repeat rapidly, then
   repeat with selection, diagnostics and height editing. Check fade-out, immediate
   hardware release, silent reactivation and no stale error flashes or queued retry.
 - Interrupt the camera using another camera client or a controlled debug fault.
@@ -552,3 +608,85 @@ particular setup, not universal error bounds. Low short-window variation and the
 pair time limit do not bound drift or distance error. Current nominal results
 therefore retain unquantified uncertainty; see the
 [technical contracts](ARCHITECTURE.md).
+
+## Tutorial navigation manual checks
+
+- Instructions and Important have larger centered titles fixed at the card top.
+  Instructions has only circular Next at bottom right; Important has circular
+  **<**, **X** in that order, plus a 14 sp documentation link near the lower-left
+  corner. Hover, hold and press the link: its text color/brightness must remain
+  constant, with no ripple; keyboard/TalkBack activation must still work.
+  Compare English/Spanish, narrow windows and large text. Controls remain reachable
+  while prose scrolls vertically below the title and above the footer.
+- Slowly drag partway in each direction: both pages must follow the finger. Release
+  below the positional threshold to return; drag beyond it or fling to select the
+  adjacent page. Next and the back chevron should slide over 360 ms; touch flings
+  retain their prior behavior. Verify vertical scroll, direction reversals, boundary swipes and
+  cancellation. Button navigation must animate the same pager without a second slide.
+  Recreate during a drag or after settling: retain the settled section rather than
+  an intermediate offset. Moving pages must not offer clickable/keyboard/TalkBack actions.
+- The documentation link opens a full-screen WIP destination with no former text.
+  Its top-left tonal arrow and Android Back both return to the same Important page
+  and scroll position. Recreate with WIP open and verify it remains covered, with
+  camera/sensors stopped and tutorial completion still unwritten. Covered pages
+  must not respond to swipes or taps; outside taps must not dismiss through WIP.
+- On both pages, slowly start an inward touch from each Android-reported physical
+  back edge. Watch the entire gesture before the system Back indicator appears:
+  the pager must remain still, with no initial displacement followed by a snap back.
+  Commit and cancel from each edge; repeat with different system Back sensitivity,
+  portrait/landscape and RTL layout. Interior-origin drags must still follow the
+  finger even if they subsequently cross an edge. Three-button navigation/zero
+  gesture insets must not introduce a dead strip; mouse/stylus behavior is unchanged.
+- On both Instructions and Important, start Android Back from each physical screen
+  edge while idle, partly dragged in either direction, or settling from an interrupted
+  button animation. A committed Back must dismiss Instructions or return Important
+  to Instructions even if the pager had moved slightly. Before dismissal, the page
+  must be fully aligned, with no sideways slide or boundary stretch/rebound; retain
+  the intentional downward exit. Cancelling Back must restore the captured source
+  page at zero offset, with no navigation/completion and normal paging restored. Repeat
+  with gesture and three-button navigation on older and current Android versions.
+  In-card swipes must still navigate normally. The entry should fade upward and
+  every dismissal (Back, X, outside tap) should fade downward. The backdrop must
+  dim and clear with equal 240 ms fades, without a brightness jump on window removal
+  or residual dimming. Controls become inactive
+  immediately and acquisition stays stopped until exit completes. Recreate during entrance
+  and dismissal; repeat with slow/disabled system motion.
+- Android Back follows WIP → Important → Instructions → dismissed. **X** and
+  outside-card taps dismiss the tutorial itself. Reopening starts on Instructions.
+  Repeat from camera, result and keypad, with normal/reduced/disabled system motion.
+- Compare the same back-arrow button in WIP, every Settings page and the method
+  selector: compact wide visual, smaller arrow, full touch target, localized Back/destination label, keyboard and TalkBack
+  operation, existing navigation and reset-lock behavior intact. Device gesture
+  arbitration, visual smoothness and accessibility rendering remain manual checks.
+
+Verify the method-selector back control retains its normal icon/container colors
+during navigation locks while remaining inactive. The Important documentation link
+should sit slightly lower and larger while fitting its left footer slot. Watch shutter readiness
+changes in both directions: its disc and border should fade together over 150 ms
+between the existing colors, without changing the background, size or capture gate.
+
+Check the method-list header shows the localized Select a method heading directly
+to the right of Back, with no repeated mode name. Test English/Spanish, large text
+and narrow windows for wrapping without overlap. Compare the shared top spacing
+in Settings, Language, Developer Options, WIP and Diagnostics: navigation is slightly
+lower below the system inset, with the same back touch target and unchanged Back
+hierarchy. Repeat tutorial scrim dismissal at normal, slow and disabled motion scales,
+including recreation during entry/exit and return from WIP. These visual checks
+require a developer-controlled device; JVM checks do not render window dim layers.
+
+Verify camera → Enter object height → method list on consecutive Back actions,
+and camera → Edit height → keypad → Back → camera as a separate path. Repeat after
+a pending top, overlays and Activity recreation. Check that
+Restart retains saved height even with the keypad open, and result-height cancellation
+keeps the result. Match the wordmark and Settings positions between Home and methods
+in normal/compact widths and text scales; no hidden Help/subtitle accessibility nodes
+should appear on Home. Check the tutorial link's small right/up spacing adjustment.
+
+During eligible capture, sustain movement for six seconds: expect the localized
+steady-camera popup with existing fades, timeout and accessibility extension. Hold
+steady before six seconds or interrupt with zoom settling, a sensor/frame change,
+Settings/help, keypad, pause or restart: the next episode must count from zero.
+Sustained motion must not repeatedly show the same hint after it expires. Verify
+existing capture-error and near-vertical messages keep priority and capture gates
+are unchanged. JVM tests cover the time boundary, resets, priority and expiry;
+physical motion, rendered popups and header alignment remain developer checks.
