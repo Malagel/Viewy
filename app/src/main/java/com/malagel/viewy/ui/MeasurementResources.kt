@@ -55,6 +55,13 @@ internal class MeasurementResources(
         reconcileOrientation()
     }
 
+    /** Complete method exit: revoke ownership/retries and forget previous camera diagnostics/zoom. */
+    fun clear() {
+        reconcile(false, false, animateRelease = false)
+        preview.invalidate()
+        previewEpoch++
+    }
+
     fun startPreview(requestZoom: (Float) -> Unit = {}, release: (Boolean) -> Unit): Long? {
         if (!eligible || recovery.waiting || recovery.needsUser) return null
         preview.invalidate()

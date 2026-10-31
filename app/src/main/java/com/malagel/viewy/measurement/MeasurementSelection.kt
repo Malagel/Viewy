@@ -9,7 +9,7 @@ sealed interface SelectionDestination {
     data class Measurement(val method: MeasurementMethod) : SelectionDestination
 }
 
-/** In-memory destinations; workflow ownership survives returning Home separately. */
+/** In-memory destinations. Leaving Measurement ends that method session in the host controller. */
 data class MeasurementSelection(val destination: SelectionDestination = SelectionDestination.Home) {
     val activeMethod: MeasurementMethod? get() = (destination as? SelectionDestination.Measurement)?.method
     val isOpen: Boolean get() = activeMethod == null

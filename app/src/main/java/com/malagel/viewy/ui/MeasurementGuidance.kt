@@ -69,3 +69,11 @@ internal fun noticeResource(notice: MeasurementNotice): Int = when (notice) {
     MeasurementNotice.SMALL_SEPARATION -> R.string.notice_small_separation
     MeasurementNotice.SENSOR_RESTARTED -> R.string.notice_sensor_restarted
 }
+
+/** The reserved caption area stays put while editing suppresses its live instruction. */
+@StringRes
+internal fun stageInstruction(state: MeasurementState, editingHeight: Boolean): Int? = when {
+    editingHeight || state.heightMeters == null || state.completed -> null
+    state.stage == MeasurementStage.TOP -> R.string.measurement_stage_top
+    else -> R.string.measurement_stage_bottom
+}

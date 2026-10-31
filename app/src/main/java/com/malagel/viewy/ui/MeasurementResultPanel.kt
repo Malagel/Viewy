@@ -35,7 +35,7 @@ import com.malagel.viewy.measurement.HeightUnit
 import com.malagel.viewy.measurement.MeasurementState
 import com.malagel.viewy.measurement.MeasurementStage
 
-private data class ResultContent(val estimate: KnownHeightResult.Estimate, val heightMeters: Double)
+private data class ResultContent(val estimate: KnownHeightResult.Estimate, val heightMeters: Double, val origin: KnownHeightResult.Estimate)
 
 /** Retains only result pixels/content on exit. Camera ownership remains in the single live layer. */
 @Composable
@@ -44,11 +44,12 @@ internal fun MeasurementResultOverlay(
     unit: HeightUnit,
     entryMemory: ResultEntryMemory,
     interactive: Boolean,
+    editingHeight: Boolean,
     onEditHeight: () -> Unit,
     onSurfaceCovered: (KnownHeightResult.Estimate) -> Unit,
 ) {
     val result = measurement.result.takeIf { measurement.stage == MeasurementStage.RESULT }
-    val current = result?.let { ResultContent(it, measurement.heightMeters!!) }
+    val current = result?.let { ResultContent(it, measurement.heightMeters!!, measurement.resultOrigin ?: it) }
     var retained by remember { mutableStateOf(current) }
     SideEffect { if (current != null) retained = current }
     AnimatedVisibility(
@@ -66,7 +67,7 @@ internal fun MeasurementResultOverlay(
         (current ?: retained)?.let { content ->
             key(ResultIdentity(content.estimate)) {
                 MeasurementResultPanel(content, unit, entryMemory, current != null,
-                    interactive && current != null, onEditHeight)
+                    interactive && current != null, editingHeight, onEditHeight)
             }
         }
     }
@@ -75,13 +76,14 @@ internal fun MeasurementResultOverlay(
 @Composable
 private fun MeasurementResultPanel(
     content: ResultContent, unit: HeightUnit, entryMemory: ResultEntryMemory,
-    active: Boolean, interactive: Boolean, onEditHeight: () -> Unit,
+    active: Boolean, interactive: Boolean, editingHeight: Boolean, onEditHeight: () -> Unit,
 ) {
-    val animateEntry = remember { entryMemory.enter(content.estimate) }
+    val animateEntry = remember { entryMemory.enter(content.origin) }
     val elapsed = remember { Animatable(if (animateEntry) 0f else ResultReveal.totalMillis.toFloat()) }
     // Unit/locale/publication changes never replace this effect. Exit cancels it immediately.
-    LaunchedEffect(active) {
-        if (active && elapsed.value < ResultReveal.totalMillis) {
+    LaunchedEffect(active, editingHeight) {
+        if (editingHeight) elapsed.snapTo(ResultReveal.totalMillis.toFloat())
+        else if (active && elapsed.value < ResultReveal.totalMillis) {
             elapsed.animateTo(ResultReveal.totalMillis.toFloat(), tween(ResultReveal.totalMillis, easing = LinearEasing))
         }
     }

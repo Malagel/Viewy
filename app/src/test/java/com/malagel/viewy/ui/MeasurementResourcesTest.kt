@@ -72,37 +72,49 @@ class MeasurementResourcesTest {
 
     private class Retry(val delay: Long, val action: () -> Unit, var canceled: Boolean = false)
 
-    @Test fun homeRevokesOwnershipImmediatelyAndSameMethodRetainsOnlyCompletedEvidence() {
-        val h = Harness()
-        val active = h.ui
-        val token = h.bind()
-        h.capture(0.5)
-        h.ui = active.copy(selection = active.selection.openModes())
-        h.reconcile() // No animation completion event is necessary for shutdown.
-        assertNull(h.ui.selection.activeMethod)
-        assertNull(h.workflow.state.top)
-        assertNull(h.workflow.state.latest)
-        assertEquals(2.0, h.workflow.state.heightMeters!!, 0.0)
-        assertEquals(1, h.releases.size)
-        assertFalse(h.resources.previewChanged(token, camera))
-        assertNull(h.resources.startPreview { fail("Home bound a camera") })
-        h.ui = active
-        h.bind()
-        assertFalse(h.workflow.state.canCapture)
-        h.capture(0.5)
-        h.capture(0.0)
-        val result = h.workflow.state.result!!
-        h.ui = active.copy(selection = active.selection.openModes())
-        h.reconcile()
-        assertSame(result, h.workflow.state.result)
-        h.ui = active.copy(selection = h.ui.selection.browse(method.mode).activate(method))
-        h.reconcile()
-        assertSame(result, h.workflow.state.result)
-        assertNull(h.resources.startPreview { fail("Retained result restarted acquisition") })
-        h.workflow.restart()
-        h.bind()
-        assertNull(h.workflow.state.result)
-        assertEquals(2.0, h.workflow.state.heightMeters!!, 0.0)
+    @Test fun homeClearsHeightCapturesResultAndCameraBeforeSameMethodCanBeEnteredFresh() {
+        for (completed in listOf(false, true)) {
+            val h = Harness()
+            val token = h.bind()
+            val sensor = h.sensorToken
+            h.capture(0.5)
+            if (completed) h.capture(0.0)
+            val editor = HeightEditor(h.workflow)
+            editor.open(HeightUnit.METERS)
+            editor.key('9')
+            editor.cancel()
+            h.workflow.clear()
+            h.ui = h.ui.copy(selection = h.ui.selection.openModes(), heightEditor = null)
+            h.resources.clear()
+            h.reconcile()
+            assertNull(h.ui.selection.activeMethod)
+            assertNull(h.workflow.state.heightMeters)
+            assertNull(h.workflow.state.top)
+            assertNull(h.workflow.state.bottom)
+            assertNull(h.workflow.state.result)
+            assertNull(h.workflow.state.resultOrigin)
+            assertNull(h.workflow.state.latest)
+            assertNull(h.workflow.state.notice)
+            assertNull(h.resources.camera.mapping)
+            assertFalse(h.resources.camera.zoom.available)
+            assertFalse(h.resources.previewChanged(token, camera))
+            assertFalse(h.registration.accepts(sensor))
+            assertNull(h.resources.startPreview { fail("Home bound a camera") })
+            h.ui = h.ui.copy(selection = h.ui.selection.browse(method.mode).activate(method))
+            h.reconcile()
+            assertFalse(h.ui.heightConfigured)
+            assertFalse(h.ui.acquisitionEligible)
+            assertNull(h.resources.startPreview { fail("Reentry skipped fresh height entry") })
+            editor.open(HeightUnit.METERS)
+            assertEquals("", editor.draft!!.text)
+            editor.key('3')
+            assertTrue(editor.confirm())
+            val fresh = h.bind()
+            assertNotEquals(token, fresh)
+            h.resources.stopPreview(token)
+            assertTrue(h.resources.camera.ready)
+            assertEquals(3.0, h.workflow.state.heightMeters!!, 0.0)
+        }
     }
 
     @Test fun zoomUsesCurrentOwnerLocksAfterTopAndUnlocksAfterRestartOrInvalidation() {
@@ -444,5 +456,129 @@ class MeasurementResourcesTest {
             h.sample(0.5)
             assertNull(h.workflow.state.notice)
         }
+    }
+    @Test fun heightDraftSuspendsImmediatelyRevokesLateCallbacksAndKeepsInterruptionNotice() {
+        for (confirm in listOf(false, true)) {
+            val h = Harness()
+            val token = h.bind()
+            h.capture(0.5)
+            val editor = HeightEditor(h.workflow)
+            editor.open(HeightUnit.METERS)
+            // The draft alone gates acquisition, even before the view reports transition coverage.
+            h.ui = h.ui.copy(heightEditor = editor.draft)
+            h.reconcile()
+            assertFalse(h.ui.acquisitionEligible)
+            assertFalse(h.ui.canCapture)
+            assertTrue(h.ui.canOpenSettings)
+            assertTrue(h.ui.canOpenHelp)
+            assertNull(h.workflow.state.top)
+            assertEquals(MeasurementNotice.ACQUISITION_SUSPENDED, h.workflow.state.notice)
+            assertFalse(h.resources.previewChanged(token, camera))
+            assertNull(h.resources.startPreview { fail("Editor bound a camera") })
+            editor.backspace()
+            editor.key('4')
+            if (confirm) assertTrue(editor.confirm()) else editor.cancel()
+            h.ui = h.ui.copy(heightEditor = null, visibility = h.ui.visibility.copy(heightEditing = true))
+            h.reconcile()
+            assertNull(h.resources.startPreview { fail("Exiting editor bound a camera") })
+            h.ui = h.ui.copy(visibility = h.ui.visibility.copy(heightEditing = false))
+            h.bind()
+            assertEquals(if (confirm) 4.0 else 2.0, h.workflow.state.heightMeters!!, 0.0)
+            assertEquals(MeasurementNotice.ACQUISITION_SUSPENDED, h.workflow.state.notice)
+            assertNull(h.workflow.state.top)
+        }
+    }
+
+    @Test fun correctingOrCancellingCompletedHeightNeverRestartsAcquisition() {
+        for (confirm in listOf(false, true)) {
+            val h = Harness()
+            h.bind()
+            h.capture(0.5)
+            h.capture(0.0)
+            val completed = h.workflow.state
+            val starts = h.starts
+            val editor = HeightEditor(h.workflow)
+            editor.open(HeightUnit.METERS)
+            h.ui = h.ui.copy(heightEditor = editor.draft)
+            h.reconcile()
+            editor.backspace()
+            editor.key('4')
+            if (confirm) assertTrue(editor.confirm()) else editor.cancel()
+            h.ui = h.ui.copy(heightEditor = null)
+            h.reconcile()
+            assertEquals(starts, h.starts)
+            assertNull(h.resources.startPreview { fail("Height correction restarted the camera") })
+            assertFalse(h.ui.acquisitionEligible)
+            assertSame(completed.top, h.workflow.state.top)
+            assertSame(completed.bottom, h.workflow.state.bottom)
+            assertSame(completed.resultOrigin, h.workflow.state.resultOrigin)
+            if (!confirm) assertSame(completed.result, h.workflow.state.result)
+        }
+    }
+    @Test fun settingsAndHelpPreserveDraftAndSavedEvidenceWithoutRevivingAcquisition() {
+        for (completed in listOf(false, true)) for (destination in listOf("settings", "help", "diagnostics")) {
+            val h = Harness()
+            val token = h.bind()
+            h.capture(0.5)
+            if (completed) h.capture(0.0)
+            val saved = h.workflow.state
+            val editor = HeightEditor(h.workflow)
+            editor.open(HeightUnit.METERS)
+            editor.backspace()
+            "1.23456789".forEach(editor::key)
+            editor.switchUnit()
+            val draft = editor.draft!!
+            h.ui = h.ui.copy(heightEditor = draft, visibility = h.ui.visibility.copy(heightEditing = true))
+            h.reconcile()
+            val editing = h.ui
+            repeat(3) {
+                h.ui = when (destination) {
+                    "settings" -> editing.copy(visibility = editing.visibility.copy(covered = true))
+                    "help" -> editing.copy(tutorial = TutorialState(card = TutorialCard(1, method)))
+                    else -> editing.withDiagnostics(true, true)
+                }
+                h.reconcile()
+                assertFalse(h.ui.canEditHeight)
+                assertSame(draft, editor.draft)
+                assertSame(draft, h.ui.heightEditor)
+                assertEquals(saved.heightMeters, h.workflow.state.heightMeters)
+                assertSame(saved.result, h.workflow.state.result)
+                assertFalse(h.ui.acquisitionEligible)
+                assertFalse(h.resources.previewChanged(token, camera))
+                h.ui = editing
+                h.reconcile()
+                assertTrue(h.ui.canEditHeight)
+                assertSame(draft, editor.draft)
+                assertFalse(h.ui.acquisitionEligible)
+                assertNull(h.resources.startPreview { fail("Overlay return revived the camera behind the editor") })
+            }
+            if (!completed) assertNull(h.workflow.state.top) // Existing interruption rule still applies.
+            editor.cancel()
+            assertEquals(saved.heightMeters, h.workflow.state.heightMeters)
+            assertSame(saved.result, h.workflow.state.result)
+        }
+    }
+
+    @Test fun completeResourceClearRemovesCameraMetadataZoomAndPendingRetryOwnership() {
+        val h = Harness()
+        val token = h.bind()
+        h.resources.previewChanged(token, camera.copy(logicalCameraId = "0", physicalCameraId = "1",
+            zoom = com.malagel.viewy.camera.PreviewZoom(1f, 8f, 4f, true, true)))
+        h.resources.previewChanged(token, h.resources.camera.copy(ready = false, failed = true, errorDetail = "old failure"))
+        val retry = h.scheduled.single()
+        h.workflow.clear()
+        h.resources.clear()
+        val epoch = h.resources.previewEpoch
+        retry.action()
+        assertEquals(epoch, h.resources.previewEpoch)
+        assertTrue(retry.canceled)
+        assertFalse(h.resources.camera.failed)
+        assertNull(h.resources.camera.errorDetail)
+        assertNull(h.resources.camera.logicalCameraId)
+        assertNull(h.resources.camera.physicalCameraId)
+        assertNull(h.resources.camera.mapping)
+        assertEquals(com.malagel.viewy.camera.PreviewZoom(), h.resources.camera.zoom)
+        assertFalse(h.resources.previewChanged(token, camera))
+        assertNull(h.resources.startPreview { fail("Cleared resources acquired without a new eligible method") })
     }
 }

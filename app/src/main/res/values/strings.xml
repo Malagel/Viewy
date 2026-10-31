@@ -15,13 +15,8 @@
     <string name="capture_bottom">Capture bottom</string>
     <string name="long_distance">Long Distance</string>
     <string name="object_height">Object height</string>
-    <string name="height_instructions">Enter here the height of the object.</string>
-    <string name="height_invalid">Enter a positive decimal height.</string>
-    <string name="height_hint">Use a measured height when possible.</string>
-    <string name="save_height">Save height</string>
     <string name="cancel">Cancel</string>
     <string name="height_edit">Object height: %1$s %2$s · Edit</string>
-    <string name="height_label">Height (%1$s)</string>
     <string name="result_horizontal_distance">Horizontal distance</string>
     <string name="result_elevation_difference">Elevation difference: %1$s°</string>
     <string name="result_disclaimer">Approximate result. Depends on object height and stable positioning.</string>
@@ -252,4 +247,18 @@
     <string name="zoom_out">Zoom out</string>
     <string name="zoom_ratio">Zoom %1$s</string>
     <string name="home">Home</string>
+    <string name="height_enter">Enter</string>
+    <string name="height_backspace">Delete last digit</string>
+    <string name="height_decimal">Decimal separator</string>
+    <string name="height_empty">Empty</string>
+    <string name="height_display">Height: %1$s %2$s</string>
+    <string name="height_unit_meters">Meters</string>
+    <string name="height_unit_centimeters">Centimeters</string>
+    <string name="height_unit_feet">Decimal feet</string>
+    <string name="height_unit_inches">Inches</string>
+    <string name="height_correction_failed">This height cannot produce a usable result. The previous measurement is unchanged.</string>
+    <plurals name="height_digit_limit">
+        <item quantity="one">Maximum %1$d digit</item>
+        <item quantity="other">Maximum %1$d digits</item>
+    </plurals>
 </resources>

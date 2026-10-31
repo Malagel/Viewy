@@ -1,5 +1,6 @@
 package com.malagel.viewy.ui
 
+import com.malagel.viewy.measurement.HeightDraft
 import com.malagel.viewy.measurement.HeightUnit
 import com.malagel.viewy.measurement.heightInMeters
 import java.util.Locale
@@ -42,11 +43,11 @@ class HeightLabelTextTest {
     @Test fun globalHeightEntryRetainsFullPrecisionAndResultsUseTheDisplayLocale() {
         val spanish = Locale.forLanguageTag("es-CL")
         val meters = heightInMeters("6,125", HeightUnit.FEET)!!
-        val input = heightInputText(HeightUnit.FEET.fromMeters(meters), spanish)
+        val input = HeightDraft.open(meters, HeightUnit.FEET).displayText(spanish)
         assertEquals("6,125", input)
         assertEquals(meters, heightInMeters(input, HeightUnit.FEET)!!, 1e-15)
-        assertEquals("2,343123456", heightInputText(2.343123456, spanish))
-        assertEquals("0.0000001", heightInputText(0.0000001, Locale.US))
+        assertEquals("2,3431", HeightDraft.open(2.343123456, HeightUnit.METERS).displayText(spanish))
+        assertEquals("<0.0001", HeightDraft.open(0.0000001, HeightUnit.METERS).displayText(Locale.US))
         assertEquals("3.05 m", distanceText(3.05, HeightUnit.METERS, Locale.US))
         assertEquals("3,05 m", distanceText(3.05, HeightUnit.METERS, spanish))
         assertEquals("10.01 ft", distanceText(3.05, HeightUnit.FEET, Locale.US))

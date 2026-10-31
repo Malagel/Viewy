@@ -15,13 +15,8 @@
     <string name="capture_bottom">Capturar extremo inferior</string>
     <string name="long_distance">Larga distancia</string>
     <string name="object_height">Altura del objeto</string>
-    <string name="height_instructions">Introduce aquí la altura del obejo lejano.</string>
-    <string name="height_invalid">Introduce una altura decimal positiva.</string>
-    <string name="height_hint">Usa una altura medida cuando sea posible.</string>
-    <string name="save_height">Guardar altura</string>
     <string name="cancel">Cancelar</string>
     <string name="height_edit">Altura del objeto: %1$s %2$s · Editar</string>
-    <string name="height_label">Altura (%1$s)</string>
     <string name="result_horizontal_distance">Distancia horizontal</string>
     <string name="result_elevation_difference">Diferencia de elevación: %1$s°</string>
     <string name="result_disclaimer">Resultado aproximado. Depende de la altura del objeto y de mantener una posición estable.</string>
@@ -250,4 +245,19 @@
     <string name="zoom_out">Alejar</string>
     <string name="zoom_ratio">Zoom %1$s</string>
     <string name="home">Inicio</string>
+    <string name="height_enter">Aceptar</string>
+    <string name="height_backspace">Borrar el último dígito</string>
+    <string name="height_decimal">Separador decimal</string>
+    <string name="height_empty">Vacío</string>
+    <string name="height_display">Altura: %1$s %2$s</string>
+    <string name="height_unit_meters">Metros</string>
+    <string name="height_unit_centimeters">Centímetros</string>
+    <string name="height_unit_feet">Pies decimales</string>
+    <string name="height_unit_inches">Pulgadas</string>
+    <string name="height_correction_failed">Esta altura no permite obtener un resultado utilizable. La medición anterior se conserva.</string>
+    <plurals name="height_digit_limit">
+        <item quantity="one">Máximo de %1$d dígito</item>
+        <item quantity="many">Máximo de %1$d dígitos</item>
+        <item quantity="other">Máximo de %1$d dígitos</item>
+    </plurals>
 </resources>

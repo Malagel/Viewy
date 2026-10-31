@@ -8,7 +8,7 @@ internal class ResultIdentity(private val estimate: KnownHeightResult.Estimate) 
     override fun hashCode(): Int = System.identityHashCode(estimate)
 }
 
-/** Host-local entry memory. Recreated hosts show their already-completed result directly. */
+/** Host-local memory of original completions, shared by all corrections of that measurement. */
 internal class ResultEntryMemory(initialResult: KnownHeightResult.Estimate?) {
     private var entered = initialResult
 

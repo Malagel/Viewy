@@ -12,6 +12,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -28,7 +30,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -37,8 +38,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -49,16 +48,13 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLocale
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -76,11 +72,6 @@ import com.malagel.viewy.R
 import com.malagel.viewy.camera.CameraPreview
 import com.malagel.viewy.domain.KnownHeightResult
 import com.malagel.viewy.measurement.*
-import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.withTimeoutOrNull
 
 @Composable
 fun ViewyScreen(
@@ -92,7 +83,12 @@ fun ViewyScreen(
     val owner = LocalLifecycleOwner.current
     var permission by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) }
     var requested by rememberSaveable { mutableStateOf(false) }
-    var editHeight by rememberSaveable { mutableStateOf(false) }
+    val editHeight = state.heightEditor != null
+    val editorTransition = key(state.methodActivationId) { updateTransition(editHeight, label = "Embedded height entry") }
+    val editorBlocks = editHeight || editorTransition.currentState || editorTransition.isRunning
+    val editorSettled = editHeight && !editorTransition.isRunning && editorTransition.currentState == editorTransition.targetState
+    var retainedDraft by remember(model, state.methodActivationId) { mutableStateOf(state.heightEditor) }
+    SideEffect { state.heightEditor?.let { retainedDraft = it } }
     var showWorkspace by rememberSaveable { mutableStateOf(false) }
     var showStatus by rememberSaveable { mutableStateOf(false) }
     var statusSnapshot by remember { mutableStateOf<MeasurementUiState?>(null) }
@@ -105,13 +101,16 @@ fun ViewyScreen(
     LaunchedEffect(diagnosticsEnabled, settingsOpen) {
         if (!diagnosticsEnabled || settingsOpen) model.dismissDiagnostics()
     }
+    val editorInteractive = editorSettled && state.canEditHeight && !overlay.blocksMeasurement && !showStatus
+    val editorHandlesBack = !overlay.blocksMeasurement && !showStatus && state.tutorial.card == null
+    LaunchedEffect(unit) { model.heightPreferenceChanged(unit) }
     val openHelp: (Boolean) -> Unit = { longPress ->
-        if (!overlay.blocksMeasurement && !editHeight && !showStatus) model.help(longPress, diagnosticsEnabled)
+        if (!overlay.blocksMeasurement && !showStatus) model.help(longPress, diagnosticsEnabled)
     }
     LaunchedEffect(state.selection.activeMethod) {
         if (state.selection.activeMethod == null) {
-            editHeight = false
             showStatus = false
+            statusSnapshot = null
         }
     }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { permission = it }
@@ -126,17 +125,20 @@ fun ViewyScreen(
         onDispose { model.visibilityChanged(MeasurementVisibility()) }
     }
     val openAppSettings = {
-        if (!overlay.blocksMeasurement && state.canOpenSettings) {
-            model.visibilityChanged(state.visibility.copy(covered = true))
-            onSettings()
-        }
+        if (!overlay.blocksMeasurement && model.prepareSettings()) onSettings()
     }
-    val openHeight = {
-        model.visibilityChanged(state.visibility.copy(heightEditing = true))
-        editHeight = true
-    }
-    val measurement = state.measurement
-    val resultEntryMemory = remember(model) { ResultEntryMemory(measurement.result) }
+    val openHeight = { model.openHeightEditor(unit) }
+    // Keep only outgoing presentation through navigation; the ViewModel has already cleared the method.
+    var outgoingMeasurement by remember(model, state.methodActivationId) { mutableStateOf(state.measurement) }
+    SideEffect { if (state.selection.activeMethod != null) outgoingMeasurement = state.measurement }
+    val measurement = if (state.selection.activeMethod != null) state.measurement else outgoingMeasurement
+    val heightMeters = measurement.heightMeters
+    val heightConfigured = heightMeters != null
+    val resultEntryMemory = remember(model, state.methodActivationId) { ResultEntryMemory(measurement.resultOrigin ?: measurement.result) }
+    val workspaceColor by animateColorAsState(
+        if (heightConfigured || editHeight) MaterialTheme.colorScheme.surfaceContainer else MaterialTheme.colorScheme.secondaryContainer,
+        tween(CAMERA_FADE_MILLIS), label = "Measurement surface",
+    )
     val textMeasurer = rememberTextMeasurer()
     val density = LocalDensity.current
     val previewStatusLabel = stringResource(R.string.preview_status)
@@ -164,9 +166,9 @@ fun ViewyScreen(
     LaunchedEffect(measurementDestination, navigating, navigationToken) {
         if (measurementDestination && !navigating) model.methodEntered(navigationToken)
     }
-    BackHandler(enabled = !settingsOpen && !diagnosticsOpen && !editHeight && !showStatus && state.tutorial.card == null &&
+    BackHandler(enabled = !settingsOpen && !diagnosticsOpen && !editorBlocks && !showStatus && state.tutorial.card == null &&
         (measurementDestination || state.selection.browsingMode != null || navigating)) {
-        if (!navigating) model.backSelection()
+        if (!navigating) model.systemBack(unit)
     }
     LaunchedEffect(measurementDestination, navigating) {
         if (!measurementDestination && !navigating) showWorkspace = false
@@ -175,99 +177,119 @@ fun ViewyScreen(
         BoxWithConstraints(Modifier.fillMaxSize().padding(insets), contentAlignment = Alignment.TopCenter) {
             val compact = maxHeight < 500.dp || LocalDensity.current.fontScale > 1.5f || maxWidth < 320.dp
             val workspace: @Composable (Boolean) -> Unit = { overflow ->
-                MeasurementVisibilityEffect(model, permission, overlay.blocksMeasurement || showStatus || navigating, editHeight)
+                key(state.methodActivationId) {
+                    MeasurementVisibilityEffect(model, permission, overlay.blocksMeasurement || showStatus || navigating, editorBlocks)
 
-                Column(
-                    Modifier.widthIn(max = 600.dp).fillMaxSize().padding(start = if (compact) 12.dp else 20.dp, end = if (compact) 12.dp else 20.dp, top = 8.dp, bottom = if (compact) 16.dp else 32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
                     Column(
-                        Modifier.weight(1f).then(if (overflow) Modifier.verticalScroll(rememberScrollState()) else Modifier),
+                        Modifier.widthIn(max = 600.dp).fillMaxSize().padding(start = if (compact) 12.dp else 20.dp, end = if (compact) 12.dp else 20.dp, top = 8.dp, bottom = if (compact) 16.dp else 32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        ViewyHeader(compact, overflow, true, { openHelp(false) }, { showWorkspace = false }, openAppSettings, diagnosticsEnabled, { openHelp(true) })
-                        key(Unit) {
-                            BoxWithConstraints(
-                                Modifier.fillMaxWidth().then(if (overflow) Modifier.height(320.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)) else Modifier.weight(1f)).clip(RoundedCornerShape(28.dp))
-                                    .background(if (state.heightConfigured) Color.Black else MaterialTheme.colorScheme.secondaryContainer),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                var resultBackdrop by remember { mutableStateOf<ResultPreviewBackdrop?>(null) }
-                                LaunchedEffect(measurement.result?.let(::ResultIdentity)) {
-                                    if (resultBackdrop?.estimate !== measurement.result) resultBackdrop = null
-                                }
-                                val hintText = hint?.let { stringResource(it) }
-                                val hintStyle = MaterialTheme.typography.bodyMedium
-                                val hintHeight = remember(hintText, hintStyle, maxWidth, density) {
-                                    hintText?.let {
-                                        textMeasurer.measure(it, hintStyle, constraints = Constraints(maxWidth = with(density) { (maxWidth - 52.dp).roundToPx().coerceAtLeast(1) })).size.height
-                                    } ?: 0
-                                }
-                                val recoveryNeeded = state.recoveryVisible
-                                val useStatusDialog = !overflow && ((compact && recoveryNeeded) || hintHeight > with(density) { (maxHeight / 2 - 54.dp).toPx() })
-                                if (state.heightConfigured) {
-                                    LivePreview(model, state) { estimate, bitmap -> resultBackdrop = ResultPreviewBackdrop(estimate, bitmap) }
-                                    if (!measurement.completed) {
-                                        CameraPreviewControls(state, unit, compact, model::requestZoom, openHeight,
-                                            Modifier.align(Alignment.TopCenter))
-                                        PreviewControlFade(state.previewVisible && state.acquisition.running, Modifier.align(Alignment.Center)) {
-                                            Reticle(Modifier.size(40.dp))
-                                        }
-                                        AlignmentChevrons(state.alignmentCue)
-                                    }
-                                }
-                                if (!state.heightConfigured) {
-                                    Button(
-                                        onClick = openHeight,
-                                        modifier = Modifier.padding(20.dp).widthIn(min = 240.dp, max = 320.dp).heightIn(min = 64.dp),
-                                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
-                                    ) { Text(stringResource(R.string.enter_height), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center) }
-                                } else {
-                                    // Long recovery text has a scrollable dialog in constrained windows.
-                                    if (measurement.completed) {
-                                        // The result overlay owns all completed-measurement content.
-                                    } else if (useStatusDialog) {
-                                        FilledTonalIconButton(onClick = { statusSnapshot = state; showStatus = true }, modifier = Modifier.align(Alignment.BottomStart).padding(4.dp)
-                                            .semantics { contentDescription = previewStatusLabel }) {
-                                            Text(if (recoveryNeeded || hint != null) "!" else "i")
-                                        }
-                                    } else if (recoveryNeeded) {
-                                        Surface(Modifier.fillMaxWidth().align(Alignment.BottomCenter), color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.95f)) {
-                                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                RecoveryControls(state, permission, requested, requestPermission, openSettings, model::retryCamera, model::restartOrientation)
+                        Column(
+                            Modifier.weight(1f).then(if (overflow && !editorBlocks) Modifier.verticalScroll(rememberScrollState()) else Modifier),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            ViewyHeader(compact, overflow, true, { openHelp(false) }, {
+                                model.cancelHeightEditor()
+                                showWorkspace = false
+                            }, openAppSettings, diagnosticsEnabled, { openHelp(true) })
+                            key(Unit) {
+                                BoxWithConstraints(
+                                    Modifier.fillMaxWidth().then(if (overflow && !editorBlocks) Modifier.height(320.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)) else Modifier.weight(1f)).clip(RoundedCornerShape(28.dp))
+                                        .background(workspaceColor),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    NavigationInputGuard(editorBlocks, Modifier.fillMaxSize()) {
+                                        BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                            var resultBackdrop by remember { mutableStateOf<ResultPreviewBackdrop?>(null) }
+                                            LaunchedEffect(measurement.result?.let(::ResultIdentity)) {
+                                                if (resultBackdrop?.estimate !== measurement.result) resultBackdrop = null
+                                            }
+                                            val hintText = hint?.let { stringResource(it) }
+                                            val hintStyle = MaterialTheme.typography.bodyMedium
+                                            val hintHeight = remember(hintText, hintStyle, maxWidth, density) {
+                                                hintText?.let {
+                                                    textMeasurer.measure(it, hintStyle, constraints = Constraints(maxWidth = with(density) { (maxWidth - 52.dp).roundToPx().coerceAtLeast(1) })).size.height
+                                                } ?: 0
+                                            }
+                                            val recoveryNeeded = state.recoveryVisible
+                                            val useStatusDialog = !overflow && ((compact && recoveryNeeded) || hintHeight > with(density) { (maxHeight / 2 - 54.dp).toPx() })
+                                            if (heightMeters != null) {
+                                                LivePreview(model, state) { estimate, bitmap -> resultBackdrop = ResultPreviewBackdrop(estimate, bitmap) }
+                                                if (!measurement.completed) {
+                                                    CameraPreviewControls(state, heightMeters, unit, compact, model::requestZoom, openHeight,
+                                                        Modifier.align(Alignment.TopCenter))
+                                                    PreviewControlFade(state.previewVisible && state.acquisition.running, Modifier.align(Alignment.Center)) {
+                                                        Reticle(Modifier.size(40.dp))
+                                                    }
+                                                    AlignmentChevrons(state.alignmentCue)
+                                                }
+                                            }
+                                            if (!heightConfigured) {
+                                                Button(
+                                                    onClick = openHeight,
+                                                    modifier = Modifier.padding(20.dp).widthIn(min = 240.dp, max = 320.dp).heightIn(min = 64.dp),
+                                                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+                                                ) { Text(stringResource(R.string.enter_height), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center) }
+                                            } else {
+                                                // Long recovery text has a scrollable dialog in constrained windows.
+                                                if (measurement.completed) {
+                                                    // The result overlay owns all completed-measurement content.
+                                                } else if (useStatusDialog) {
+                                                    FilledTonalIconButton(onClick = { statusSnapshot = state; showStatus = true }, modifier = Modifier.align(Alignment.BottomStart).padding(4.dp)
+                                                        .semantics { contentDescription = previewStatusLabel }) {
+                                                        Text(if (recoveryNeeded || hint != null) "!" else "i")
+                                                    }
+                                                } else if (recoveryNeeded) {
+                                                    Surface(Modifier.fillMaxWidth().align(Alignment.BottomCenter), color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.95f)) {
+                                                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                            RecoveryControls(state, permission, requested, requestPermission, openSettings, model::retryCamera, model::restartOrientation)
+                                                        }
+                                                    }
+                                                } else {
+                                                    PreviewGuidance(hint, Modifier.align(Alignment.BottomCenter))
+                                                }
+                                            }
+                                            resultBackdrop?.takeIf { it.estimate === measurement.result }?.let { (_, bitmap) ->
+                                                Image(bitmap.asImageBitmap(), contentDescription = null, contentScale = ContentScale.FillBounds,
+                                                    modifier = Modifier.fillMaxSize())
+                                            }
+                                            MeasurementResultOverlay(measurement, unit, resultEntryMemory, state.viewfinderInteractive, editorBlocks, openHeight) { estimate ->
+                                                if (resultBackdrop?.estimate === estimate) resultBackdrop = null
                                             }
                                         }
-                                    } else {
-                                        PreviewGuidance(hint, Modifier.align(Alignment.BottomCenter))
+                                    }
+                                    editorTransition.AnimatedVisibility(
+                                        visible = { it }, enter = fadeIn(tween(CAMERA_FADE_MILLIS)),
+                                        exit = fadeOut(tween(CAMERA_FADE_MILLIS)),
+                                    ) {
+                                        (state.heightEditor ?: retainedDraft)?.let { draft ->
+                                            EmbeddedHeightEditor(draft, editorInteractive, editorHandlesBack, model::heightKey, model::heightBackspace,
+                                                model::switchHeightUnit, model::cancelHeightEditor, model::confirmHeightEditor)
+                                        }
                                     }
                                 }
-                                resultBackdrop?.takeIf { it.estimate === measurement.result }?.let { (_, bitmap) ->
-                                    Image(bitmap.asImageBitmap(), contentDescription = null, contentScale = ContentScale.FillBounds,
-                                        modifier = Modifier.fillMaxSize())
-                                }
-                                MeasurementResultOverlay(measurement, unit, resultEntryMemory, state.viewfinderInteractive, openHeight) { estimate ->
-                                    if (resultBackdrop?.estimate === estimate) resultBackdrop = null
-                                }
                             }
+                            MeasurementStageArea(
+                                measurement, textMeasurer,
+                                if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                                editingHeight = editorBlocks,
+                            )
                         }
-                        MeasurementStageArea(
-                            measurement, textMeasurer,
-                            if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                        MeasurementControls(
+                            captureTop = measurement.top == null, canCapture = state.canCapture,
+                            compact = compact, onRestart = model::restart, onCapture = model::capture,
+                            captureRestriction = captureRestriction,
+                            homeControl = { HomeControl(model::openModes) },
                         )
                     }
-                    MeasurementControls(
-                        captureTop = measurement.top == null, canCapture = state.canCapture,
-                        compact = compact, onRestart = model::restart, onCapture = model::capture,
-                        captureRestriction = captureRestriction,
-                        homeControl = { HomeControl(model::openModes) },
-                    )
                 }
             }
             // An exceptional window gets a readable, scrollable workspace dialog. Its
             // capture/navigation row stays fixed; the regular portrait screen never scrolls.
             val exceptional = maxHeight < 360.dp || maxWidth < 280.dp || LocalDensity.current.fontScale > 2f
-            val workspaceDialogOpen = exceptional && showWorkspace && (measurementDestination || navigating)
+            if (exceptional && editHeight && !showWorkspace) SideEffect { showWorkspace = true }
+            val workspaceDialogOpen = exceptional && (showWorkspace || editorBlocks) && (measurementDestination || navigating)
             val home: @Composable (Boolean) -> Unit = { interactive ->
                 NavigationInputGuard(homeEntering, Modifier.fillMaxSize().graphicsLayer { alpha = homeEntryAlpha.value }) {
                     HomeScreen(homePresentationDestination(state.selection.destination),
@@ -300,11 +322,14 @@ fun ViewyScreen(
                 }
             }
             if (workspaceDialogOpen) Dialog(
-                onDismissRequest = { if (!overlay.blocksMeasurement && !navigating) showWorkspace = false },
+                onDismissRequest = {
+                    if (editHeight) model.cancelHeightEditor()
+                    else if (!editorBlocks && !overlay.blocksMeasurement && !navigating) showWorkspace = false
+                },
                 properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = false),
             ) {
-                BackHandler(enabled = !overlay.blocksMeasurement && !editHeight && !showStatus && state.tutorial.card == null) {
-                    if (!navigating) model.backSelection()
+                BackHandler(enabled = !overlay.blocksMeasurement && !editorBlocks && !showStatus && state.tutorial.card == null) {
+                    if (!navigating) model.systemBack(unit)
                 }
                 Surface(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout))) {
                     ScreenOverlayHost(overlayTransition, overlay, backdropOnly = false, overlay = { destination, interactive ->
@@ -322,17 +347,13 @@ fun ViewyScreen(
             }
         }
     }
-    if (editHeight && state.selection.activeMethod != null) HeightDialog(measurement, unit, onDismiss = { editHeight = false }) { meters ->
-        model.setHeight(meters)
-        editHeight = false
-    }
     if (showStatus && state.selection.activeMethod != null) AlertDialog(
         onDismissRequest = { showStatus = false }, title = { Text(stringResource(R.string.preview_status)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(stringResource(R.string.measurement_method_subtitle))
                 Text(stageText(measurement))
-                if (!state.heightConfigured) TextButton(onClick = { showStatus = false; editHeight = true }) { Text(stringResource(R.string.enter_height)) }
+                if (!heightConfigured) TextButton(onClick = { showStatus = false; openHeight() }) { Text(stringResource(R.string.enter_height)) }
                 else {
                     // The dialog suspends hardware; retain the failure that prompted it.
                     RecoveryControls(statusSnapshot ?: state, permission, requested, requestPermission, openSettings,
@@ -502,12 +523,12 @@ private fun LivePreview(
 /** A shared row gives the height editor only the space left after zoom and a fixed gap. */
 @Composable
 private fun CameraPreviewControls(
-    state: MeasurementUiState, unit: HeightUnit, compact: Boolean,
+    state: MeasurementUiState, heightMeters: Double, unit: HeightUnit, compact: Boolean,
     onZoom: (Float) -> Unit, onEditHeight: () -> Unit, modifier: Modifier = Modifier,
 ) {
     var retainedZoomState by remember { mutableStateOf(state) }
     SideEffect { if (state.previewVisible) retainedZoomState = state }
-    val number = heightLabelText(unit.fromMeters(state.measurement.heightMeters!!), LocalLocale.current.platformLocale)
+    val number = heightLabelText(unit.fromMeters(heightMeters), LocalLocale.current.platformLocale)
     val description = stringResource(R.string.height_edit, number, unit.label)
     Row(modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -594,6 +615,7 @@ private fun MeasurementStageArea(
     measurement: MeasurementState,
     textMeasurer: TextMeasurer,
     style: TextStyle,
+    editingHeight: Boolean,
 ) {
     val top = stringResource(R.string.measurement_stage_top)
     val bottom = stringResource(R.string.measurement_stage_bottom)
@@ -607,10 +629,13 @@ private fun MeasurementStageArea(
             )
         }
         Box(Modifier.fillMaxWidth().heightIn(min = with(density) { reservedHeight.toDp() }), contentAlignment = Alignment.Center) {
-            if (measurement.heightMeters != null && !measurement.completed) Text(
-                stageText(measurement),
-                Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite }, textAlign = TextAlign.Center, style = style,
-            )
+            val instruction = stageInstruction(measurement, editingHeight)
+            Crossfade(targetState = instruction, animationSpec = tween(150), label = "Capture instruction") { displayed ->
+                if (displayed != null) Text(stringResource(displayed),
+                    Modifier.fillMaxWidth().then(if (displayed == instruction) Modifier.semantics {
+                        liveRegion = LiveRegionMode.Polite
+                    } else Modifier.clearAndSetSemantics {}), textAlign = TextAlign.Center, style = style)
+            }
         }
     }
 }
@@ -661,122 +686,6 @@ private fun MeasurementControls(
             Canvas(Modifier.fillMaxSize().padding(6.dp)) { drawCircle(color) }
         }
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { homeControl() }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class, FlowPreview::class)
-@Composable
-private fun HeightDialog(state: MeasurementState, unit: HeightUnit, onDismiss: () -> Unit, onSave: (Double) -> Unit) {
-    val locale = LocalLocale.current.platformLocale
-    val originalText = rememberSaveable { state.heightMeters?.let { heightInputText(unit.fromMeters(it), locale) } ?: "" }
-    var text by rememberSaveable { mutableStateOf(originalText) }
-    val meters = heightInMeters(text, unit)
-    val opacity = remember { Animatable(0f) }
-    var pendingClose by remember { mutableStateOf<(() -> Unit)?>(null) }
-    val closing = pendingClose != null
-    val close: (() -> Unit) -> Unit = { action ->
-        if (pendingClose == null) pendingClose = action
-    }
-    Dialog(
-        onDismissRequest = { close(onDismiss) },
-        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
-    ) {
-        val focusRequester = remember { FocusRequester() }
-        val keyboard = LocalSoftwareKeyboardController.current
-        val focusManager = LocalFocusManager.current
-        val imeVisible by rememberUpdatedState(WindowInsets.isImeVisible)
-        val windowInfo = LocalWindowInfo.current
-        var requestedInitialFocus by remember { mutableStateOf(false) }
-        var cardVisible by remember { mutableStateOf(false) }
-        var placement by remember { mutableStateOf(HeightDialogPlacement()) }
-        val keyboardTarget = WindowInsets.imeAnimationTarget
-        val keyboardCurrent = WindowInsets.ime
-        val density = LocalDensity.current
-        // One dialog-owned animation job: dismissal cancels entry and continues
-        // from its current opacity. Remove the window only after exit completes.
-        LaunchedEffect(cardVisible, closing) {
-            if (closing) {
-                // Hide while the focused decimal editor is still attached. Removing
-                // it first can restart input with default editor options mid-hide.
-                keyboard?.hide()
-                if (opacity.value > 0f) opacity.animateTo(0f, tween(170, easing = LinearEasing))
-                // Visibility can change before the hide animation finishes; require
-                // the animated bottom inset to reach zero too. Bound faulty IMEs.
-                withTimeoutOrNull(750L) {
-                    snapshotFlow { !imeVisible && keyboardCurrent.getBottom(density) == 0 }.first { it }
-                }
-                focusManager.clearFocus(force = true)
-                withFrameNanos { }
-                pendingClose?.invoke()
-            } else if (cardVisible) {
-                opacity.animateTo(1f, tween(175))
-            }
-        }
-        LaunchedEffect(requestedInitialFocus, closing) {
-            if (!requestedInitialFocus || closing) return@LaunchedEffect
-            // Wait out transient initial inset reports and retain their maximum.
-            // The timeout also leaves hardware/floating-keyboard entry reachable.
-            withTimeoutOrNull(1_000L) {
-                snapshotFlow { maxOf(keyboardCurrent.getBottom(density), keyboardTarget.getBottom(density)) }
-                    .onEach { placement = placement.observe(it) }
-                    .debounce(120L)
-                    .first { it > 0 }
-            }
-            placement = placement.freeze()
-            withFrameNanos { }
-            cardVisible = true
-        }
-        LaunchedEffect(windowInfo.isWindowFocused, closing) {
-            if (windowInfo.isWindowFocused && !requestedInitialFocus && !closing) {
-                // Wait for the dialog's field to attach; never steal focus again on recomposition
-                // or reopen a keyboard the user has deliberately dismissed.
-                withFrameNanos { }
-                focusRequester.requestFocus()
-                keyboard?.show()
-                requestedInitialFocus = true
-            }
-        }
-        Box(
-            Modifier.fillMaxSize()
-                .windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout)
-                    .union(WindowInsets(bottom = placement.frozenKeyboardBottomPx ?: 0)))
-                .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 20.dp),
-            contentAlignment = Alignment.BottomCenter,
-        ) {
-            Surface(
-                modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth()
-                    .graphicsLayer { alpha = opacity.value }
-                    .then(if (cardVisible && !closing) Modifier else Modifier.clearAndSetSemantics {}),
-                shape = MaterialTheme.shapes.extraLarge,
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            ) {
-                Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text(stringResource(R.string.object_height), style = MaterialTheme.typography.headlineSmall)
-                    Column(
-                        Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Text(stringResource(R.string.height_instructions))
-                        OutlinedTextField(
-                            modifier = Modifier.focusRequester(focusRequester),
-                            value = text, onValueChange = { text = it }, label = { Text(stringResource(R.string.height_label, unit.label)) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true,
-                            isError = text.isNotEmpty() && meters == null,
-                            supportingText = { Text(if (text.isNotEmpty() && meters == null) stringResource(R.string.height_invalid) else stringResource(R.string.height_hint)) },
-                        )
-                    }
-                    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { close(onDismiss) }, enabled = cardVisible && !closing) { Text(stringResource(R.string.cancel)) }
-                        TextButton(onClick = {
-                            meters?.let { parsed ->
-                                val saved = if (text == originalText) state.heightMeters ?: parsed else parsed
-                                close { onSave(saved) }
-                            }
-                        }, enabled = cardVisible && !closing && meters != null) { Text(stringResource(R.string.save_height)) }
-                    }
-                }
-            }
-        }
     }
 }
 

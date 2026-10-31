@@ -108,6 +108,12 @@ class AndroidOrientationAcquisition(context: Context, private val onState: (Acqu
         onState(state)
     }
 
+    fun clear() {
+        stop()
+        state = AcquisitionState()
+        onState(state)
+    }
+
     fun capture(): CaptureResult = session?.capture(SystemClock.elapsedRealtimeNanos())
         ?: CaptureResult.Rejected(CaptureStatus.WAITING)
 

@@ -3,7 +3,10 @@ package com.malagel.viewy.ui
 import com.malagel.viewy.domain.KnownHeightDistance
 import com.malagel.viewy.domain.KnownHeightResult
 import com.malagel.viewy.domain.ViewingDirection
+import com.malagel.viewy.measurement.HeightDraft
 import com.malagel.viewy.measurement.HeightUnit
+import com.malagel.viewy.measurement.KnownHeightWorkflow
+import com.malagel.viewy.orientation.*
 import java.math.BigDecimal
 import java.text.NumberFormat
 import java.util.Locale
@@ -107,7 +110,7 @@ class ResultPresentationTest {
         // Secondary quantities and editable height keep their existing compact precision policy.
         assertEquals("9.8", distanceNumberText(9.8, HeightUnit.METERS, Locale.US))
         assertEquals("1.6", measurementNumberText(1.6, Locale.US))
-        assertEquals("9.8", heightInputText(9.8, Locale.US))
+        assertEquals("9.8", HeightDraft.open(9.8, HeightUnit.METERS).displayText(Locale.US))
     }
 
     @Test fun counterUsesStablePrecisionAndEndsAtExactlyTheNormalFormattedValue() {
@@ -175,5 +178,27 @@ class ResultPresentationTest {
         // Compose reaches the same final timeline frame immediately at animation scale zero.
         assertEquals(1f, ResultReveal.countFraction(ResultReveal.totalMillis.toFloat()), 0f)
         (0..2).forEach { assertEquals(1f, ResultReveal.supportingAlpha(ResultReveal.totalMillis.toFloat(), it), 0f) }
+    }
+    @Test fun correctedEstimateUsesOriginalCompletionForEntryAndRecreatedHostsStartSettled() {
+        val workflow = KnownHeightWorkflow()
+        workflow.setHeight(2.0)
+        workflow.cameraReady(true)
+        val memory = ResultEntryMemory(null)
+        val quality = OrientationQuality(13, 480_000_000L, 0, 0.0, 0.0, 0.0, 3, CaptureStatus.READY)
+        listOf(0.5, 0.0).forEachIndexed { index, z ->
+            val time = 2_000_000_000L + index * 1_000_000_000L
+            val observation = OrientationObservation(ViewingDirection(1.0, 0.0, z), time,
+                "frame", OrientationSource.GAME_ROTATION_VECTOR, quality, "camera")
+            workflow.update(observation, "frame", true, time)
+            workflow.capture(CaptureResult.Captured(observation), time)
+        }
+        val original = workflow.state.result!!
+        assertTrue(memory.enter(workflow.state.resultOrigin!!))
+        assertTrue(workflow.correctCompletedHeight(4.0))
+        assertNotEquals(ResultIdentity(original), ResultIdentity(workflow.state.result!!))
+        assertSame(original, workflow.state.resultOrigin)
+        assertFalse(memory.enter(workflow.state.resultOrigin!!))
+        val recreated = ResultEntryMemory(workflow.state.resultOrigin)
+        assertFalse(recreated.enter(workflow.state.resultOrigin!!))
     }
 }

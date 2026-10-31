@@ -1,6 +1,5 @@
 package com.malagel.viewy.ui
 
-import java.text.DecimalFormatSymbols
 import java.text.NumberFormat
 import java.math.BigDecimal
 import java.math.MathContext
@@ -12,12 +11,6 @@ import com.malagel.viewy.measurement.HeightUnit
 internal fun heightLabelText(value: Double, locale: Locale): String {
     val rounded = BigDecimal.valueOf(value).round(MathContext(6, RoundingMode.HALF_UP)).stripTrailingZeros()
     return decimalText(rounded, locale, minimumFraction = 1)
-}
-
-/** Editable values keep full precision, no grouping or exponent, using a supported decimal separator. */
-internal fun heightInputText(value: Double, locale: Locale): String {
-    val separator = DecimalFormatSymbols.getInstance(locale).decimalSeparator.takeIf { it == ',' } ?: '.'
-    return java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString().replace('.', separator)
 }
 
 internal fun distanceText(meters: Double, unit: com.malagel.viewy.measurement.HeightUnit, locale: Locale): String =

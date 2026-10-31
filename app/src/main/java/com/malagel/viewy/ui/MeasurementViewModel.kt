@@ -14,6 +14,9 @@ import com.malagel.viewy.domain.MeasurementMode
 import com.malagel.viewy.measurement.MeasurementSelection
 import com.malagel.viewy.measurement.KnownHeightWorkflow
 import com.malagel.viewy.measurement.MeasurementState
+import com.malagel.viewy.measurement.HeightDraft
+import com.malagel.viewy.measurement.HeightEditor
+import com.malagel.viewy.measurement.HeightUnit
 import com.malagel.viewy.measurement.MeasurementNotice
 import com.malagel.viewy.orientation.*
 import com.malagel.viewy.tutorial.LocalTutorialSeenStore
@@ -29,27 +32,43 @@ data class MeasurementUiState(
     val camera: CameraPreviewState = CameraPreviewState(),
     val acquisition: AcquisitionState = AcquisitionState(),
     val diagnosticsOpen: Boolean = false,
+    val heightEditor: HeightDraft? = null,
     val tutorial: TutorialState = TutorialState(),
     val visibility: MeasurementVisibility = MeasurementVisibility(),
     val resumed: Boolean = false,
     val previewEpoch: Long = 0,
+    /** Changes only for a new method activation; scopes presentation retained by Compose. */
+    val methodActivationId: Long = 0,
     val cameraFailureVisible: Boolean = false,
     val guidance: Int? = null,
     val alignmentCue: AlignmentCueState = AlignmentCueState(),
 ) {
-    val canCapture: Boolean get() = measurement.canCapture && camera.zoom.settled
+    internal fun navigateTo(
+        next: MeasurementSelection, nextTutorial: TutorialState, nextMeasurement: MeasurementState,
+    ): MeasurementUiState {
+        val enteringMethod = next.activeMethod != null && next.activeMethod != selection.activeMethod
+        return copy(selection = next, tutorial = nextTutorial, measurement = nextMeasurement, heightEditor = null,
+            methodActivationId = methodActivationId + if (enteringMethod) 1 else 0)
+    }
+
+    val canCapture: Boolean get() = heightEditor == null && measurement.canCapture && camera.zoom.settled
+    internal val backRestartsMeasurement: Boolean get() = selection.activeMethod != null && measurement.completed
+    internal val backOpensHeightEditor: Boolean get() = requiresCamera && heightConfigured && !measurement.completed
     val orientationFailureVisible: Boolean get() = acquisitionEligible && camera.ready &&
         !acquisition.running && acquisition.failure != null
     val recoveryVisible: Boolean get() = requiresCamera && heightConfigured && !measurement.completed &&
         (if (!visibility.permissionGranted) viewfinderInteractive
         else acquisitionEligible && (cameraFailureVisible || orientationFailureVisible))
-    val canOpenSettings: Boolean get() = !diagnosticsOpen && !tutorial.methodEntering && tutorial.card == null && tutorial.pendingMethod == null
-    val canOpenHelp: Boolean get() = selection.activeMethod != null && !selection.isOpen && !tutorial.methodEntering && tutorial.card == null && tutorial.pendingMethod == null
+    val canOpenSettings: Boolean get() = !visibility.covered && !diagnosticsOpen && !tutorial.methodEntering && tutorial.card == null && tutorial.pendingMethod == null
+    val canOpenHelp: Boolean get() = !visibility.covered && selection.activeMethod != null && !selection.isOpen && !tutorial.methodEntering && tutorial.card == null && tutorial.pendingMethod == null
+    val canEditHeight: Boolean get() = heightEditor != null && resumed && visibility.surfaceVisible &&
+        visibility.windowFocused && !visibility.covered && !diagnosticsOpen && !selection.isOpen &&
+        !tutorial.methodEntering && tutorial.card == null && tutorial.pendingMethod == null
     val requiresCamera: Boolean get() = selection.activeMethod?.requiresCamera == true
     val requiresOrientation: Boolean get() = selection.activeMethod?.requiresOrientation == true
     val heightConfigured: Boolean get() = measurement.heightMeters != null
     val viewfinderInteractive: Boolean get() = resumed && visibility.surfaceVisible && visibility.windowFocused &&
-        !visibility.covered && !visibility.heightEditing && !diagnosticsOpen && !selection.isOpen &&
+        !visibility.covered && heightEditor == null && !visibility.heightEditing && !diagnosticsOpen && !selection.isOpen &&
         !tutorial.methodEntering && tutorial.card == null && tutorial.pendingMethod == null
     val acquisitionEligible: Boolean get() = requiresCamera && heightConfigured && !measurement.completed &&
         visibility.permissionGranted && viewfinderInteractive
@@ -61,7 +80,7 @@ data class MeasurementUiState(
 /** Owns ONE foreground acquisition; diagnostics only observes its snapshots. Everything runs on main. */
 class MeasurementViewModel(application: Application) : AndroidViewModel(application) {
     private val workflow = KnownHeightWorkflow()
-    private var workflowMethod: MeasurementMethod? = null
+    private val heightEditor = HeightEditor(workflow)
     private val alignmentGuidance = AlignmentGuidance()
     private val guidance = MeasurementGuidance {
         if (Build.VERSION.SDK_INT >= 29) application.getSystemService(AccessibilityManager::class.java)
@@ -120,44 +139,88 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     private fun updateSelection(next: MeasurementSelection, activated: MeasurementMethod? = null) {
+        val previous = mutableState.value.selection
+        if (next == previous) return
+        val leavingMethod = previous.activeMethod != null && previous.activeMethod != next.activeMethod
+        heightEditor.cancel()
         tutorials.selectionChanged(next, activated)
-        mutableState.value = mutableState.value.copy(selection = next, tutorial = tutorials.state)
+        // Publish navigation before synchronous release callbacks can observe or revive the old method.
+        if (leavingMethod) workflow.clear()
+        mutableState.value = mutableState.value.navigateTo(next, tutorials.state, workflow.state)
+        if (leavingMethod) {
+            resources.clear()
+            acquisition.clear()
+        }
         reconcile()
+    }
+
+    /** Cover acquisition atomically, preserving the editor and saved measurement until Settings returns. */
+    fun prepareSettings(): Boolean {
+        val state = mutableState.value
+        if (!state.canOpenSettings) return false
+        mutableState.value = state.copy(visibility = state.visibility.copy(covered = true))
+        reconcile()
+        return true
     }
 
     fun openModes() { if (mutableState.value.canOpenSettings) updateSelection(mutableState.value.selection.openModes()) }
     fun backSelection() = updateSelection(mutableState.value.selection.back())
+    /** Called only by the uncovered destination's Android Back handlers. */
+    fun systemBack(unit: HeightUnit) {
+        val state = mutableState.value
+        when {
+            state.backRestartsMeasurement -> restart()
+            state.backOpensHeightEditor -> openHeightEditor(unit)
+            else -> backSelection()
+        }
+    }
     fun browseMode(mode: MeasurementMode) = updateSelection(mutableState.value.selection.browse(mode))
 
     fun methodEntered(token: Long) { tutorials.methodEntered(token); publishTutorial() }
     fun help(longPress: Boolean, diagnosticsEnabled: Boolean) {
         when (helpAction(mutableState.value, longPress, diagnosticsEnabled)) {
-            HelpAction.TUTORIAL -> { tutorials.openManually(); publishTutorial() }
-            HelpAction.DIAGNOSTICS -> { mutableState.value = mutableState.value.withDiagnostics(open = true, enabled = diagnosticsEnabled); reconcile() }
+            HelpAction.TUTORIAL -> {
+                tutorials.openManually()
+                publishTutorial()
+            }
+            HelpAction.DIAGNOSTICS -> {
+                mutableState.value = mutableState.value.withDiagnostics(open = true, enabled = diagnosticsEnabled)
+                reconcile()
+            }
             HelpAction.NONE -> Unit
         }
     }
     fun dismissDiagnostics() { mutableState.value = mutableState.value.withDiagnostics(open = false); reconcile() }
     fun dismissTutorial(cardId: Long) { tutorials.dismiss(cardId); publishTutorial() }
     fun changeTutorialPage(cardId: Long, page: TutorialPage) { tutorials.changePage(cardId, page); publishTutorial() }
-    private fun publishTutorial() { mutableState.value = mutableState.value.copy(tutorial = tutorials.state); reconcile() }
+    private fun publishTutorial() { mutableState.value = mutableState.value.copy(tutorial = tutorials.state, heightEditor = heightEditor.draft); reconcile() }
 
     fun selectMethod(method: MeasurementMethod) {
         if (mutableState.value.diagnosticsOpen) return
         val previous = mutableState.value.selection
         val next = previous.activate(method)
         if (next == previous) return
-        if (method != workflowMethod) {
-            // A different workflow must never inherit captures or a hardware session.
-            workflow.restart()
-            resources.reconcile(false, false, animateRelease = false)
-        }
-        workflowMethod = method
         updateSelection(next, activated = method)
     }
 
-    fun setHeight(meters: Double) { workflow.setHeight(meters); publish(); reconcile() }
-    fun restart() { workflow.restart(); publish(); reconcile() }
+    fun openHeightEditor(unit: HeightUnit) {
+        val state = mutableState.value
+        if (!state.viewfinderInteractive || state.selection.activeMethod == null || heightEditor.draft != null) return
+        heightEditor.open(unit)
+        // Publish the gate before synchronous resource release can call back.
+        mutableState.value = state.copy(heightEditor = heightEditor.draft,
+            visibility = state.visibility.copy(heightEditing = true))
+        reconcile()
+    }
+
+    fun heightKey(character: Char) { if (!mutableState.value.canEditHeight) return; heightEditor.key(character); publish() }
+    fun heightBackspace() { if (!mutableState.value.canEditHeight) return; heightEditor.backspace(); publish() }
+    fun switchHeightUnit() { if (!mutableState.value.canEditHeight) return; heightEditor.switchUnit(); publish() }
+    fun heightPreferenceChanged(unit: HeightUnit) { heightEditor.preferenceChanged(unit); publish() }
+    fun cancelHeightEditor() { heightEditor.cancel(); publish(); reconcile() }
+    fun confirmHeightEditor() { if (!mutableState.value.canEditHeight) return; heightEditor.confirm(); publish(); reconcile() }
+
+    fun restart() { heightEditor.cancel(); workflow.restart(); publish(); reconcile() }
     fun recaptureBottom() { workflow.recaptureBottom(); publish(); reconcile() }
     fun capture() {
         // Freshness is recomputed NOW, not trusted from the last 100 ms UI snapshot.
@@ -177,7 +240,7 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
 
     private fun publish() {
         val next = mutableState.value.copy(
-            measurement = workflow.state, camera = resources.camera, previewEpoch = resources.previewEpoch,
+            measurement = workflow.state, heightEditor = heightEditor.draft, camera = resources.camera, previewEpoch = resources.previewEpoch,
             cameraFailureVisible = resources.cameraFailureVisible,
         )
         publishGuidance(next)
