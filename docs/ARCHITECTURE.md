@@ -383,10 +383,10 @@ vW = R_WD * vD
 ```
 
 For a rotation matrix the inverse is its transpose; composition order matters.
-Only explicit PRIMARY_CAMERA or GYROSCOPE pose references on API 28+ are accepted,
+Only explicit PRIMARY_CAMERA or GYROSCOPE pose references are accepted,
 with four finite near-unit quaternion components and a rear-hemisphere axis.
 These references share sensor axes but differ in translation origin, irrelevant
-for a direction. Missing/pre-28, undefined, automotive, unknown, malformed or
+for a direction. Missing, undefined, automotive, unknown, malformed or
 contradictory metadata uses the labeled fallback. Mapping identity incorporates
 selected logical/physical camera, pose reference and quaternion or fallback;
 a mapping change starts a new sensor session.
@@ -431,7 +431,7 @@ Pairs require identical source/frame/mapping, strictly increasing sensor times
 and a bounded elapsed interval. Wall-clock or UI receipt time never replaces
 sensor time. Invalid/non-increasing/future/old events invalidate the frame;
 long sample gaps, abrupt full-quaternion steps, platform discontinuity flags
-when available, and transitions into/out of unreliable status also reset it.
+on API 33+, and transitions into/out of unreliable status also reset it.
 Abrupt-motion detection cannot distinguish fast legitimate movement from reset.
 No observation may span registrations, even if a platform reference persists.
 Queued callbacks carry a registration token to prevent contamination of a new session.
@@ -607,8 +607,8 @@ pixels or change the release decision. Disposal-first cleanup closes immediately
 without an animated snapshot.
 
 `PreviewPresentationGate` keeps readiness false through initial zoom acknowledgement
-and the existing settling interval, then requests a draw confirmation. API 29+
-hardware rendering uses a frame-commit callback; older/software rendering posts
+and the existing settling interval, then requests a draw confirmation.
+Hardware rendering uses a frame-commit callback; software rendering posts
 completion after draw dispatch. Generations reject confirmation after readiness
 loss, closure or rebinding. This is a presentation fence, not an exposure timestamp
 or a brightness/exposure-quality test; dark scenes remain valid. Once presented,
@@ -758,7 +758,7 @@ restriction, restart or capture-stage change resets it. Workflow corrections tak
 priority and can defer its first display. No extra timer or sensor registration is
 introduced. The near-vertical message has priority while the existing angle
 restriction applies, with immediate visibility targets and no display timeout. Corrections last
-five seconds, extended by Android's recommended text timeout on API 29+;
+five seconds, extended by Android's recommended text timeout;
 hardware recovery hides them and retains persistent actions. Presentation never
 changes capture eligibility or sensor quality assessment.
 
@@ -899,11 +899,10 @@ units. No separate settings store or changes to canonical meter values exist.
 
 The regional initializer reads system resources, bypassing application-language
 overrides. A known region is required; Unicode regional/measurement overrides are
-recognized. On API 28+, Android's
+recognized. Android's
 [`LocaleData.getMeasurementSystem`](https://developer.android.com/reference/android/icu/util/LocaleData#getMeasurementSystem(android.icu.util.ULocale))
-maps US to Imperial and SI/UK to Metric. The UK region defaults to Metric. On API
-23–27, US/Liberia/Myanmar default to Imperial and other known regions to Metric,
-without calling ICU. Missing, unknown or failed information defaults to Metric.
+maps US to Imperial and SI/UK to Metric. The UK region defaults to Metric.
+Missing, unknown or failed information defaults to Metric.
 The saved result is not recalculated on later launches or language changes.
 
 `SettingsViewModel` exposes immutable preference snapshots and explicit initial
@@ -958,7 +957,7 @@ keeps its existing Material 3 dark scheme and edge-to-edge setup. The locale con
 advertises English and Spanish to Android 13+ system settings.
 `AppCompatDelegate.setApplicationLocales` uses an empty list for device language;
 `getApplicationLocales` supplies the current choice, including system changes.
-AppCompat's `autoStoreLocales` metadata enables app-private storage on API 23–32
+AppCompat's `autoStoreLocales` metadata enables app-private storage on API 31–32
 and migration to system-managed locales on newer Android. Text and formatting use
 the Activity's localized resources/Compose locale; the application-context sensor
 adapter and pure math do not depend on locale. English default resources provide
@@ -1000,6 +999,8 @@ and locale reset across OS versions remain manual verification requirements.
 
 ## Build contracts
 
+The minimum supported OS is Android 12 (API 31). Hardware capabilities remain
+runtime requirements rather than mandatory manifest features.
 Versions live in `gradle/libs.versions.toml` and Gradle build files; the wrapper
 pins its distribution and checksum. AGP supplies built-in Kotlin, upgraded by the
 root buildscript to match the Compose compiler; do not also apply Kotlin Android.

@@ -151,9 +151,8 @@ future validated features; they have no selectable methods.
   suspends acquisition and discards an incomplete endpoint pair. Acquisition
   resumes only after the covering surface finishes closing.
 - Units initialize once from the device's regional measurement preferences,
-  independently of app language. Android 28+ uses ICU; older versions use regional
-  defaults. Mixed-system regions such as the UK and unknown regions default to
-  Metric. Existing saved preferences and later Settings choices always take
+  independently of app language, using Android ICU. Mixed-system regions such as
+  the UK and unknown regions default to Metric. Existing saved preferences and later Settings choices always take
   priority. Metric uses meters; Imperial uses decimal feet for heights and
   short distances; long results automatically use kilometers or miles as described
   below. Tapping the units row switches immediately, including existing
@@ -164,7 +163,7 @@ future validated features; they have no selectable methods.
 - Language defaults to **Use device language**, with **English** and **Español**
   overrides. Unsupported device languages fall back to English. Android per-app
   language settings and the in-app picker share the same override on Android 13+;
-  AppCompat supports older versions. Language changes update text and number
+  AppCompat supports Android 12 and 12L. Language changes update text and number
   formatting in place, without restarting the Activity or blanking the screen.
   The language selector, method, height and completed results stay in
   place; acquisition remains suspended throughout Settings. Back

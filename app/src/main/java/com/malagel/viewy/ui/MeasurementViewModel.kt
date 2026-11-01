@@ -2,7 +2,6 @@ package com.malagel.viewy.ui
 
 import android.app.Application
 import android.content.Context
-import android.os.Build
 import android.view.accessibility.AccessibilityManager
 import android.os.SystemClock
 import android.os.Handler
@@ -86,9 +85,8 @@ class MeasurementViewModel(application: Application) : AndroidViewModel(applicat
     private val heightEditor = HeightEditor(workflow)
     private val alignmentGuidance = AlignmentGuidance()
     private val guidance = MeasurementGuidance {
-        if (Build.VERSION.SDK_INT >= 29) application.getSystemService(AccessibilityManager::class.java)
+        application.getSystemService(AccessibilityManager::class.java)
             ?.getRecommendedTimeoutMillis(5_000, AccessibilityManager.FLAG_CONTENT_TEXT)?.toLong() ?: 5_000L
-        else 5_000L
     }
     private val tutorials = TutorialCoordinator(
         LocalTutorialSeenStore(application.getSharedPreferences(LocalTutorialSeenStore.FILE_NAME, Context.MODE_PRIVATE)),

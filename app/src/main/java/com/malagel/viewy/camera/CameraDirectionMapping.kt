@@ -13,7 +13,7 @@ data class CameraDirectionMapping(
     companion object {
         /**
          * Only explicit PRIMARY_CAMERA (0) / GYROSCOPE (1) references share Android
-         * sensor axes. Pre-28, undefined, automotive and unknown references are not used.
+         * sensor axes. Missing, undefined, automotive and unknown references are not used.
          * R_CD maps device into camera, so invert it to map camera +Z into device.
          * This is an optical-axis estimate, NOT a calibrated preview-center ray.
          */

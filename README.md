@@ -88,8 +88,8 @@ with `sdk.dir` in an untracked `local.properties`.
 Use the included Gradle wrapper; no system Gradle is required. The first build
 needs network access for dependencies; the app itself operates offline. Toolchain
 and library versions are defined in `gradle/libs.versions.toml`, the Gradle build
-files, and `gradle/wrapper/gradle-wrapper.properties`. Minimum Android API is 23;
-compile and target API are 37. Keep local paths and signing keys out of Git.
+files, and `gradle/wrapper/gradle-wrapper.properties`. Minimum Android version is
+Android 12 (API 31); compile and target API are 37. Keep local paths and signing keys out of Git.
 
 ## Build and test
 
@@ -106,7 +106,7 @@ commands, recorded results and hardware procedures are in
 
 ## Install and run
 
-With an authorized API 23+ device or emulator connected:
+With an authorized API 31+ device or emulator connected:
 
 ```sh
 adb install -r app/build/outputs/apk/debug/app-debug.apk

@@ -8,7 +8,6 @@ import android.hardware.camera2.CaptureResult
 import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.TotalCaptureResult
 import android.hardware.display.DisplayManager
-import android.os.Build
 import android.os.Handler
 import android.os.SystemClock
 import android.os.Looper
@@ -165,7 +164,7 @@ class CameraPreview(
             val logicalId = Camera2CameraInfo.from(rear).cameraId
             val manager = context.getSystemService(CameraManager::class.java)
             val logical = manager.getCameraCharacteristics(logicalId)
-            val physicalIds = if (Build.VERSION.SDK_INT >= 28) logical.physicalCameraIds else emptySet()
+            val physicalIds = logical.physicalCameraIds
             // Keep the logical output unpinned; physical metadata supplies aiming axes.
             val physicalCandidates = physicalIds.mapNotNull { id ->
                 runCatching { id to manager.getCameraCharacteristics(id) }.getOrNull()
@@ -179,7 +178,7 @@ class CameraPreview(
             }
             val selectedId = physical?.first ?: logicalId
             val characteristics = physical?.second ?: logical
-            val reference = if (Build.VERSION.SDK_INT >= 28) characteristics[CameraCharacteristics.LENS_POSE_REFERENCE] else null
+            val reference = characteristics[CameraCharacteristics.LENS_POSE_REFERENCE]
             val mapping = CameraDirectionMapping.forRearCamera(
                 "rear-$logicalId/physical-$selectedId", reference, characteristics[CameraCharacteristics.LENS_POSE_ROTATION],
             )
@@ -193,13 +192,13 @@ class CameraPreview(
             if (identityRequired) {
                 val mappings = physicalCandidates.associate { (id, c) ->
                     id to CameraDirectionMapping.forRearCamera("rear-$logicalId/physical-$id",
-                        if (Build.VERSION.SDK_INT >= 28) c[CameraCharacteristics.LENS_POSE_REFERENCE] else null,
+                        c[CameraCharacteristics.LENS_POSE_REFERENCE],
                         c[CameraCharacteristics.LENS_POSE_ROTATION])
                 }
                 val epoch = bindingEpoch
                 interop.setSessionCaptureCallback(object : CameraCaptureSession.CaptureCallback() {
                     override fun onCaptureCompleted(session: CameraCaptureSession, request: CaptureRequest, result: TotalCaptureResult) {
-                        val id = if (Build.VERSION.SDK_INT >= 29) result[CaptureResult.LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_ID] else null
+                        val id = result[CaptureResult.LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_ID]
                         val frame = result.frameNumber
                         // Observe metadata only; CameraX owns requests and session lifecycle.
                         handler.post {
