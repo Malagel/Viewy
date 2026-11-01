@@ -61,7 +61,7 @@ future validated features; they have no selectable methods.
   text is included in this destination yet.
   Horizontal swipes track the finger between Instructions and Important, then settle
   to a page using distance and fling velocity. Short drags can return to the same page;
-  vertical scrolling remains independent. Buttons use a slower 360 ms page slide;
+  vertical scrolling remains independent. Buttons use a short 220 ms page slide;
   touch-driven drags and flings retain normal pager behavior. Android Back takes
   priority over the pager on both pages, from either screen edge. Touches starting
   in Android's back-gesture edge regions cannot move the pager, including before

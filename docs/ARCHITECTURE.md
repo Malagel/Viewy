@@ -177,7 +177,7 @@ Only settled pages publish to the coordinator. Buttons animate that pager locall
 without publishing a destination through the ViewModel before motion starts; Android
 Back also animates it before publishing. Both small pages are composed ahead of the
 slide, with the illustration clock stopped when Instructions is offscreen and settled.
-Programmatic page movement uses a 360 ms FastOutSlowIn tween; touch fling behavior is
+Programmatic page movement uses a 220 ms FastOutSlowIn tween; touch fling behavior is
 unchanged. Boolean interaction gates use derived state to avoid recomposing the card
 on every entrance-opacity frame. No touch-consuming overlay is inserted during a drag. Moving pages
 lose semantics/focus and their callbacks cannot act. Vertical prose scrolling remains

@@ -49,6 +49,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
+// Programmatic paging is short and deterministic; touch flings keep the pager's own spec.
+private val tutorialPageAnimation = tween<Float>(220, easing = FastOutSlowInEasing)
+
 /** Shared two-page tutorial and a separate full-screen documentation destination. */
 @Composable
 internal fun MethodTutorialDialog(
@@ -92,14 +95,14 @@ internal fun MethodTutorialDialog(
     val pageScope = rememberCoroutineScope()
     val moveToPage: (TutorialPage) -> Unit = { page ->
         pageScope.launch {
-            pager.animateScrollToPage(page.ordinal, animationSpec = tween(360, easing = FastOutSlowInEasing))
+            pager.animateScrollToPage(page.ordinal, animationSpec = tutorialPageAnimation)
         }
     }
     // Button/Back requests and swipes share one pager. Only settled pages enter retained state.
     LaunchedEffect(card.id, card.page, systemBackInProgress, closing) {
         if (!systemBackInProgress && !closing &&
             (pager.currentPage != card.page.ordinal || pager.currentPageOffsetFraction != 0f)) {
-            pager.animateScrollToPage(card.page.ordinal, animationSpec = tween(360, easing = FastOutSlowInEasing))
+            pager.animateScrollToPage(card.page.ordinal, animationSpec = tutorialPageAnimation)
         }
     }
     LaunchedEffect(pager) {
@@ -143,7 +146,7 @@ internal fun MethodTutorialDialog(
                     if (previous == null) closing = true
                     else {
                         // Keep input/publication suspended until the committed destination is aligned.
-                        pager.animateScrollToPage(previous.ordinal, animationSpec = tween(360, easing = FastOutSlowInEasing))
+                        pager.animateScrollToPage(previous.ordinal, animationSpec = tutorialPageAnimation)
                         publishPage(card.id, previous)
                     }
                 }
