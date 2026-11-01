@@ -43,7 +43,7 @@ future validated features; they have no selectable methods.
   updates; recreated destinations appear settled.
 - Returning Home immediately releases camera and orientation ownership and clears
   the entire method session: height, keypad draft, captures, results, notices and
-  camera/sensor diagnostics. Reentering the method starts at **Enter object height**
+  camera/sensor diagnostics. Reentering the method starts at **Enter height**
   without acquisition. Leaving measurement for the method list also ends the session.
   Global settings, permissions and completed tutorials are unaffected. Temporary
   Settings and Help surfaces preserve saved height, draft and completed results;
@@ -98,12 +98,12 @@ future validated features; they have no selectable methods.
   while clearing captures/results. Android Back while the distance result is displayed
   performs the same Restart action, retaining height and prompting a fresh top capture.
   From the unfinished camera workspace, Android Back clears height/captures and
-  returns directly to **Enter object height** with acquisition stopped; the next
+  returns directly to **Enter height** with acquisition stopped; the next
   Back exits the method. The last available camera image and controls fade into
   the height prompt over 225 ms; acquisition stops immediately. Without an
   available image, the prompt fades over the themed waiting surface. The camera's Edit height button opens a draft keypad;
   Back from that editor discards draft changes and returns to the camera with the
-  saved height retained. Initial-entry cancellation returns to Enter object height;
+  saved height retained. Initial-entry cancellation returns to Enter height;
   completed-result editor cancellation preserves the result. Covering
   surfaces keep their existing Back hierarchy.
   Capture retains its existing behavior.
@@ -170,8 +170,9 @@ future validated features; they have no selectable methods.
   fade its existing shutter/border colors over 150 ms; capture is disabled immediately. Restart and Home sit
   symmetrically closer to the large, solid shutter-style Capture button.
 - After method selection, until a positive finite height is saved, a tonal rounded
-  rectangle offers
-  a prominent **Enter object height** action without starting camera or
+  workspace centers a decorative vertical-dimension icon, an object-height heading,
+  a short explanation and a primary **Enter height** action.
+  The group scrolls when space or text size requires it, without starting camera or
   orientation acquisition or requesting camera permission. Entry uses the global
   unit system (meters or decimal feet), accepts decimal
   point or comma, without grouping separators. A rounded, borderless preview-edge
@@ -183,7 +184,7 @@ future validated features; they have no selectable methods.
   height cue, a single-line value with ellipsis when needed, and the unit. Its
   accessible edit description retains the complete display value. All three height actions open the same embedded keypad in the rounded
   camera/result container, retaining its ordinary size and placement. The initial
-  **Enter object height** button is unchanged and never opens the editor automatically.
+  **Enter height** action never opens the editor automatically.
   A new height starts empty; existing heights open in meters or decimal feet
   according to Settings, with converted text truncated to four fractional digits.
   Unchanged confirmation still retains the exact stored physical value. Local m/cm and ft/in toggles convert the
@@ -212,7 +213,7 @@ future validated features; they have no selectable methods.
   Camera and editor share a restrained 225 ms opacity transition over an opaque
   themed surface. The prompt and keypad share one cover transition, so initial
   confirmation fades directly from keypad to the waiting camera without showing
-  Enter object height again. Opening the camera's editor retains the last image
+  Enter height again. Opening the camera's editor retains the last image
   beneath the incoming keypad instead of replacing it with a solid color first.
   On return from the keypad, Settings or Help, the preview draws beneath its native
   themed cover until streaming, initial zoom settling and a subsequent draw

@@ -8,7 +8,9 @@
     <string name="camera_retry">Reintentar cámara</string>
     <string name="measurement_stage_top">Apunta al extremo superior</string>
     <string name="measurement_stage_bottom">Apunta al extremo inferior</string>
-    <string name="enter_height">Introducir altura del objeto</string>
+    <string name="enter_height">Introducir altura</string>
+    <string name="height_prompt_title">Altura del objeto</string>
+    <string name="height_prompt_description">Introduce una altura conocida o estimada. Mientras más preciso sea, mejor será el resultado.</string>
     <string name="orientation_retry">Reintentar orientación</string>
     <string name="restart_measurement">Reiniciar</string>
     <string name="capture_top">Capturar extremo superior</string>

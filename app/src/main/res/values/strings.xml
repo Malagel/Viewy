@@ -8,7 +8,9 @@
     <string name="camera_retry">Retry camera</string>
     <string name="measurement_stage_top">Aim at the top</string>
     <string name="measurement_stage_bottom">Aim at the bottom</string>
-    <string name="enter_height">Enter object height</string>
+    <string name="enter_height">Enter height</string>
+    <string name="height_prompt_title">Object\'s height</string>
+    <string name="height_prompt_description">Use a known or estimated height to start.</string>
     <string name="orientation_retry">Retry orientation</string>
     <string name="restart_measurement">Restart</string>
     <string name="capture_top">Capture top</string>

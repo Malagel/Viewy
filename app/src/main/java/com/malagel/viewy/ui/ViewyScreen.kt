@@ -264,12 +264,7 @@ fun ViewyScreen(
                                             WorkspaceCover.HEIGHT_PROMPT -> Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.secondaryContainer) {
                                                 NavigationInputGuard(workspaceMotion.moving || coverTarget != cover || editorBlocks,
                                                     Modifier.fillMaxSize()) {
-                                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                                        Button(onClick = openHeight,
-                                                            modifier = Modifier.padding(20.dp).widthIn(min = 240.dp, max = 320.dp).heightIn(min = 64.dp),
-                                                            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
-                                                        ) { Text(stringResource(R.string.enter_height), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center) }
-                                                    }
+                                                    HeightPrompt(onEnterHeight = openHeight)
                                                 }
                                             }
                                             WorkspaceCover.HEIGHT_EDITOR -> (state.heightEditor ?: retainedDraft)?.let { draft ->
