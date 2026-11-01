@@ -13,6 +13,7 @@ data class OnboardingState(
     val permissions: Map<OnboardingPermission, PermissionStatus> = OnboardingPermission.entries.associateWith { PermissionStatus.NOT_REQUESTED },
 ) {
     val requesting get() = PermissionStatus.REQUESTING in permissions.values
+    val allPermissionsGranted get() = OnboardingPermission.entries.all { permissions[it] == PermissionStatus.GRANTED }
     val canContinue get() = !requesting
     fun next(from: OnboardingPage = page) = if (!canContinue || from != page) this else copy(page = when (page) {
         OnboardingPage.WELCOME -> OnboardingPage.PERMISSIONS

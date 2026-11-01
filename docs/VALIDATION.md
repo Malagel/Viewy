@@ -66,11 +66,15 @@ Developer device validation for onboarding remains required:
   All prose/actions must remain reachable and moving pages must be inaccessible.
   Confirm the enlarged wordmark stays on one line and the rounded page headings
   wrap readably. Setup should fade upward once, with no entrance replay after
-  recreation. Verify the raised Continue and matching tonal Not now controls.
+  recreation. Permissions must show one primary button: Not now until all grants,
+  then Continue, including after revocation and return from Android Settings.
+  Check that Allowed matches Allow camera in font, weight and size. The final
+  Continue to Viewy button must retain its colors while saving and exiting, with
+  no disabled-color flash. Storage-error Retry must still leave setup unfinished.
   Compare the camera card before/after granting, denying and granting through
   Android Settings: its position and bounds must remain identical while labels
-  and explanations crossfade. Hidden permission actions and the faded-out Not now
-  slot must not be accessible or focusable. Repeat with disabled motion.
+  and explanations crossfade. Hidden permission actions must not be accessible or
+  focusable. Repeat with disabled motion.
 - Check regional initialization on API 23–27 and 28+ with US, Chile and UK regions,
   including a different app-language override. Change units in Settings and relaunch;
   the explicit choice must survive. Reset app data only when intentionally testing

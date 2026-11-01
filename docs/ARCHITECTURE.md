@@ -865,9 +865,11 @@ CAMERA. An Activity Result launcher requests permission solely on an explicit ta
 initial mounting and lifecycle resume refresh the platform grant. Grant, denial
 and skipping never persist completion. Measurement retains its own contextual
 launcher, resume refresh and app-settings recovery, with no automatic request.
-The permission action, explanations and tonal skip button retain their measured
-slots while their content crossfades over 180 ms. Hidden content loses semantics
-and its actions are disabled immediately, without changing the card's position
+The permission action and explanations retain their measured slots while their
+content crossfades over 180 ms. Allow camera and Allowed use the same label
+typography. One primary footer button changes from Not now to Continue only when
+every declared permission is granted; no separate skip button is rendered.
+Hidden content loses semantics and its actions are disabled immediately, without changing the card's position
 or bounds after a grant, denial or return from Android Settings. Permission-card
 padding is reduced only at the top. All onboarding motion uses Compose duration
 scaling, including immediate completion with disabled system animations.
@@ -878,6 +880,9 @@ Settings DataStore through `SettingsViewModel`'s serialized write/error/retry pa
 Home is gated on the persisted snapshot, so failed or interrupted uncommitted
 writes cannot advance startup. Existing preferences are preserved, newer completion
 versions are not downgraded, and clearing app data naturally restores onboarding.
+The final button disables interaction during writes and after completion while
+preserving its enabled colors through the startup crossfade. Storage errors retain
+the normal disabled appearance and Retry; no optimistic completion is published.
 
 Welcome's accuracy disclaimer is static and localized. Setup performs no hardware
 discovery, compatibility checks, camera initialization or sensor registration.

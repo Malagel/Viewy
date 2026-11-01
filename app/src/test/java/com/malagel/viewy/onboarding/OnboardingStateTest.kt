@@ -92,6 +92,21 @@ class OnboardingStateTest {
         assertEquals(1, writes)
     }
 
+    @Test fun permissionContinuationTracksEveryGrantAndLaterRevocation() {
+        val permissions = ready().next()
+        for (state in listOf(permissions, permissions.request(camera),
+            permissions.request(camera).result(camera, false), permissions.copy(permissions = emptyMap()))) {
+            assertFalse(state.allPermissionsGranted)
+        }
+        val granted = permissions.request(camera).result(camera, true)
+        assertTrue(granted.allPermissionsGranted)
+        assertTrue(permissions.refresh(camera, true).allPermissionsGranted)
+        assertFalse(granted.refresh(camera, false).allPermissionsGranted)
+        // Skipping still navigates to completion without pretending permission was granted.
+        assertEquals(OnboardingPage.COMPLETION, permissions.next().page)
+        assertFalse(permissions.next().allPermissionsGranted)
+    }
+
     @Test fun onboardingAndHomeDoNotAcquireEvenWithPermissionAndLaterMethodRecoveryStillWorks() {
         val workflow = KnownHeightWorkflow()
         var starts = 0

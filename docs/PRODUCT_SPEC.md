@@ -25,13 +25,16 @@ future validated features; they have no selectable methods.
   use larger rounded headings. Setup enters with a short fade and subtle upward
   motion; Activity recreation shows the retained page directly.
   Permissions lists Camera with an explicit Android permission action and its
-  granted state. Denial, **Not now**, and **Continue** all allow progress; no request
+  granted state, matching the request action's typography. A single navigation
+  button reads **Not now** until all permissions are granted, then **Continue**.
+  Skipping or denying still allows progress; no request
   launches automatically. Contextual camera recovery remains available in methods.
-  **Not now** uses a full-width tonal button matching Continue's shape and size.
-  Camera permission changes crossfade within stable card bounds; granting access
-  fades out Not now while preserving its space so the card stays anchored.
+  Camera permission changes crossfade within stable card bounds, with one fixed
+  navigation-button slot so the card stays anchored after a grant.
   Only **Continue to Viewy** persists completion before entering Home. Write failures
-  retain onboarding and expose storage Retry. Back returns one screen, exiting
+  retain onboarding and expose storage Retry. The final button retains its colors
+  while saving and fading out to Home, without briefly flashing disabled colors.
+  Back returns one screen, exiting
   normally from Welcome. Activity recreation retains the current screen; an
   unfinished process restart begins at Welcome. English/Spanish, system insets,
   scrollable prose, large text and system-scaled short slides are supported.

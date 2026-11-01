@@ -159,22 +159,22 @@ private fun OnboardingPageContent(
                 Text(stringResource(R.string.settings_storage_error), textAlign = TextAlign.Center)
                 TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
             }
-            if (page == OnboardingPage.PERMISSIONS) {
-                val showSkip = state.permissions.values.any { it != PermissionStatus.GRANTED }
-                // Keep the measured footer slot after granting so the centered card stays anchored.
-                PermissionStateContent(showSkip, Modifier.fillMaxWidth()) {
-                    FilledTonalButton(onClick = onContinue, enabled = showSkip,
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            disabledContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            disabledContentColor = MaterialTheme.colorScheme.onSecondaryContainer),
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
-                        Text(stringResource(R.string.onboarding_not_now), textAlign = TextAlign.Center)
-                    }
-                }
-            }
-            Button(onClick = onContinue, enabled = state.canContinue && (page != OnboardingPage.COMPLETION || preferences.canEdit),
+            val completed = preferences.preferences?.onboardingCompleted == true
+            val completing = page == OnboardingPage.COMPLETION && (preferences.writing || completed)
+            val buttonColors = ButtonDefaults.buttonColors()
+            // Saving blocks input immediately, but must not gray out the outgoing button.
+            Button(onClick = onContinue,
+                enabled = state.canContinue && (page != OnboardingPage.COMPLETION || (preferences.canEdit && !completed)),
+                colors = if (completing) ButtonDefaults.buttonColors(
+                    disabledContainerColor = buttonColors.containerColor,
+                    disabledContentColor = buttonColors.contentColor,
+                ) else buttonColors,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
-                Text(stringResource(if (page == OnboardingPage.COMPLETION) R.string.onboarding_enter else R.string.onboarding_continue),
+                Text(stringResource(when {
+                    page == OnboardingPage.COMPLETION -> R.string.onboarding_enter
+                    page == OnboardingPage.PERMISSIONS && !state.allPermissionsGranted -> R.string.onboarding_not_now
+                    else -> R.string.onboarding_continue
+                }),
                     textAlign = TextAlign.Center)
             }
         }
@@ -194,12 +194,14 @@ private fun PermissionRow(permission: OnboardingPermission, status: PermissionSt
                     PermissionStateContent(!granted) {
                         TextButton(onClick = onRequest, enabled = !granted && status != PermissionStatus.REQUESTING,
                             colors = ButtonDefaults.textButtonColors(disabledContentColor = MaterialTheme.colorScheme.primary)) {
-                            Text(stringResource(R.string.camera_permission_allow), textAlign = TextAlign.Center)
+                            Text(stringResource(R.string.camera_permission_allow), style = MaterialTheme.typography.labelLarge,
+                                textAlign = TextAlign.Center)
                         }
                     }
                     PermissionStateContent(granted) {
                         Text(stringResource(R.string.onboarding_permission_granted), Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                            color = MaterialTheme.colorScheme.primary, textAlign = TextAlign.Center)
+                            color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge,
+                            textAlign = TextAlign.Center)
                     }
                 }
             }
