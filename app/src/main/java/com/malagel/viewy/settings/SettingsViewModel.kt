@@ -75,6 +75,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun switchUnits() = write { repository.switchUnits() }
     fun setDiagnostics(enabled: Boolean) = write { repository.setDiagnostics(enabled) }
+    fun completeOnboarding() = write { repository.completeOnboarding() }
     private fun write(action: suspend () -> Unit) {
         if (!mutableState.value.canEdit) return
         mutableState.value = mutableState.value.copy(writing = true)
