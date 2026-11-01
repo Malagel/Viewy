@@ -9,7 +9,7 @@
     <application
         android:allowBackup="false"
         android:icon="@drawable/ic_viewy"
-        android:label="@string/app_name"
+        android:label="${launcherLabel}"
         android:localeConfig="@xml/locales_config"
         android:supportsRtl="true"
         android:theme="@style/Theme.Viewy">

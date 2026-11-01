@@ -1004,6 +1004,18 @@ runtime requirements rather than mandatory manifest features.
 Versions live in `gradle/libs.versions.toml` and Gradle build files; the wrapper
 pins its distribution and checksum. AGP supplies built-in Kotlin, upgraded by the
 root buildscript to match the Compose compiler; do not also apply Kotlin Android.
+The standard debug build uses application ID `com.malagel.viewy.debug`, launcher
+label ViewyDebug and Android debug signing. Release uses `com.malagel.viewy`,
+launcher label Viewy, disables debugging and enables AGP's `optimization` DSL
+with default Android release rules and integrated resource shrinking. In-app
+branding and all runtime logic are shared. Distinct application IDs isolate app
+data and allow simultaneous installation. Release signing is unsigned by default,
+configurable through ignored `signing.local.properties`, or explicitly switched
+to the development key with `-Pviewy.localReleaseSigning=true` for local testing.
+The shared deployment implementation selects only these two build types;
+`deploy-release.sh` opts into development-key signing. See README for signing
+setup and deployment commands.
+
 JUnit 4 supports JVM tests. Camera2 interop opt-in stays in the camera adapter.
 The manifest requests CAMERA and removes the transitive network-state permission;
 there are no Internet, microphone, location or storage permissions. No navigation or dependency-injection framework is implemented. Preferences

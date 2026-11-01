@@ -2,6 +2,7 @@
 .kotlin/
 **/build/
 local.properties
+signing.local.properties
 scripts/deploy.local.conf
 .idea/
 *.iml
