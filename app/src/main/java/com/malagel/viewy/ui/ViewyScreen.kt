@@ -63,6 +63,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.malagel.viewy.R
+import com.malagel.viewy.camera.PreviewZoom
 import com.malagel.viewy.measurement.*
 
 @Composable
@@ -157,7 +158,7 @@ fun ViewyScreen(
     LaunchedEffect(Unit) {
         if (homeEntryAlpha.value < 1f) homeEntryAlpha.animateTo(1f, tween(300, easing = LinearEasing))
     }
-    val homeEntering = homeEntryAlpha.value < 1f
+    val homeEntering by remember(homeEntryAlpha) { derivedStateOf { homeEntryAlpha.value < 1f } }
     val destinationTransition = updateTransition(state.selection.destination, label = "Home and measurement")
     val navigating = homeEntering || destinationTransition.currentState != destinationTransition.targetState || destinationTransition.isRunning
     val navigationToken = state.tutorial.navigationToken
@@ -216,7 +217,10 @@ fun ViewyScreen(
                                                 LivePreview(model, state, MaterialTheme.colorScheme.surfaceContainer, workspaceMotion,
                                                     resultCovered = measurement.result != null && coveredResult === measurement.result)
                                                 if (!measurement.completed) {
-                                                    CameraPreviewControls(state, displayedCameraHeight, unit, compact, model::requestZoom, openHeight,
+                                                    CameraPreviewControls(state.camera.zoom,
+                                                        state.camera.zoom.editable(state.camera.ready, measurement.top != null, measurement.completed),
+                                                        state.previewVisible, state.previewHeightEditVisible,
+                                                        displayedCameraHeight, unit, compact, model::requestZoom, openHeight,
                                                         Modifier.align(Alignment.TopCenter))
                                                     PreviewControlFade(state.previewVisible && state.acquisition.running, Modifier.align(Alignment.Center)) {
                                                         Reticle(Modifier.size(40.dp))
@@ -278,9 +282,8 @@ fun ViewyScreen(
                                 }
                             }
                             MeasurementStageArea(
-                                measurement, textMeasurer,
+                                stageInstruction(measurement, editorBlocks), textMeasurer,
                                 if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
-                                editingHeight = editorBlocks,
                             )
                         }
                         MeasurementControls(
@@ -454,21 +457,30 @@ private fun PreviewControlFade(visible: Boolean, modifier: Modifier, content: @C
 /** A shared row gives the height editor only the space left after zoom and a fixed gap. */
 @Composable
 private fun CameraPreviewControls(
-    state: MeasurementUiState, heightMeters: Double, unit: HeightUnit, compact: Boolean,
+    zoom: PreviewZoom, zoomEditable: Boolean, previewVisible: Boolean, heightEditVisible: Boolean,
+    heightMeters: Double, unit: HeightUnit, compact: Boolean,
     onZoom: (Float) -> Unit, onEditHeight: () -> Unit, modifier: Modifier = Modifier,
 ) {
-    var retainedZoomState by remember { mutableStateOf(state) }
-    SideEffect { if (state.previewVisible) retainedZoomState = state }
+    // Retain only rendered zoom data, so unrelated sensor snapshots cannot update these controls.
+    var retainedZoom by remember { mutableStateOf(zoom) }
+    var retainedZoomEditable by remember { mutableStateOf(zoomEditable) }
+    SideEffect {
+        if (previewVisible) {
+            retainedZoom = zoom
+            retainedZoomEditable = zoomEditable
+        }
+    }
     val number = heightLabelText(unit.fromMeters(heightMeters), LocalLocale.current.platformLocale)
     val description = stringResource(R.string.height_edit, number, unit.label)
     Row(modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        PreviewControlFade(state.previewVisible, Modifier) {
+        PreviewControlFade(previewVisible, Modifier) {
             // Keep the outgoing ratio and enabled appearance until its fade completes.
-            ZoomControls(if (state.previewVisible) state else retainedZoomState, onZoom)
+            ZoomControls(if (previewVisible) zoom else retainedZoom,
+                if (previewVisible) zoomEditable else retainedZoomEditable, onZoom)
         }
         Box(Modifier.weight(1f), contentAlignment = Alignment.TopEnd) {
-            PreviewControlFade(state.previewHeightEditVisible, Modifier) {
+            PreviewControlFade(heightEditVisible, Modifier) {
                 if (compact) {
                     LabeledIconButton(R.string.object_height, "↕", onEditHeight, description = description)
                 } else {
@@ -512,9 +524,7 @@ private fun CameraHeightButton(number: String, unit: String, description: String
 
 /** One snapshot drives gestures, button bounds and the persistent ratio label. */
 @Composable
-private fun ZoomControls(state: MeasurementUiState, onZoom: (Float) -> Unit, modifier: Modifier = Modifier) {
-    val zoom = state.camera.zoom
-    val editable = zoom.editable(state.camera.ready, state.measurement.top != null, state.measurement.completed)
+private fun ZoomControls(zoom: PreviewZoom, editable: Boolean, onZoom: (Float) -> Unit, modifier: Modifier = Modifier) {
     val zoomIn = stringResource(R.string.zoom_in)
     val zoomOut = stringResource(R.string.zoom_out)
     val ratioLabel = String.format(LocalLocale.current.platformLocale, "%.1f×", zoom.ratio)
@@ -543,10 +553,9 @@ private fun ZoomControls(state: MeasurementUiState, onZoom: (Float) -> Unit, mod
 /** Reserve both caption layouts even before height entry, including wrapping at large text sizes. */
 @Composable
 private fun MeasurementStageArea(
-    measurement: MeasurementState,
+    instruction: Int?,
     textMeasurer: TextMeasurer,
     style: TextStyle,
-    editingHeight: Boolean,
 ) {
     val top = stringResource(R.string.measurement_stage_top)
     val bottom = stringResource(R.string.measurement_stage_bottom)
@@ -560,7 +569,6 @@ private fun MeasurementStageArea(
             )
         }
         Box(Modifier.fillMaxWidth().heightIn(min = with(density) { reservedHeight.toDp() }), contentAlignment = Alignment.Center) {
-            val instruction = stageInstruction(measurement, editingHeight)
             Crossfade(targetState = instruction, animationSpec = tween(150), label = "Capture instruction") { displayed ->
                 if (displayed != null) Text(stringResource(displayed),
                     Modifier.fillMaxWidth().then(if (displayed == instruction) Modifier.semantics {

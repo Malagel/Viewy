@@ -12,7 +12,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -49,15 +48,16 @@ internal fun AlignmentChevrons(state: AlignmentCueState, modifier: Modifier = Mo
     val nudge = if (state.cue == AlignmentCue.LEFT || state.cue == AlignmentCue.RIGHT) {
         // Compose scales motion with system settings and suspends infinite motion at scale zero.
         val motion = rememberInfiniteTransition(label = "Alignment nudge")
-        val fraction by motion.animateFloat(0f, 1f,
+        motion.animateFloat(0f, 1f,
             infiniteRepeatable(tween(700, easing = FastOutSlowInEasing), RepeatMode.Reverse),
             label = "Alignment offset")
-        fraction
-    } else 0f
+    } else null
     Canvas(modifier.size(128.dp, 48.dp).clearAndSetSemantics {}) {
+        // Movement invalidates drawing without recomposing the chevrons every frame.
+        val offset = (nudge?.value ?: 0f) * 8.dp.toPx()
         for ((direction, opacity) in listOf(-1f to left.value, 1f to right.value)) {
             if (opacity <= 0f) continue
-            val x = center.x + direction * (40.dp.toPx() + nudge * 8.dp.toPx())
+            val x = center.x + direction * (40.dp.toPx() + offset)
             val path = Path().apply {
                 moveTo(x - direction * 4.5.dp.toPx(), center.y - 9.dp.toPx())
                 lineTo(x + direction * 4.5.dp.toPx(), center.y)

@@ -18,6 +18,11 @@ control row reserves space above the navigation inset. The manifest requests
 portrait for the Activity; large-screen Android policies may override this. Product behavior is defined in
 [Product specification](PRODUCT_SPEC.md).
 
+Camera controls receive zoom and visibility values, and the stage caption receives
+only its instruction identity, allowing Compose to skip them when sensor snapshots
+change without affecting their presentation. Sensor publication and capture gates
+retain their existing timing.
+
 The complete [Material 3 baseline dark scheme](https://m3.material.io/styles/color/the-color-system/key-colors-tones)
 supplies all Compose color roles;
 platform launch colors and system-bar icon styles match it. The Activity uses
@@ -124,7 +129,8 @@ wordmark and Settings anchored identically when a method becomes active.
 `HomeScreen` presents the existing header without contextual Help and a centered,
 480 dp maximum-width, 28 dp rounded selection card. The card has stable bounded
 height and independently scrollable mode/method lists. Destination-keyed Compose
-`AnimatedContent` slides forward left and backward right over 220 ms. Moving and
+`AnimatedContent` slides forward left and backward right over 220 ms, without a
+size transform for the fixed card bounds. Moving and
 outgoing lists cannot receive input; repeated Back is consumed during motion.
 The method-list header places the localized Select a method heading beside Back
 and does not repeat the mode name.
@@ -152,7 +158,8 @@ height confirmation uses the shared method-return transition: measurement exits 
 callbacks distinguish Android Back from Home without captured navigation state.
 Returning Home retains its 280 ms vertical entrance and the measurement's downward
 exit. Content keys distinguish selection from measurement, leaving Home/Methods
-animation to the selection card. Sensor and preference publications do not change
+animation to the selection card. Its fixed full-screen bounds need no size transform.
+Sensor and preference publications do not change
 the transition target. Compose duration scaling handles reduced
 or disabled motion. Recreated hosts initialize settled. Input guards cover moving
 and outgoing destinations. Hardware eligibility changes synchronously with logical
@@ -164,7 +171,8 @@ On fresh Activity creation, the initial Home surface has a separate 300 ms
 opacity-only entrance. Its Animatable belongs to `ViewyScreen`, outside the
 destination content, so returning Home does not replay it. Activity recreation
 opts out; system duration scaling applies and Home input/accessibility remains
-blocked until the fade finishes. The launcher/task window transition remains
+blocked until the fade finishes. Only the graphics layer reads each opacity frame;
+composition observes the derived input gate. The launcher/task window transition remains
 controlled by Android.
 
 Method help uses one centered edge-to-edge Compose Dialog with a bounded-width,

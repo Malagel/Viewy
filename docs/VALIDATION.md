@@ -97,6 +97,27 @@ in the method-help row below.
 Source and tests define the individual cases. Mocked deployment tests verify script decisions using
 fictional devices/configuration, not real wireless reliability.
 
+## Animation responsiveness and rendering
+
+The animation and rendering changes passed the bounded JVM tests, debug assembly
+and Android lint invocation above using JDK 17 and API 37. Lint reported warnings
+in existing manifest/resources, dependency declarations and bitmap drawable calls,
+with no errors. No device or emulator was used. Existing navigation, tutorial, zoom
+and resource-release tests cover state contracts; they do not execute Compose
+animations or native preview rendering.
+
+Automated checks cannot establish smoother rendered frames or lower tap latency.
+On a developer-owned device, compare repeated tutorial buttons with short drags
+and flings, then repeat forward/Back menu and measurement navigation. Exercise
+interrupted paging, committed/canceled predictive Back, rapid taps, TalkBack,
+large text and both normal/exceptional workspaces. Check normal, slow and disabled
+system animation scales and available high-refresh modes. Profile frame times
+and recomposition counts during Home entry, alignment nudges and live sensor
+updates; include opening/closing Settings, Help and the height editor with a live
+preview. Inspect main-thread time in synchronous bitmap retention separately
+from animation duration. Bitmap retention still precedes cover/unbind on main;
+its device-specific cost and overall frame pacing remain unmeasured.
+
 ## Known Object Height tutorial illustration
 
 The integrated illustration passed debug Kotlin/resource compilation, the JVM

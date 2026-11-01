@@ -3,7 +3,6 @@ package com.malagel.viewy.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Transition
@@ -183,7 +182,8 @@ internal fun MeasurementDestinationHost(
                     slideOutVertically(tween(ScreenMotion.exitMillis, easing = FastOutSlowInEasing)) { offset }
                 else -> ExitTransition.None
             }
-            entrance togetherWith exit using SizeTransform(clip = false, sizeAnimationSpec = { _, _ -> tween(0) })
+            // Both destinations fill the host; no size transition is needed.
+            (entrance togetherWith exit).using(null)
         },
     ) { destination ->
         val measuring = destination is SelectionDestination.Measurement

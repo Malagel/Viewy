@@ -46,6 +46,8 @@ private class PreviewSurface(context: Context) : FrameLayout(context) {
     }
 
     fun color(value: Int) {
+        // Sensor publications may recompose AndroidView without a theme change.
+        if (color == value) return
         color = value
         setBackgroundColor(value)
         preview?.setBackgroundColor(value)

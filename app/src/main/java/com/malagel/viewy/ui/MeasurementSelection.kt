@@ -59,8 +59,9 @@ internal fun SelectionLists(
         modifier = modifier,
         transitionSpec = {
             val forward = targetState is SelectionDestination.Methods
-            slideInHorizontally(tween(220)) { if (forward) it else -it } togetherWith
-                slideOutHorizontally(tween(220)) { if (forward) -it else it }
+            // Both lists fill the fixed card; only their horizontal placement changes.
+            (slideInHorizontally(tween(220)) { if (forward) it else -it } togetherWith
+                slideOutHorizontally(tween(220)) { if (forward) -it else it }).using(null)
         },
     ) { level ->
         val interactive = enabled && level == destination && !moving
