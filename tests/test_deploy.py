@@ -11,13 +11,19 @@ import time
 import unittest
 
 
-SCRIPT = Path(__file__).resolve().parents[1] / 'scripts/deploy.sh'
+SCRIPTS = Path(__file__).resolve().parents[1] / 'scripts'
 CONFIG_KEYS = ('JAVA_HOME', 'ANDROID_HOME', 'ANDROID_SDK_ROOT', 'ANDROID_SERIAL',
                'ANDROID_USER_HOME', 'GRADLE_USER_HOME', 'PHONE_SERIAL')
 SERVICE = 'adb-FICTIONAL123-test._adb-tls-connect._tcp'
 
 
 class DeployTest(unittest.TestCase):
+    variant = 'debug'
+    label = 'ViewyDebug'
+    app_id = 'com.malagel.viewy.debug'
+    task = ':app:assembleDebug'
+    options = ''
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix='viewy-deploy-')
         self.addCleanup(self.temp.cleanup)
@@ -25,9 +31,10 @@ class DeployTest(unittest.TestCase):
         self.repo = self.root / 'repo with spaces'
         (self.repo / 'scripts').mkdir(parents=True)
         # Shorten only the polling budget so failure cases run quickly.
-        script = SCRIPT.read_text().replace('deadline=$((SECONDS + 15))',
-                                            'deadline=$((SECONDS + 2))')
-        self.write_executable(self.repo / 'scripts/deploy.sh', script)
+        for name in ('deploy.sh', 'deploy-release.sh', 'deploy-common.sh'):
+            script = (SCRIPTS / name).read_text().replace(
+                'deadline=$((SECONDS + 15))', 'deadline=$((SECONDS + 2))')
+            self.write_executable(self.repo / 'scripts' / name, script)
         sdk = self.root / 'sdk'
         (sdk / 'platform-tools').mkdir(parents=True)
         jdk = self.root / 'jdk'
@@ -50,7 +57,7 @@ case "$1" in
     devices)
         printf 'List of devices attached\\n'
         case "$SCENARIO" in
-            service|build-fail|install-fail|launch-fail|missing-apk) printf '%s device\\n' "$SERVICE" ;;
+            service|build-fail|install-fail|launch-fail|missing-apk|signing-fail) printf '%s device\\n' "$SERVICE" ;;
             duplicates) printf '192.0.2.1:34567 device\\n%s device\\nother device\\n' "$SERVICE" ;;
             offline-alias) printf '%s offline\\n192.0.2.1:34567 device\\n' "$SERVICE" ;;
             ip) printf '192.0.2.1:34567 device\\nother device\\n' ;;
@@ -92,7 +99,12 @@ case "$1" in
                 else
                     printf 'Status: ok\\n'
                 fi ;;
-            install) [[ "$SCENARIO" != install-fail ]] || exit 1 ;;
+            install)
+                if [[ "$SCENARIO" == signing-fail ]]; then
+                    printf 'Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE: signatures do not match]\\n'
+                    exit 1
+                fi
+                [[ "$SCENARIO" != install-fail ]] || exit 1 ;;
         esac ;;
 esac
 ''')
@@ -101,8 +113,13 @@ printf '%s\\n' "JAVA_HOME=$JAVA_HOME" "ANDROID_HOME=$ANDROID_HOME" "ANDROID_SDK_
 printf 'gradle %s\\n' "$*" >> "$TEST_LOG"
 [[ "$SCENARIO" != build-fail ]] || exit 1
 if [[ "$SCENARIO" != missing-apk ]]; then
-    mkdir -p app/build/outputs/apk/debug
-    touch app/build/outputs/apk/debug/app-debug.apk
+    case "$*" in
+        *:app:assembleDebug) variant=debug ;;
+        *:app:assembleRelease) variant=release ;;
+        *) exit 1 ;;
+    esac
+    mkdir -p "app/build/outputs/apk/$variant"
+    touch "app/build/outputs/apk/$variant/app-$variant.apk"
 fi
 ''')
 
@@ -113,7 +130,8 @@ fi
 
     def run_script(self, scenario, serial='', success=True):
         self.env.update(SCENARIO=scenario, ANDROID_SERIAL=serial)
-        result = subprocess.run([str(self.repo / 'scripts/deploy.sh')],
+        entry = 'deploy.sh' if self.variant == 'debug' else 'deploy-release.sh'
+        result = subprocess.run([str(self.repo / 'scripts' / entry)],
                                 cwd='/tmp', env=self.env, capture_output=True,
                                 text=True, timeout=8)
         self.assertEqual(result.returncode == 0, success,
@@ -122,12 +140,15 @@ fi
         calls = self.log.read_text().splitlines() if self.log.exists() else []
         if success:
             target = serial or ('192.0.2.1:34567' if scenario in ('ip', 'offline-alias') else SERVICE)
-            install = f'-s {target} install -r {self.repo}/app/build/outputs/apk/debug/app-debug.apk'
-            launch = f'-s {target} shell am start -W -n com.malagel.viewy/.MainActivity'
+            install = f'-s {target} install -r {self.repo}/app/build/outputs/apk/{self.variant}/app-{self.variant}.apk'
+            launch = f'-s {target} shell am start -W -n {self.app_id}/com.malagel.viewy.MainActivity'
             self.assertIn(install, calls)
             self.assertIn(launch, calls)
-            self.assertLess(calls.index('gradle :app:assembleDebug'), calls.index(install))
+            self.assertLess(calls.index(f'gradle --no-daemon --max-workers=1 --no-watch-fs {self.options}{self.task}'), calls.index(install))
             self.assertLess(calls.index(install), calls.index(launch))
+        self.assertFalse(any('uninstall' in c or 'pm clear' in c for c in calls))
+        if success:
+            self.assertIn(f'Success: {self.label} built, installed, and launched', result.stdout)
         return calls
 
     def assert_no_build(self, scenario, serial=''):
@@ -255,8 +276,23 @@ ANDROID_SERIAL=missing
         calls = self.run_script('install-fail', success=False)
         self.assertFalse(any('shell am start' in c for c in calls))
 
+    def test_signing_mismatch_stops_launch_and_explains_data_preservation(self):
+        calls = self.run_script('signing-fail', success=False)
+        self.assertFalse(any('shell am start' in c for c in calls))
+        self.assertIn('Signing certificate mismatch', self.result.stderr)
+        self.assertIn(self.app_id, self.result.stderr)
+        self.assertIn('no data was cleared', self.result.stderr)
+
     def test_android_launch_error_is_failure(self):
         self.run_script('launch-fail', success=False)
+
+
+class ReleaseDeployTest(DeployTest):
+    variant = 'release'
+    label = 'Viewy'
+    app_id = 'com.malagel.viewy'
+    task = ':app:assembleRelease'
+    options = '-Pviewy.localReleaseSigning=true '
 
 
 if __name__ == '__main__':

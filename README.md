@@ -3,7 +3,7 @@
 Viewy is an offline Android app for approximate physical measurements using phone
 cameras, orientation sensors and other supported hardware. The current method
 estimates horizontal distance to a vertical object from its assumed height and
-two aiming directions. Application ID: `com.malagel.viewy`.
+two aiming directions. Release application ID: `com.malagel.viewy`.
 
 ## Basic usage
 
@@ -99,23 +99,68 @@ From the repository root, build the debug APK with bounded resource use:
 ./gradlew --no-daemon --max-workers=1 --no-watch-fs :app:assembleDebug
 ```
 
-The APK is `app/build/outputs/apk/debug/app-debug.apk`. Reproducible test/lint
-commands, recorded results and hardware procedures are in
+The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. It uses standard
+Android debug signing, is debuggable, and installs as **ViewyDebug**
+(`com.malagel.viewy.debug`). Release installs as **Viewy** (`com.malagel.viewy`),
+is non-debuggable, and uses AGP 9.4's `optimization { enable = true }` for R8 code
+and resource optimization with the standard Android release rules. Only the
+standard `debug` and `release` build types exist; both apps can coexist with
+independent permissions, preferences, onboarding and other application data.
+
+To build a locally signed release APK without deploying:
+
+```sh
+./gradlew --no-daemon --max-workers=1 --no-watch-fs -Pviewy.localReleaseSigning=true :app:assembleRelease
+```
+
+The signed APK is `app/build/outputs/apk/release/app-release.apk`. Local release
+signing explicitly reuses the Android development/debug key; this changes only
+the certificate, not release optimization or debuggability. That certificate is
+for local testing and is not Viewy's eventual production identity.
+
+Without the local-signing flag, release uses `signing.local.properties` at the
+repository root when configured, or produces `app-release-unsigned.apk` otherwise.
+The properties file is ignored by Git. Keep it readable only by your account
+(for example, `chmod 600 signing.local.properties`), store the keystore securely
+outside the repository, and never commit credentials or keys. Its format is:
+
+```properties
+storeFile=/absolute/path/to/private-release-key.jks
+storePassword=YOUR_LOCAL_STORE_PASSWORD
+keyAlias=YOUR_RELEASE_ALIAS
+keyPassword=YOUR_LOCAL_KEY_PASSWORD
+```
+
+Use Java properties escaping for special characters (including backslashes).
+A configured signing file must contain all four values. A release built without
+`-Pviewy.localReleaseSigning=true` uses this configured signing identity; the flag
+explicitly bypasses the file for local development signing. Production key custody
+and distribution signing must be decided before publishing. Preserve a consistent
+certificate when updating an installed application; a locally signed release cannot
+be updated in place with a different production certificate.
+
+Reproducible test/lint commands, recorded results and hardware procedures are in
 [Validation](docs/VALIDATION.md). Run only checks relevant to your change;
 [AGENTS.md](AGENTS.md) defines resource and device restrictions.
 
 ## Install and run
 
-With an authorized API 31+ device or emulator connected:
+With an authorized API 31+ device connected, choose one command:
 
 ```sh
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb shell am start -n com.malagel.viewy/.MainActivity
+./scripts/deploy.sh          # ViewyDebug: :app:assembleDebug
+./scripts/deploy-release.sh  # Viewy: :app:assembleRelease, development-key signing
 ```
 
-Alternatively, `./scripts/deploy.sh` builds, installs while preserving app data,
-and launches Viewy. The script invokes a standard Gradle assembly without the
-resource flags above. VSCodium's **Viewy: Build & Deploy** task runs the same script.
+Both commands share device discovery, local configuration and environment handling.
+They build with bounded Gradle resource use, install with `-r` to preserve data,
+and launch the matching app. Neither uninstalls apps nor clears data. A signing
+mismatch stops deployment with an explanation; use the installed app's certificate
+or explicitly decide how to migrate its data before changing signing identity.
+Existing installations of `com.malagel.viewy` now correspond to release; debug uses
+its new separate ID. VSCodium's **Viewy: Build & Deploy (DEBUG)** and
+**Viewy: Build & Deploy (RELEASE)** tasks run the respective scripts.
+
 Optional machine settings belong in `scripts/deploy.local.conf` (ignored by Git).
 This is a trusted Bash file; for example:
 

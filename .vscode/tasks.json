@@ -2,9 +2,15 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Viewy: Build & Deploy",
+            "label": "Viewy: Build & Deploy (DEBUG)",
             "type": "process",
             "command": "${workspaceFolder}/scripts/deploy.sh",
+            "problemMatcher": []
+        },
+        {
+            "label": "Viewy: Build & Deploy (RELEASE)",
+            "type": "process",
+            "command": "${workspaceFolder}/scripts/deploy-release.sh",
             "problemMatcher": []
         }
     ]

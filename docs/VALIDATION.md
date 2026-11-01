@@ -21,9 +21,44 @@ validation; no device or emulator was used.
 For deployment-script changes, use checks that mock ADB and Gradle:
 
 ```sh
-bash -n scripts/deploy.sh
+for script in scripts/deploy.sh scripts/deploy-release.sh scripts/deploy-common.sh; do bash -n "$script" || break; done
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_deploy.py'
 ```
+
+For both build types and release optimization, run one bounded build/check:
+
+```sh
+./gradlew --no-daemon --max-workers=1 --no-watch-fs -Pviewy.localReleaseSigning=true :app:assembleDebug :app:assembleRelease :app:testDebugUnitTest :app:lintRelease
+VIEWY_VERIFY_APKS=1 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_apks.py'
+```
+
+The APK checks require exported `ANDROID_HOME` and `JAVA_HOME` from the README
+setup. They inspect the actual APKs with Build Tools 36.0.0, checking application
+IDs, launcher labels in all packaged locales, launcher activity, debuggability,
+valid signatures and matching development certificates. R8 output checks cover
+obfuscation, removed code, resource analysis and enabled optimization. These
+host-only checks do not invoke ADB. The deployment suite mocks ADB/Gradle and
+runs its discovery, environment, ordering and failure checks for both entry points,
+including signing mismatch rejection without uninstalling or clearing data.
+
+The combined build/check command above passes with JDK 17, including both APK
+assemblies, JVM tests and release lint. Lint has no errors; warnings cover tool/
+dependency updates, platform guidance, typography and KTX suggestions. Inspection
+of the locally signed artifacts confirms separate IDs and labels, the common
+launcher activity, release debugging disabled, and valid development signatures.
+R8 includes `proguard-android-optimize.txt`, obfuscates application classes and
+reports removed code and unreachable resources without additional app keep rules.
+The mocked deployment and APK checks pass. Configured production signing has not
+been exercised with a production key; none was supplied or created.
+
+Release runtime validation remains manual: deploy both apps with the README
+commands, confirm both launcher entries coexist and retain independent onboarding,
+permissions, units and language across updates. In the optimized release, exercise
+onboarding, tutorial/navigation/animations, language persistence, height entry,
+camera preview and zoom, sensor capture, result correction and diagnostics, including
+background/resume. Build-time dependency resolution and R8 success cannot establish
+runtime camera/sensor correctness or usability. Changing a release certificate
+must not trigger automatic uninstall or data deletion.
 
 For documentation changes, check links/references and run `git diff --check`;
 Android builds are unnecessary. Follow [AGENTS.md](../AGENTS.md) for resource and

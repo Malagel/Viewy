@@ -1,4 +1,4 @@
-# Optional local configuration for scripts/deploy.sh.
+# Optional local configuration for scripts/deploy.sh and scripts/deploy-release.sh.
 #
 # Copy this file to scripts/deploy.local.conf and edit the values.
 # deploy.local.conf is ignored by Git.
