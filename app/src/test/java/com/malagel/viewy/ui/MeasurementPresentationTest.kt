@@ -53,12 +53,12 @@ class MeasurementPresentationTest {
             ViewingDirection(1.0, 0.0, 0.5), observation.direction) as com.malagel.viewy.domain.KnownHeightResult.Estimate
         val completed = ready.copy(measurement = ready.measurement.copy(result = result))
         assertFalse(completed.previewHeightEditVisible) // Completed height editing belongs to the result panel.
-        for (state in listOf(permission, failure)) {
-            assertFalse(state.previewVisible)
-            assertTrue(state.previewHeightEditVisible)
-            assertFalse(state.copy(visibility = state.visibility.copy(covered = true)).previewHeightEditVisible)
-            assertFalse(state.copy(visibility = state.visibility.copy(windowFocused = false)).previewHeightEditVisible)
-        }
+        assertFalse(permission.previewVisible)
+        assertFalse(permission.previewHeightEditVisible)
+        assertFalse(failure.previewVisible)
+        assertTrue(failure.previewHeightEditVisible)
+        assertFalse(failure.copy(visibility = failure.visibility.copy(covered = true)).previewHeightEditVisible)
+        assertFalse(failure.copy(visibility = failure.visibility.copy(windowFocused = false)).previewHeightEditVisible)
         assertFalse(ready.copy(selection = MeasurementSelection()).previewHeightEditVisible)
     }
 
@@ -172,7 +172,7 @@ class MeasurementPresentationTest {
         assertTrue(starting.copy(visibility = starting.visibility.copy(permissionGranted = false)).recoveryVisible)
         assertFalse(starting.copy(selection = MeasurementSelection(),
             visibility = starting.visibility.copy(permissionGranted = false)).recoveryVisible)
-        assertFalse(starting.copy(visibility = starting.visibility.copy(permissionGranted = false, windowFocused = false)).recoveryVisible)
+        assertTrue(starting.copy(visibility = starting.visibility.copy(permissionGranted = false, windowFocused = false)).recoveryVisible)
         assertFalse(ready.copy(acquisition = AcquisitionState(running = false)).recoveryVisible)
     }
 

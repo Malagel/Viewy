@@ -57,7 +57,7 @@ data class MeasurementUiState(
     val orientationFailureVisible: Boolean get() = acquisitionEligible && camera.ready &&
         !acquisition.running && acquisition.failure != null
     val recoveryVisible: Boolean get() = requiresCamera && heightConfigured && !measurement.completed &&
-        (if (!visibility.permissionGranted) viewfinderInteractive
+        (if (!visibility.permissionGranted) viewfinderUncovered
         else acquisitionEligible && (cameraFailureVisible || orientationFailureVisible))
     val canOpenSettings: Boolean get() = !visibility.covered && !diagnosticsOpen && !tutorial.methodEntering && tutorial.card == null && tutorial.pendingMethod == null
     val canOpenHelp: Boolean get() = !visibility.covered && selection.activeMethod != null && !selection.isOpen && !tutorial.methodEntering && tutorial.card == null && tutorial.pendingMethod == null
@@ -67,13 +67,16 @@ data class MeasurementUiState(
     val requiresCamera: Boolean get() = selection.activeMethod?.requiresCamera == true
     val requiresOrientation: Boolean get() = selection.activeMethod?.requiresOrientation == true
     val heightConfigured: Boolean get() = measurement.heightMeters != null
-    val viewfinderInteractive: Boolean get() = resumed && visibility.surfaceVisible && visibility.windowFocused &&
+    // Android's permission dialog may pause/unfocus the Activity. Keep its underlying
+    // explanation drawn, while interaction and acquisition retain their foreground gates.
+    private val viewfinderUncovered: Boolean get() = visibility.surfaceVisible &&
         !visibility.covered && heightEditor == null && !visibility.heightEditing && !diagnosticsOpen && !selection.isOpen &&
         !tutorial.methodEntering && tutorial.card == null && tutorial.pendingMethod == null
+    val viewfinderInteractive: Boolean get() = resumed && visibility.windowFocused && viewfinderUncovered
     val acquisitionEligible: Boolean get() = requiresCamera && heightConfigured && !measurement.completed &&
         visibility.permissionGranted && viewfinderInteractive
     val previewVisible: Boolean get() = acquisitionEligible && camera.ready
-    val previewHeightEditVisible: Boolean get() = requiresCamera && heightConfigured && viewfinderInteractive &&
+    val previewHeightEditVisible: Boolean get() = visibility.permissionGranted && requiresCamera && heightConfigured && viewfinderInteractive &&
         (previewVisible || recoveryVisible)
 }
 

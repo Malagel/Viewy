@@ -2,9 +2,7 @@
     <string name="app_name">Viewy</string>
     <string name="measurement_method_subtitle">Larga distancia · Altura conocida</string>
     <string name="camera_permission_explanation">Se necesita acceso a la cámara para apuntar. Viewy no toma ni guarda fotos.</string>
-    <string name="camera_permission_retry">Permitir cámara / reintentar</string>
     <string name="camera_permission_allow">Permitir cámara</string>
-    <string name="open_app_settings">Abrir ajustes de la aplicación</string>
     <string name="camera_retry">Reintentar cámara</string>
     <string name="measurement_stage_top">Apunta al extremo superior</string>
     <string name="measurement_stage_bottom">Apunta al extremo inferior</string>

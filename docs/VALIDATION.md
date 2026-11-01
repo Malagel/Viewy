@@ -34,6 +34,23 @@ language-independent regional extensions. Welcome can advance without a hardware
 discovery result. These tests do not recreate an Android
 Activity, execute permission dialogs or render Compose animations.
 
+Camera-permission regression tests distinguish pending requests from denial,
+prevent duplicate requests, retain the missing-permission explanation through
+pause/focus loss, preserve navigation/editor coverage, and keep acquisition gated
+until a real grant in the foreground. They cover explicit retry, settings recovery
+after an unrequestable denial, resume-time grant refresh and later revocation.
+On a developer-controlled device, skip camera access in setup, enter Known Object
+Height, dismiss its tutorial and save height. Tap Allow camera: the underlying
+explanation and single button must stay in place while Android prompts, with no
+retry label or second action flashing. Deny and retry, then grant; recovery should
+fade out only after the grant. The preview height action must remain absent while
+permission is missing and appear with zoom once the preview is ready. During the
+panel's exit, no outgoing action may be tapped, focused or read by TalkBack.
+Repeat in compact/status-dialog and exceptional
+viewfinder layouts, through recreation, and with permanent denial followed by
+Allow camera → Android app settings → grant → return. No camera or orientation
+work should start while permission is missing or Android owns focus.
+
 Developer device validation for onboarding remains required:
 
 - With fresh app data, verify Welcome → Permissions → Completion → Home, including

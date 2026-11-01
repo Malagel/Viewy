@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.provider.Settings
 import androidx.annotation.StringRes
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
@@ -31,6 +32,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
+import androidx.core.app.ActivityCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -73,9 +76,22 @@ fun ViewyScreen(
     animateHomeEntry: Boolean = false,
 ) {
     val context = LocalContext.current
+    val activity = LocalActivity.current
     val owner = LocalLifecycleOwner.current
-    var permission by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) }
-    var requested by rememberSaveable { mutableStateOf(false) }
+    val permissionSaver = remember(context) {
+        listSaver<CameraPermissionRecovery, Boolean>(
+            save = { listOf(it.requesting, it.needsSettings) },
+            restore = { CameraPermissionRecovery(
+                granted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED,
+                requesting = it[0], needsSettings = it[1],
+            ) },
+        )
+    }
+    var permissionRecovery by rememberSaveable(stateSaver = permissionSaver) {
+        mutableStateOf(CameraPermissionRecovery(
+            granted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED))
+    }
+    val permission = permissionRecovery.granted
     val editHeight = state.heightEditor != null
     val requestedCover = workspaceCover(state.heightConfigured, editHeight)
     var outgoingCover by remember(model, state.methodActivationId) { mutableStateOf(requestedCover) }
@@ -111,10 +127,14 @@ fun ViewyScreen(
             statusSnapshot = null
         }
     }
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { permission = it }
-    DisposableEffect(owner) {
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        permissionRecovery = permissionRecovery.result(granted,
+            canRequestAgain = activity?.let { ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.CAMERA) } ?: true)
+    }
+    DisposableEffect(owner, context) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) permission = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+            if (event == Lifecycle.Event.ON_RESUME) permissionRecovery = permissionRecovery.refresh(
+                ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
         }
         owner.lifecycle.addObserver(observer)
         onDispose { owner.lifecycle.removeObserver(observer) }
@@ -141,9 +161,16 @@ fun ViewyScreen(
     val textMeasurer = rememberTextMeasurer()
     val density = LocalDensity.current
     val previewStatusLabel = stringResource(R.string.preview_status)
-    val requestPermission = { requested = true; launcher.launch(Manifest.permission.CAMERA) }
-    val openSettings = {
-        context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:${context.packageName}".toUri()))
+    val requestPermission = {
+        when (permissionRecovery.action) {
+            CameraPermissionAction.REQUEST -> {
+                permissionRecovery = permissionRecovery.request()
+                launcher.launch(Manifest.permission.CAMERA)
+            }
+            CameraPermissionAction.OPEN_SETTINGS ->
+                context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:${context.packageName}".toUri()))
+            CameraPermissionAction.NONE -> Unit
+        }
     }
     val hint = state.guidance
     val captureRestriction = when (measurement.alignment) {
@@ -237,14 +264,24 @@ fun ViewyScreen(
                                                         .semantics { contentDescription = previewStatusLabel }) {
                                                         Text(if (recoveryNeeded || hint != null) "!" else "i")
                                                     }
-                                                } else if (recoveryNeeded) {
+                                                } else if (recoveryNeeded && permission && state.visibility.permissionGranted) {
                                                     Surface(Modifier.fillMaxWidth().align(Alignment.BottomCenter), color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.95f)) {
                                                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                            RecoveryControls(state, permission, requested, requestPermission, openSettings, model::retryCamera, model::restartOrientation)
+                                                            RecoveryControls(state, permissionRecovery, requestPermission, model::retryCamera, model::restartOrientation)
                                                         }
                                                     }
-                                                } else {
+                                                } else if (!recoveryNeeded) {
                                                     PreviewGuidance(hint, Modifier.align(Alignment.BottomCenter))
+                                                }
+                                            }
+                                            // Keep permission content composed through exit; it must not
+                                            // disappear as soon as the live grant changes to true.
+                                            PreviewControlFade(heightConfigured && !measurement.completed && !useStatusDialog &&
+                                                !permission && recoveryNeeded, Modifier.align(Alignment.BottomCenter)) {
+                                                Surface(Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.95f)) {
+                                                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                        CameraPermissionControls(permissionRecovery.requesting, requestPermission)
+                                                    }
                                                 }
                                             }
                                             MeasurementResultOverlay(measurement, unit, resultEntryMemory, state.viewfinderInteractive, editorBlocks, openHeight) { estimate ->
@@ -361,7 +398,7 @@ fun ViewyScreen(
                 if (!heightConfigured) TextButton(onClick = { showStatus = false; openHeight() }) { Text(stringResource(R.string.enter_height)) }
                 else {
                     // The dialog suspends hardware; retain the failure that prompted it.
-                    RecoveryControls(statusSnapshot ?: state, permission, requested, requestPermission, openSettings,
+                    RecoveryControls(statusSnapshot ?: state, permissionRecovery, requestPermission,
                         { showStatus = false }, { showStatus = false })
                     statusSnapshot?.guidance?.let { Text(stringResource(it)) }
                 }
@@ -373,23 +410,32 @@ fun ViewyScreen(
 
 @Composable
 private fun RecoveryControls(
-    state: MeasurementUiState, permission: Boolean, requested: Boolean,
-    onPermission: () -> Unit, onSettings: () -> Unit, onCameraRetry: () -> Unit, onOrientationRetry: () -> Unit,
+    state: MeasurementUiState, permission: CameraPermissionRecovery,
+    onPermission: () -> Unit, onCameraRetry: () -> Unit, onOrientationRetry: () -> Unit,
 ) {
-    when {
-        !permission && state.recoveryVisible -> {
-            Text(stringResource(R.string.camera_permission_explanation))
-            TextButton(onClick = onPermission) { Text(stringResource(if (requested) R.string.camera_permission_retry else R.string.camera_permission_allow)) }
-            if (requested) TextButton(onClick = onSettings) { Text(stringResource(R.string.open_app_settings)) }
+    PreviewControlFade(!permission.granted && state.recoveryVisible, Modifier) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            CameraPermissionControls(permission.requesting, onPermission)
         }
-        state.cameraFailureVisible && state.acquisitionEligible -> {
+    }
+    when {
+        permission.granted && state.cameraFailureVisible && state.acquisitionEligible -> {
             Text(stringResource(state.camera.messageRes))
             TextButton(onClick = onCameraRetry) { Text(stringResource(R.string.camera_retry)) }
         }
-        state.orientationFailureVisible -> {
+        permission.granted && state.orientationFailureVisible -> {
             Text(stringResource(R.string.guidance_orientation))
             TextButton(onClick = onOrientationRetry) { Text(stringResource(R.string.orientation_retry)) }
         }
+    }
+}
+
+@Composable
+private fun CameraPermissionControls(requesting: Boolean, onPermission: () -> Unit) {
+    Text(stringResource(R.string.camera_permission_explanation))
+    TextButton(onClick = onPermission, enabled = !requesting,
+        colors = ButtonDefaults.textButtonColors(disabledContentColor = MaterialTheme.colorScheme.primary)) {
+        Text(stringResource(R.string.camera_permission_allow))
     }
 }
 

@@ -537,7 +537,20 @@ ratio label stays visible with the controls, using nearly opaque surfaces.
 
 Capture requires a presented OPEN/STREAMING preview, a verified active ID on
 multi-camera devices, settled zoom and current orientation readiness. Permission
-is rechecked on resume; denial retains permission recovery controls. Camera readiness
+is rechecked on resume; denial retains permission recovery controls. The missing-permission explanation
+stays drawn on an uncovered viewfinder during Activity pause or window-focus loss,
+including while Android owns the permission dialog. Acquisition and height editing
+still require the existing resumed/focused gates. `CameraPermissionRecovery` keeps
+pending requests separate from denial. Its sole action always reads Allow camera;
+a denied result with no further rationale routes the next explicit tap to Android
+app settings, without launching settings automatically. Request and settings-recovery
+flags survive recreation; the grant itself is checked against Android on restore
+and resume. See [Android permission guidance](https://developer.android.com/training/permissions/requesting).
+The inline permission surface uses `PreviewControlFade`'s 225 ms opacity transition.
+Its static text/action stay composed through exit after the live grant changes;
+the shared guard immediately removes outgoing touch, focus and accessibility.
+This decorative exit does not delay or alter acquisition eligibility.
+Camera readiness
 alone never requests recovery UI. `CameraRecovery` distinguishes quiet binding/retry
 waiting from a failure requiring user action. `MeasurementResources` owns one
 cancelable main-thread scheduled retry: at most three replacement bindings after
@@ -606,7 +619,8 @@ sleep or image-brightness heuristic is used.
 `MeasurementUiState.previewVisible` supplies the same eligible-and-ready target
 for the live camera and zoom controls. The preview-edge height editor shares that
 target during acquisition, with an uncovered, focused recovery exception
-that keeps height editable without a live camera. On completion it is removed;
+that keeps height editable without a live camera after permission is granted.
+Missing camera permission always hides that editor. On completion it is removed;
 height editing belongs to the result panel’s object-height action. A shared
 preview-control row reserves zoom’s measured width and a 16 dp gap before giving
 the height action its remaining width. A full label falls back to a height cue,

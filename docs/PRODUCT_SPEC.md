@@ -397,8 +397,16 @@ future validated features; they have no selectable methods.
   camera/sensor sessions. Completed results retain their captured geometry after
   shutdown, overlays, backgrounding, Activity recreation and height correction
   until Restart or method exit; measurements are not persisted across process death.
-- Camera permission explanation, retry/settings access, and visible camera or
-  orientation unavailability with captures blocked.
+- Camera permission recovery has one **Allow camera** action. Its explanation and
+  button stay visible behind Android's permission dialog, without changing labels
+  or adding actions. Repeated taps are blocked while a request is pending. A denial
+  leaves recovery available; if another system prompt is unavailable, the same action
+  opens Android app settings on the next tap. Camera or orientation unavailability
+  remains visible with captures blocked.
+  Granting access fades out the inline permission panel instead of removing it
+  abruptly. The fading panel cannot receive input or accessibility focus. The
+  preview-edge height editor is absent until camera permission is granted; it
+  appears with the preview/zoom controls or granted-camera recovery.
 - Material 3 baseline dark colors across the app, launch window and system bars,
   independent of the system theme. Neutral surfaces use restrained lavender accents.
 - Home and methods share exact wordmark/Settings positions: common compact sizing
