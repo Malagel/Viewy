@@ -16,7 +16,17 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import com.malagel.viewy.onboarding.OnboardingViewModel
+import com.malagel.viewy.ui.OnboardingScreen
+import com.malagel.viewy.ui.NavigationInputGuard
 import com.malagel.viewy.ui.MeasurementViewModel
 import com.malagel.viewy.ui.ViewyScreen
 import com.malagel.viewy.ui.theme.ViewyTheme
@@ -25,6 +35,7 @@ class MainActivity : AppCompatActivity() {
     private val measurement by lazy { ViewModelProvider(this)[MeasurementViewModel::class.java] }
 
     private val settings by lazy { ViewModelProvider(this)[SettingsViewModel::class.java] }
+    private val onboarding by lazy { ViewModelProvider(this)[OnboardingViewModel::class.java] }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,17 +48,33 @@ class MainActivity : AppCompatActivity() {
                 val state by measurement.state.collectAsStateWithLifecycle()
                 val preferences by settings.state.collectAsStateWithLifecycle()
                 val loaded = preferences.preferences
+                var onboardingPresented by rememberSaveable { mutableStateOf(false) }
                 when {
                     preferences.reset == ResetStatus.ACCEPTED -> Surface(Modifier.fillMaxSize()) {
                         Box(contentAlignment = Alignment.Center) { Text(stringResource(R.string.reset_requested)) }
                     }
                     loaded != null -> {
-                        ViewyScreen(state, measurement, loaded.units.heightUnit, settings::open,
-                            diagnosticsEnabled = loaded.diagnosticsEnabled,
-                            settingsOpen = preferences.destination != SettingsDestination.CLOSED,
-                            settingsContent = { backdropOnly, interactive -> SettingsScreen(preferences, settings, backdropOnly, interactive) },
-                            animateHomeEntry = savedInstanceState == null,
-                        )
+                        if (!loaded.onboardingCompleted) SideEffect { onboardingPresented = true }
+                        val startup = updateTransition(loaded.onboardingCompleted, label = "Application startup")
+                        val moving = startup.currentState != startup.targetState || startup.isRunning
+                        startup.AnimatedContent(Modifier.fillMaxSize(), transitionSpec = {
+                            (fadeIn(tween(180)) togetherWith fadeOut(tween(120))).using(null)
+                        }) { completed ->
+                            NavigationInputGuard(moving || completed != loaded.onboardingCompleted, Modifier.fillMaxSize()) {
+                                if (!completed) {
+                                    val introduction by onboarding.state.collectAsStateWithLifecycle()
+                                    OnboardingScreen(introduction, onboarding, preferences, settings::completeOnboarding, settings::retryLoading,
+                                        animateEntry = savedInstanceState == null)
+                                } else {
+                                    ViewyScreen(state, measurement, loaded.units.heightUnit, settings::open,
+                                        diagnosticsEnabled = loaded.diagnosticsEnabled,
+                                        settingsOpen = preferences.destination != SettingsDestination.CLOSED,
+                                        settingsContent = { backdropOnly, interactive -> SettingsScreen(preferences, settings, backdropOnly, interactive) },
+                                        animateHomeEntry = savedInstanceState == null && !onboardingPresented,
+                                    )
+                                }
+                            }
+                        }
                     }
                     else -> Surface(Modifier.fillMaxSize()) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {

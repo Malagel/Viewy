@@ -32,7 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.malagel.viewy.R
 
-private val ViewyWordmarkFont = FontFamily(Font(R.font.nunito_bold, weight = FontWeight.Bold))
+internal val ViewyWordmarkFont = FontFamily(Font(R.font.nunito_bold, weight = FontWeight.Bold))
 
 @Composable
 internal fun ViewyHeader(compact: Boolean, overflow: Boolean, active: Boolean, onHelp: () -> Unit, onCloseWorkspace: () -> Unit, onSettings: () -> Unit, diagnosticsEnabled: Boolean = false, onDiagnostics: () -> Unit = {}) {

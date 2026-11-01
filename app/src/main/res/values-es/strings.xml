@@ -244,4 +244,16 @@
         <item quantity="many">Máximo de %1$d dígitos</item>
         <item quantity="other">Máximo de %1$d dígitos</item>
     </plurals>
+
+    <string name="onboarding_welcome">Bienvenido a Viewy</string>
+    <string name="onboarding_description">Viewy utiliza los sensores y la cámara de tu teléfono para realizar mediciones del mundo real. No necesitas equipo adicional.</string>
+    <string name="onboarding_permissions">Permisos</string>
+    <string name="onboarding_camera">Cámara</string>
+    <string name="onboarding_permission_granted">Permitido</string>
+    <string name="onboarding_permission_denied">Acceso rechazado. Puedes permitirlo más adelante.</string>
+    <string name="onboarding_not_now">Ahora no</string>
+    <string name="onboarding_continue">Continuar</string>
+    <string name="onboarding_complete">Todo listo!</string>
+    <string name="onboarding_enter">Continuar a Viewy</string>
+    <string name="onboarding_accuracy_disclaimer">La precisión depende del dispositivo y de las condiciones de medición.</string>
 </resources>

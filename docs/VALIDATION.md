@@ -21,6 +21,47 @@ Android builds are unnecessary. Follow [AGENTS.md](../AGENTS.md) for resource an
 device restrictions. Run only checks relevant to the change; recorded results below do not imply
 that these commands have been rerun on every revision.
 
+Onboarding JVM coverage exercises three-page forward/Back state, stale callback
+suppression, retained temporary navigation versus fresh-process state, permission
+grant/denial/skip/resume refresh, inactive acquisition and later contextual grant.
+Real temporary Preferences DataStores cover incomplete/completed restart, fresh
+storage after reset, legacy preference preservation, regional initialization
+before the first snapshot, Settings overrides and completion-version retention.
+Injected storage failures and suspended/canceled writes cover retry and ensure
+completion is not visible before commit. Regional-policy tests cover Metric,
+Imperial, mixed/unknown regions, API 23–27 fallback, ICU mappings/failure and
+language-independent regional extensions. Welcome can advance without a hardware
+discovery result. These tests do not recreate an Android
+Activity, execute permission dialogs or render Compose animations.
+
+Developer device validation for onboarding remains required:
+
+- With fresh app data, verify Welcome → Permissions → Completion → Home, including
+  Back, rapid repeated taps, recreation on each page, and process termination before
+  the final action. Restart after completion must go directly to Home. Confirm
+  Home has no entrance animation behind onboarding or blank completion frame.
+- Exercise already-granted, granted, denied and skipped Camera access. No prompt
+  should launch automatically. After skipping/denying, enter Known Object Height,
+  dismiss its tutorial and save height; use its existing permission recovery, then
+  return from Android app settings and confirm the grant is refreshed.
+- Check English/Spanish on compact windows, maximum font size, TalkBack, gesture
+  and button navigation, and normal/slow/disabled animator duration scales.
+  All prose/actions must remain reachable and moving pages must be inaccessible.
+  Confirm the enlarged wordmark stays on one line and the rounded page headings
+  wrap readably. Setup should fade upward once, with no entrance replay after
+  recreation. Verify the raised Continue and matching tonal Not now controls.
+  Compare the camera card before/after granting, denying and granting through
+  Android Settings: its position and bounds must remain identical while labels
+  and explanations crossfade. Hidden permission actions and the faded-out Not now
+  slot must not be accessible or focusable. Repeat with disabled motion.
+- Check regional initialization on API 23–27 and 28+ with US, Chile and UK regions,
+  including a different app-language override. Change units in Settings and relaunch;
+  the explicit choice must survive. Reset app data only when intentionally testing
+  deletion; it should restore onboarding and initialize units again.
+- Confirm Welcome shows only the static accuracy disclaimer, with no compatibility
+  status or wait. Setup must leave camera privacy indicators and sensor acquisition
+  inactive.
+
 JVM coverage in `app/src/test` exercises geometry/invariance, typed failures,
 conditioning and conditional bounds; quaternion signs/order/formats and poles;
 spherical steadiness statistics, timestamps, discontinuities, reliability and

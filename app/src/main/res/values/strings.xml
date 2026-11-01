@@ -246,4 +246,16 @@
         <item quantity="other">Maximum %1$d digits</item>
     </plurals>
     <string name="documentation_wip" translatable="false">WIP</string>
+
+    <string name="onboarding_welcome">Welcome to Viewy</string>
+    <string name="onboarding_description">Viewy uses your phone’s sensors and camera to take real-world measurements. No additional equipment needed.</string>
+    <string name="onboarding_permissions">Permissions</string>
+    <string name="onboarding_camera">Camera</string>
+    <string name="onboarding_permission_granted">Allowed</string>
+    <string name="onboarding_permission_denied">Camera access was declined. You can allow it later when measuring.</string>
+    <string name="onboarding_not_now">Not now</string>
+    <string name="onboarding_continue">Continue</string>
+    <string name="onboarding_complete">You\'re all set!</string>
+    <string name="onboarding_enter">Continue to Viewy</string>
+    <string name="onboarding_accuracy_disclaimer">Accuracy depends on your device and measurement conditions.</string>
 </resources>

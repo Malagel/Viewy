@@ -7,7 +7,10 @@ two aiming directions. Application ID: `com.malagel.viewy`.
 
 ## Basic usage
 
-1. Viewy opens Home with no active measurement. Tap **Long Distance**,
+1. On first launch, continue through Welcome, Permissions and Completion. Camera
+   access is optional here and can be allowed later in a measurement method.
+   Units initialize from the device region and remain changeable in Settings.
+   Subsequent launches open Home with no active measurement. Tap **Long Distance**,
    then **Known Object Height**. Before height entry, Android Back returns to the method list;
    **Home** returns directly to all modes.
    Mode/method lists slide inside the card. Measurement fades in from the right;

@@ -829,7 +829,63 @@ one shared title/back layout: 16 dp top, 8 dp bottom/horizontal spacing below th
 host-owned system insets. It keeps the existing full back-button touch target;
 Diagnostics retains its intentionally scrollable header in constrained workspaces.
 
+## Startup and onboarding
+
+`MainActivity` waits for the existing Settings preference snapshot, then mounts
+either onboarding or the established `ViewyScreen`. Home/measurement UI is not
+composed behind onboarding. The Activity retains its existing ViewModel ownership
+and lifecycle forwarding; the inactive measurement state cannot acquire hardware.
+Completing onboarding crossfades into Home without also running Home's launch fade.
+Subsequent launches retain the normal Home entrance. Compose duration scaling
+applies to the 220 ms page slides and startup fade; navigation guards suppress
+moving/outgoing input, focus and accessibility. Recreated pages initialize settled.
+Onboarding has a 300 ms opacity/upward entrance on fresh Activity creation,
+without replay on page changes or recreation. The wordmark fits on one line with
+Foundation text autosizing; its bundled rounded font also styles the larger
+Permissions and Completion headings. Primary actions sit above the navigation inset.
+
+`OnboardingViewModel` retains temporary page and permission state across
+Activity recreation, with no process-death page restoration. Page-aware callbacks
+reject repeated stale navigation. A typed permission list currently contains only
+CAMERA. An Activity Result launcher requests permission solely on an explicit tap;
+initial mounting and lifecycle resume refresh the platform grant. Grant, denial
+and skipping never persist completion. Measurement retains its own contextual
+launcher, resume refresh and app-settings recovery, with no automatic request.
+The permission action, explanations and tonal skip button retain their measured
+slots while their content crossfades over 180 ms. Hidden content loses semantics
+and its actions are disabled immediately, without changing the card's position
+or bounds after a grant, denial or return from Android Settings. Permission-card
+padding is reduced only at the top. All onboarding motion uses Compose duration
+scaling, including immediate completion with disabled system animations.
+
+`AppPreferences.onboardingVersion` defaults to zero; version 1 or greater is
+complete. Only the final action writes `onboarding_version` in the existing
+Settings DataStore through `SettingsViewModel`'s serialized write/error/retry path.
+Home is gated on the persisted snapshot, so failed or interrupted uncommitted
+writes cannot advance startup. Existing preferences are preserved, newer completion
+versions are not downgraded, and clearing app data naturally restores onboarding.
+
+Welcome's accuracy disclaimer is static and localized. Setup performs no hardware
+discovery, compatibility checks, camera initialization or sensor registration.
+Permission state is read independently of hardware readiness; actual measurement
+retains its existing runtime camera and orientation validation.
+
 ## Settings, locales and application-data reset
+
+Before emitting a preference snapshot, `AppPreferencesRepository` atomically
+initializes a missing `measurement_units` key. The initializer runs only for a
+missing key; legacy choices and serialized Settings edits win. Initialization
+failures follow the existing loading/error/Retry path without publishing default
+units. No separate settings store or changes to canonical meter values exist.
+
+The regional initializer reads system resources, bypassing application-language
+overrides. A known region is required; Unicode regional/measurement overrides are
+recognized. On API 28+, Android's
+[`LocaleData.getMeasurementSystem`](https://developer.android.com/reference/android/icu/util/LocaleData#getMeasurementSystem(android.icu.util.ULocale))
+maps US to Imperial and SI/UK to Metric. The UK region defaults to Metric. On API
+23–27, US/Liberia/Myanmar default to Imperial and other known regions to Metric,
+without calling ICU. Missing, unknown or failed information defaults to Metric.
+The saved result is not recalculated on later launches or language changes.
 
 `SettingsViewModel` exposes immutable preference snapshots and explicit initial
 loading, write and storage-error states. Measurement UI waits for the first saved
@@ -931,7 +987,7 @@ root buildscript to match the Compose compiler; do not also apply Kotlin Android
 JUnit 4 supports JVM tests. Camera2 interop opt-in stays in the camera adapter.
 The manifest requests CAMERA and removes the transitive network-state permission;
 there are no Internet, microphone, location or storage permissions. No navigation or dependency-injection framework is implemented. Preferences
-DataStore stores units/diagnostics; only tutorial completion uses its dedicated
+DataStore stores units, diagnostics and onboarding completion; only tutorial completion uses its dedicated
 SharedPreferences. Android/AppCompat owns locale persistence. Selection, settings
 navigation and workflow state remain in memory.
 

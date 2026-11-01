@@ -16,7 +16,26 @@ future validated features; they have no selectable methods.
 
 ## Implemented behavior
 
-- Each fresh application session opens Home with Viewy's wordmark and Settings,
+- Before onboarding is completed, startup presents exactly three screens:
+  **Welcome to Viewy**, **Permissions**, and **You're all set!** Welcome introduces
+  approximate real-world measurement, with a prominent rounded Viewy wordmark and
+  a static disclaimer that accuracy depends on the device and measurement conditions.
+  Setup performs no hardware compatibility check or acquisition, and Continue is
+  available immediately after its entrance animation. Permissions and Completion
+  use larger rounded headings. Setup enters with a short fade and subtle upward
+  motion; Activity recreation shows the retained page directly.
+  Permissions lists Camera with an explicit Android permission action and its
+  granted state. Denial, **Not now**, and **Continue** all allow progress; no request
+  launches automatically. Contextual camera recovery remains available in methods.
+  **Not now** uses a full-width tonal button matching Continue's shape and size.
+  Camera permission changes crossfade within stable card bounds; granting access
+  fades out Not now while preserving its space so the card stays anchored.
+  Only **Continue to Viewy** persists completion before entering Home. Write failures
+  retain onboarding and expose storage Retry. Back returns one screen, exiting
+  normally from Welcome. Activity recreation retains the current screen; an
+  unfinished process restart begins at Welcome. English/Spanish, system insets,
+  scrollable prose, large text and system-scaled short slides are supported.
+- After completed onboarding, each fresh application session opens Home with Viewy's wordmark and Settings,
   fading in over 300 ms without vertical movement. In-app returns retain their
   existing navigation motion; Activity recreation does not replay the launch fade.
   Home opens without an active method, camera preview, capture controls, permission prompt or
@@ -128,7 +147,11 @@ future validated features; they have no selectable methods.
   Opening Settings preserves the selected method, height and completed result,
   suspends acquisition and discards an incomplete endpoint pair. Acquisition
   resumes only after the covering surface finishes closing.
-- Units default to Metric (meters); Imperial uses decimal feet for heights and
+- Units initialize once from the device's regional measurement preferences,
+  independently of app language. Android 28+ uses ICU; older versions use regional
+  defaults. Mixed-system regions such as the UK and unknown regions default to
+  Metric. Existing saved preferences and later Settings choices always take
+  priority. Metric uses meters; Imperial uses decimal feet for heights and
   short distances; long results automatically use kilometers or miles as described
   below. Tapping the units row switches immediately, including existing
   results. Height entry defaults to meters or decimal feet and offers a local
@@ -162,8 +185,8 @@ future validated features; they have no selectable methods.
   preferences/tutorial removal and app closure. Cancel changes nothing. Android
   performs the full storage clear and permission revocation without uninstalling.
   A rejected/failed request shows an error; an accepted request is not reported as
-  completed and does not relaunch the app. Manual reopening starts at Home with
-  Metric, diagnostics off, device language and first-use help eligible.
+  completed and does not relaunch the app. Manual reopening starts onboarding with
+  regionally initialized units, diagnostics off, device language and first-use help eligible.
 - Restart is a circular
   arrow control matching Home on the left of capture; the control row is raised
   above the navigation inset for easier thumb access. Capture availability changes
