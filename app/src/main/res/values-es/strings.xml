@@ -21,7 +21,7 @@
     <string name="height_edit">Altura del objeto: %1$s %2$s · Editar</string>
     <string name="result_horizontal_distance">Distancia horizontal</string>
     <string name="result_elevation_difference">Diferencia de elevación: %1$s°</string>
-    <string name="result_disclaimer">Resultado aproximado. Siga las instrucciones para tener el mejor resultado posible.</string>
+    <string name="result_disclaimer">La precisión depende del uso correcto. Siga las instrucciones para tener el mejor resultado posible.</string>
     <string name="guidance_keep_steady">Mantén la cámara fija.</string>
     <string name="guidance_near_vertical">No se puede alinear en este ángulo.</string>
     <string name="guidance_orientation">Sensor de orientación no disponible. Reintenta la orientación para iniciar una nueva sesión.</string>
@@ -74,11 +74,11 @@
     <string name="tutorial_important">Importante</string>
     <string name="tutorial_how_it_works">¿Cómo funciona?</string>
     <string name="tutorial_next_section">Siguiente sección: %1$s</string>
-    <string name="tutorial_known_height_tips">Sigue estos consejos para obtener los mejores resultados posibles</string>
+    <string name="tutorial_known_height_tips">Sigue estos consejos para obtener los mejores resultados posibles:</string>
     <string name="tutorial_known_height_tip_1">Mantente en el mismo lugar y conserva la posición del teléfono durante toda la medición.</string>
     <string name="tutorial_known_height_tip_2">Intenta apuntar ambas capturas en la misma dirección, moviendo el teléfono solo verticalmente.</string>
     <string name="tutorial_known_height_tip_3">Asegúrate de usar el zoom para conseguir una captura precisa y estable.</string>
-    <string name="tutorial_known_height_tip_4">Lo ideal es usar un objeto cuya altura conozcas de antemano.</string>
+    <string name="tutorial_known_height_tip_4">Lo mejor es usar un objeto cuya altura exacta conozcas de antemano.</string>
     <string name="tutorial_go_back">Volver</string>
     <string name="tutorial_steps">Realizar una medición</string>
     <string name="tutorial_known_height_intro">Obtén la distancia aproximada a un objeto cuya altura conoces.</string>

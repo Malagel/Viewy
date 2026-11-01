@@ -21,7 +21,7 @@
     <string name="height_edit">Object height: %1$s %2$s · Edit</string>
     <string name="result_horizontal_distance">Horizontal distance</string>
     <string name="result_elevation_difference">Elevation difference: %1$s°</string>
-    <string name="result_disclaimer">Approximate result. Follow the instructions to get the best results.</string>
+    <string name="result_disclaimer">Precision depends on the correct usage. Follow the instructions to get the best results possible.</string>
     <string name="guidance_keep_steady">Keep the camera steady.</string>
     <string name="guidance_near_vertical">Cannot align at this angle.</string>
     <string name="guidance_orientation">Orientation sensor unavailable.</string>
@@ -78,7 +78,7 @@
     <string name="tutorial_known_height_tip_1">Keep yourself and your phone in the same place the whole time.</string>
     <string name="tutorial_known_height_tip_2">Try pointing both shots in the same direction, only moving the phone vertically.</string>
     <string name="tutorial_known_height_tip_3">Make sure to use the zoom to get a precise and steady shot.</string>
-    <string name="tutorial_known_height_tip_4">Ideally, use an object whose height you know beforehand.</string>
+    <string name="tutorial_known_height_tip_4">Ideally, use an object whose exact height you know beforehand.</string>
     <string name="tutorial_go_back">Go back</string>
     <string name="tutorial_steps">Take a measurement</string>
 
