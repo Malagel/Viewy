@@ -955,8 +955,18 @@ destination rather than replaying entrance; no animation state is persisted.
 The platform launch theme inherits dark `Theme.AppCompat.NoActionBar`; Compose
 keeps its existing Material 3 dark scheme and edge-to-edge setup. The locale config
 advertises English and Spanish to Android 13+ system settings.
-`AppCompatDelegate.setApplicationLocales` uses an empty list for device language;
-`getApplicationLocales` supplies the current choice, including system changes.
+`AppCompatDelegate.getApplicationLocales` supplies the Android-owned override,
+including system changes. An empty list retains automatic device-language behavior
+and is never replaced with a persisted initial selection. The picker resolves the
+first supported language from the override followed by the current configuration
+locale list, falling back to English. It exposes only English and Spanish; tapping
+either always writes that explicit override with `setApplicationLocales`, even
+when the effective language stays the same. Existing empty overrides need no
+migration. Clearing an override through Android system settings restores automatic
+behavior. Resource packaging is restricted to English and Spanish so dependency
+translations cannot expand Android's supported-language matching. One English-qualified
+label makes English discoverable during ordered resource matching; the complete
+default strings remain the English fallback.
 AppCompat's `autoStoreLocales` metadata enables app-private storage on API 31–32
 and migration to system-managed locales on newer Android. Text and formatting use
 the Activity's localized resources/Compose locale; the application-context sensor

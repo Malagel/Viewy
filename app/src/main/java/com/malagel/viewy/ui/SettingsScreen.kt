@@ -99,6 +99,8 @@ fun SettingsScreen(state: SettingsUiState, model: SettingsViewModel, backdropOnl
 /** Each AnimatedContent entry renders its own page, including its own scroll state. */
 @Composable
 private fun SettingsPage(state: SettingsUiState, model: SettingsViewModel, page: SettingsDestination, interactive: Boolean) {
+    // Observing configuration refreshes both the summary and radio choice in place.
+    val configuredTags = LocalConfiguration.current.locales.toLanguageTags()
     Column(Modifier.fillMaxSize()) {
         ScreenHeader(onBack = { if (interactive) model.back() }, enabled = !state.resetLocked,
             title = stringResource(when (page) {
@@ -115,14 +117,11 @@ private fun SettingsPage(state: SettingsUiState, model: SettingsViewModel, page:
                     SettingsRow(stringResource(R.string.measurement_units), state.preferences?.let {
                         stringResource(if (it.units == MeasurementUnits.METRIC) R.string.metric else R.string.imperial)
                     } ?: stringResource(R.string.settings_loading), state.canEdit) { if (interactive) model.switchUnits() }
-                    SettingsRow(stringResource(R.string.language), languageName(AppLanguages.current()), !state.resetLocked) { if (interactive) model.languages() }
+                    SettingsRow(stringResource(R.string.language), languageName(AppLanguages.current(configuredTags)), !state.resetLocked) { if (interactive) model.languages() }
                     SettingsRow(stringResource(R.string.developer_options), enabled = !state.resetLocked) { if (interactive) model.developer() }
                 }
                 SettingsDestination.LANGUAGE -> {
-                    // A new override can have the same effective language as the device,
-                    // so refresh the Android-owned choice even without recreation.
-                    var requests by remember { mutableIntStateOf(0) }
-                    val current = remember(LocalConfiguration.current, requests) { AppLanguages.current() }
+                    val current = AppLanguages.current(configuredTags)
                     AppLanguage.entries.forEach { language ->
                         ListItem(
                             headlineContent = { Text(languageName(language)) },
@@ -131,7 +130,6 @@ private fun SettingsPage(state: SettingsUiState, model: SettingsViewModel, page:
                                 enabled = !state.resetLocked, onClick = {
                                     if (interactive) {
                                         model.selectLanguage(language)
-                                        requests++
                                     }
                                 }),
                         )
@@ -168,7 +166,6 @@ private fun SettingsRow(title: String, value: String? = null, enabled: Boolean =
 
 @Composable
 private fun languageName(language: AppLanguage): String = when (language) {
-    AppLanguage.DEVICE -> stringResource(R.string.language_device)
     AppLanguage.ENGLISH -> stringResource(R.string.language_english)
     AppLanguage.SPANISH -> stringResource(R.string.language_spanish)
 }

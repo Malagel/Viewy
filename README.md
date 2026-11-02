@@ -51,7 +51,9 @@ Small windows or large text offer status/details dialogs; **Open viewfinder**
 opens a scrollable workspace in exceptionally constrained layouts. Help stays
 scrollable in its centered card. The top-right gear opens Settings at any time
 outside another modal. Tap **Measurement units** to switch Metric/Imperial, or
-**Language** to select **English**, **Español**, or **Use device language** (default).
+**Language** to select **English** or **Español**. Until a language is selected,
+Viewy follows the first supported device language in preference order, falling back
+to English. A manual selection overrides device preferences across restarts.
 Changes save automatically. Settings, diagnostics, tutorials, selection and height
 editing suspend camera/sensor work and discard incomplete endpoint pairs. Entered
 height, keypad draft and completed results remain available through Settings and

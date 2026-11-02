@@ -11,14 +11,41 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SettingsPresentationTest {
-    @Test fun deviceEnglishAndSpanishMapToAndroidLanguageTags() {
-        assertEquals("", AppLanguage.DEVICE.tags)
-        assertEquals("en", AppLanguage.ENGLISH.tags)
-        assertEquals("es", AppLanguage.SPANISH.tags)
-        for (choice in AppLanguage.entries) assertEquals(choice, AppLanguage.fromTags(choice.tags))
-        assertEquals(AppLanguage.SPANISH, AppLanguage.fromTags("es-CL,en"))
-        assertEquals(AppLanguage.ENGLISH, AppLanguage.fromTags("en-US"))
-        assertEquals(AppLanguage.DEVICE, AppLanguage.fromTags(""))
+    @Test fun onlyEnglishAndSpanishAreSelectable() {
+        assertEquals(listOf("en", "es"), AppLanguage.entries.map { it.tags })
+        for (choice in AppLanguage.entries) assertEquals(choice, AppLanguage.resolve(choice.tags, ""))
+    }
+
+    @Test fun automaticLanguageUsesTheFirstSupportedDevicePreferenceOrEnglish() {
+        for ((tags, expected) in listOf(
+            "es-CL" to AppLanguage.SPANISH,
+            "en-US" to AppLanguage.ENGLISH,
+            "fr-FR" to AppLanguage.ENGLISH,
+            "fr-FR,es-CL,en-US" to AppLanguage.SPANISH,
+            "fr-FR,en-US,es-CL" to AppLanguage.ENGLISH,
+            "es-CL,en-US" to AppLanguage.SPANISH,
+            "en-US,es-CL" to AppLanguage.ENGLISH,
+            "ja-JP,de-DE" to AppLanguage.ENGLISH,
+            "" to AppLanguage.ENGLISH,
+        )) assertEquals(tags, expected, AppLanguage.resolve("", tags))
+    }
+
+    @Test fun androidOwnedOverridesWinOverDeviceChanges() {
+        for (choice in AppLanguage.entries) {
+            // Both in-app and system per-app selections are represented by Android's locale tags.
+            val androidTags = choice.tags
+            for (deviceTags in listOf("en-US", "es-CL", "fr-FR,es-ES")) {
+                assertEquals(choice, AppLanguage.resolve(androidTags, deviceTags))
+            }
+        }
+    }
+
+    @Test fun emptyLegacyOverrideContinuesFollowingDeviceChanges() {
+        // Existing automatic installations and a system-level reset both have an empty override.
+        val androidTags = ""
+        assertEquals(AppLanguage.ENGLISH, AppLanguage.resolve(androidTags, "en-US"))
+        assertEquals(AppLanguage.SPANISH, AppLanguage.resolve(androidTags, "fr-FR,es-CL"))
+        assertEquals(AppLanguage.ENGLISH, AppLanguage.resolve(androidTags, "de-DE"))
     }
 
     @Test fun settingsBackReturnsThroughTheParentAndFreshSessionsStartClosed() {
@@ -65,7 +92,7 @@ class SettingsPresentationTest {
     @Test fun languageApplicationKeepsTheSelectorVisibleUntilExplicitBack() {
         val settings = SettingsUiState(preferences = AppPreferences()).open().languages()
         val requests = mutableListOf<AppLanguage>()
-        for (language in listOf(AppLanguage.SPANISH, AppLanguage.ENGLISH, AppLanguage.DEVICE, AppLanguage.ENGLISH)) {
+        for (language in listOf(AppLanguage.SPANISH, AppLanguage.ENGLISH, AppLanguage.ENGLISH)) {
             settings.selectLanguage(language) { choice ->
                 // Locale application must keep the language selector active.
                 assertEquals(SettingsDestination.LANGUAGE, settings.destination)
@@ -73,7 +100,7 @@ class SettingsPresentationTest {
             }
             assertEquals(SettingsDestination.LANGUAGE, settings.destination)
         }
-        assertEquals(listOf(AppLanguage.SPANISH, AppLanguage.ENGLISH, AppLanguage.DEVICE, AppLanguage.ENGLISH), requests)
+        assertEquals(listOf(AppLanguage.SPANISH, AppLanguage.ENGLISH, AppLanguage.ENGLISH), requests)
         assertEquals(SettingsDestination.MAIN, settings.back().destination)
         for (blocked in listOf(settings.back(), settings.back().back(),
             settings.copy(reset = ResetStatus.REQUESTING), settings.copy(reset = ResetStatus.ACCEPTED))) {

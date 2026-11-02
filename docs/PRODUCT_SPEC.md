@@ -160,8 +160,12 @@ future validated features; they have no selectable methods.
   m/cm or ft/in toggle without changing the global preference.
   Stored physical values remain in meters; changing units neither edits height nor
   recalculates geometry or resets captures. Presentation rounding never changes stored values.
-- Language defaults to **Use device language**, with **English** and **Español**
-  overrides. Unsupported device languages fall back to English. Android per-app
+- Language automatically follows the first supported device language in preference
+  order, falling back to English when none is supported. Settings lists only
+  **English** and **Español**, with the effective language selected. An explicit
+  choice, even of the currently active language, persists across restarts and
+  overrides subsequent device language changes. Without an override, device
+  language changes continue to apply, including for existing installations. Android per-app
   language settings and the in-app picker share the same override on Android 13+;
   AppCompat supports Android 12 and 12L. Language changes update text and number
   formatting in place, without restarting the Activity or blanking the screen.

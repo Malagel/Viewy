@@ -29,7 +29,15 @@ class LocalizedResourcesTest {
                 placeholders.findAll(text).map { it.value }.toList())
         }
         assertEquals("Ajustes", spanish.getValue("settings"))
-        assertEquals("Use device language", english.getValue("language_device"))
+        assertFalse(english.containsKey("language_device"))
+        assertFalse(spanish.containsKey("language_device"))
+    }
+
+    @Test fun englishHasAnExplicitResourceLocaleForOrderedDeviceMatching() {
+        // Without an English-qualified resource, Android can skip English in favor of Spanish
+        // later in the preference list, even though the default resources contain English.
+        assertEquals(strings("values/strings.xml").getValue("language"),
+            strings("values-en/strings.xml").getValue("language"))
     }
 
     @Test fun systemLanguagePickerAdvertisesExactlyEnglishAndSpanish() {

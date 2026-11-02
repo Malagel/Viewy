@@ -91,7 +91,6 @@
     <string name="metric">Métricas</string>
     <string name="imperial">Imperiales</string>
     <string name="language">Idioma</string>
-    <string name="language_device">Usar idioma del dispositivo</string>
     <string name="developer_options">Opciones de desarrollador</string>
     <string name="enable_diagnostics">Activar diagnóstico</string>
     <string name="erase_app_data">Borrar todos los datos de la aplicación</string>

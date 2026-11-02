@@ -67,6 +67,11 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    androidResources {
+        // Dependency translations must not expand the languages Android considers supported.
+        localeFilters += listOf("en", "es")
+    }
+
     buildFeatures {
         compose = true
         buildConfig = true
