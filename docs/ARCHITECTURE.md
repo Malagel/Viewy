@@ -196,15 +196,64 @@ The link keeps a 48 dp touch target and button semantics; a null indication
 removes hover/press brightness changes without changing its normal theme color. Its decorative
 6 sp bullet markers align with the first body-text line.
 
-The documentation link opens an opaque full-screen WIP surface in the existing modal
-host. The tutorial stays mounted with its page and scroll position, hidden from input,
-focus and accessibility. `TutorialCard.documentationOpen` is retained in the ViewModel;
-only Important can open it. The coordinator rejects covered page changes and obsolete
-card IDs. Android Back or the placeholder's `NavigationBackButton` closes only that
-surface, retaining Important and leaving completion unwritten. The shared back-arrow
-component reserves a 48 dp touch target around a 44 × 32 dp rounded visual and a
-20 dp arrow, with localized destination labels. The method selector preserves both
-container and icon colors while disabled; interaction stays blocked. No documentation prose or equation-rendering code remains.
+The documentation link opens `MethodDocumentationScreen` in the existing modal
+host. The tutorial stays mounted with its page and saveable per-page scroll position,
+hidden from input, focus and accessibility through documentation exit completion.
+Coverage stops any remaining prose fling at its opening offset, preventing hidden
+scroll motion from changing the page awaiting return.
+`TutorialCard.documentationOpen` remains the sole retained navigation destination;
+only Important can open it. The coordinator rejects duplicate opens, covered page
+changes and obsolete card IDs. No measurement or acquisition state is changed by
+local documentation navigation, and the tutorial continues to suspend acquisition.
+
+One Boolean Compose transition slides documentation from the physical right and
+fades it over 260 ms with FastOutSlowIn easing; the tutorial shifts 24 dp left.
+Only graphics layers read the animated fraction. Android duration scaling applies,
+including disabled animations; recreated hosts initialize at the retained destination.
+Coverage includes reversed entrances until motion completes. Moving documentation
+and covered tutorial controls lose touch, keyboard focus and accessibility access.
+Android Back can reverse entrance and is consumed during exit. Predictive Back
+commits navigation only after gesture completion; cancellation leaves the destination
+unchanged. The top-left shared back arrow closes only documentation. Help completion
+is still recorded only on tutorial dismissal. The shared back-arrow component reserves
+a 48 dp touch target around a 44 × 32 dp rounded visual and a 20 dp arrow, with
+localized destination labels. The method selector preserves both container and icon
+colors while disabled; interaction stays blocked.
+
+`MethodDocumentationContent` selects resource-backed blocks by `MeasurementMethod`,
+independently of translated titles. Content is created only when documentation is
+mounted. Headings/subheadings, paragraphs, bullet lists and images render in a
+simple vertically scrollable Column with a 720 dp maximum prose width; short documents
+do not need lazy virtualization. `ScreenHeader` uses the localized
+**How does it work?** title and stays fixed
+below content-owned system bar/cutout insets. The documentation Surface fills the
+dialog window outside the tutorial card's inset container, coloring the status and
+navigation areas with its theme background through entrance and exit. The dialog
+uses transparent system bars with light icons and disables platform contrast scrims;
+transparent bar-color setters also cover older Android and dialog-window behavior.
+Text uses Material typography and Android font scaling. Documentation
+scroll state is independent of tutorial paging and saveable across Activity recreation.
+The initial English/Spanish entry identifies pending reference material without
+inventing mathematics or implying calibrated accuracy.
+
+To edit documentation:
+
+1. Add or update matching string resources in `values/strings.xml` and
+   `values-es/strings.xml`.
+2. Edit the method's ordered blocks in `MethodDocumentationContent.kt`. Register
+   future implemented methods by their enum identity, alongside their tutorial.
+3. Add pre-rendered equations or illustrations as VectorDrawable XML or PNG in
+   drawable resources. SVG may be retained as source but must be converted for Android.
+4. Insert an Image block with a localized spoken description and optional caption.
+   Transparent single-color formulas can use `monochrome` for theme foreground tint;
+   colored illustrations can provide a separate `darkDrawable`. Otherwise the same
+   asset must be readable on both theme surfaces. Images preserve intrinsic aspect
+   ratio, use Fit scaling and center independently of paragraph alignment.
+5. Run localized-resource/content tests and compile; inspect image readability,
+   large text, independent scrolling and Back behavior on a developer-owned device.
+
+Painters use Compose's resource loading; no runtime equation typesetting, document
+parser, WebView, network access, extra library or background processing is involved.
 
 A full-window pointer ancestor reserves Android-reported left/right system-gesture
 insets before content padding. For a touch starting in either physical edge region,
@@ -224,8 +273,8 @@ same path handles Back from either screen edge, without requiring idle paging.
 Committed Back dismisses Instructions or animates Important to Instructions before
 publishing that destination. Cancellation realigns and restores the captured source
 before pager ownership returns. Pager overscroll is disabled so boundary stretching
-cannot leave an independent visual rebound. WIP Back returns to Important. Explicit close
-and outside taps request tutorial dismissal; the WIP surface blocks outside hits.
+cannot leave an independent visual rebound. Documentation Back returns to Important. Explicit close
+and outside taps request tutorial dismissal; the documentation surface blocks outside hits.
 
 The transient dialog window disables platform window animations and native dimming.
 A decorative Compose scrim uses the original theme dim amount and animates opacity
@@ -838,9 +887,9 @@ same enabled/disabled theme colors as before. Both Button color states read that
 animated value so the availability gate changes immediately without a color jump;
 the container, dimensions, semantics and capture mathematics are unchanged.
 
-`ScreenHeader` gives Settings and its Language/Developer pages, WIP and Diagnostics
+`ScreenHeader` gives Settings and its Language/Developer pages, documentation and Diagnostics
 one shared title/back layout: 16 dp top, 8 dp bottom/horizontal spacing below the
-host-owned system insets. It keeps the existing full back-button touch target;
+caller-owned system insets. It keeps the existing full back-button touch target;
 Diagnostics retains its intentionally scrollable header in constrained workspaces.
 
 ## Startup and onboarding

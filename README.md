@@ -22,7 +22,8 @@ two aiming directions. Release application ID: `com.malagel.viewy`.
    or swipe left; swipe right from **Important** to return. Read the tips and use
    the bottom-right **<** to go back or **X** to close. Android Back returns one
    tutorial page at a time and closes from Instructions. **How does it work?** opens
-   a WIP screen; its top-left back arrow or Android Back returns to Important. Tap **Enter height** and save the vertical distance
+   scrollable method documentation; its top-left back arrow or Android Back returns
+   to the same Important page and scroll position. Tap **Enter height** and save the vertical distance
    between the object's endpoints with the embedded keypad. Metric offers m/cm;
    Imperial offers decimal ft/in, following Settings without changing global units.
    Tap **Enter** to confirm. Back from the camera returns to **Enter height**;

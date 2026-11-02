@@ -77,10 +77,18 @@ future validated features; they have no selectable methods.
   centered titles fixed at the top. Instructions has a circular **>** at bottom right;
   Important has matching **<** and **X** controls for returning and closing. Its compact
   **How does it work?** link sits near the bottom-left corner, without hover or press
-  brightening, and opens a full-screen **WIP**
-  placeholder. The placeholder has a tonal back-arrow button at top left; it and
-  Android Back return to Important without dismissing help. No technical explanation
-  text is included in this destination yet.
+  brightening, and opens a full-screen documentation surface within the same modal
+  host. Its fixed **How does it work?** header has a tonal back arrow; it and
+  Android Back return to Important with its page and scroll position preserved,
+  without dismissing help.
+  The documentation background extends behind the status and navigation bars,
+  while content respects system insets and cutouts.
+  Documentation slides from the right and fades over 260 ms, reversing on Back;
+  covered/moving controls cannot receive input or accessibility focus. Motion follows
+  system animation scaling. The localized, independently scrollable reference currently
+  contains short sections identifying future mathematical explanations and limitations.
+  Resource-backed content supports headings, paragraphs, lists and pre-rendered equation
+  or illustration images offline; full mathematical explanations and assets remain pending.
   Horizontal swipes track the finger between Instructions and Important, then settle
   to a page using distance and fling velocity. Short drags can return to the same page;
   vertical scrolling remains independent. Buttons use a short 220 ms page slide;
@@ -96,7 +104,7 @@ future validated features; they have no selectable methods.
   Important retains larger, font-scaled bullet markers. Card bounds stay fixed and
   motion follows system animation scaling. Android Back from Important returns to
   Instructions and dismisses from Instructions; outside taps and **X** close the
-  tutorial. Every reopening starts with Instructions. Page or placeholder navigation
+  tutorial. Every reopening starts with Instructions. Page or documentation navigation
   alone never records tutorial completion.
   Help suspends camera and orientation acquisition. Entered height and completed
   results remain available; an incomplete endpoint pair is discarded.
@@ -133,9 +141,9 @@ future validated features; they have no selectable methods.
   using a slightly richer purple than the other tonal controls.
   It opens full-screen dark Material 3 settings with or without an active method.
   Settings and the method selector use the same compact, wide tonal back-arrow
-  button as the WIP screen, with a 48 dp touch target. Temporary method-selector
+  button as the documentation screen, with a 48 dp touch target. Temporary method-selector
   navigation locks preserve its normal colors.
-  Full-screen Settings, Language, Developer Options, WIP and Diagnostics share
+  Full-screen Settings, Language, Developer Options, documentation and Diagnostics share
   header spacing below the system insets, with a modest top gap above navigation.
   Settings provides global Metric/Imperial units, language selection and a separate
   Developer Options destination. Changes save automatically. Back from a child
