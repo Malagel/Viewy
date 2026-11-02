@@ -74,7 +74,7 @@
     <string name="tutorial_next_section">Siguiente sección: %1$s</string>
     <string name="tutorial_known_height_tips">Sigue estos consejos para obtener los mejores resultados posibles:</string>
     <string name="tutorial_known_height_tip_1">Mantente en el mismo lugar y conserva la posición del teléfono durante toda la medición.</string>
-    <string name="tutorial_known_height_tip_2">Intenta apuntar ambas capturas en la misma dirección, moviendo el teléfono solo verticalmente.</string>
+    <string name="tutorial_known_height_tip_2">Intenta apuntar ambas capturas en la misma dirección, solo rotando el teléfono hacia arriba o abajo.</string>
     <string name="tutorial_known_height_tip_3">Asegúrate de usar el zoom para conseguir una captura precisa y estable.</string>
     <string name="tutorial_known_height_tip_4">Lo mejor es usar un objeto cuya altura exacta conozcas de antemano.</string>
     <string name="tutorial_go_back">Volver</string>
