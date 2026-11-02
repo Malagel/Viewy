@@ -900,7 +900,9 @@ composed behind onboarding. The Activity retains its existing ViewModel ownershi
 and lifecycle forwarding; the inactive measurement state cannot acquire hardware.
 Completing onboarding crossfades into Home without also running Home's launch fade.
 Subsequent launches retain the normal Home entrance. Compose duration scaling
-applies to the 220 ms page slides and startup fade; navigation guards suppress
+applies to the 220 ms full-width page slides and startup fade. Forward navigation
+slides outgoing and incoming pages left without fading; Back reverses direction.
+Navigation guards suppress
 moving/outgoing input, focus and accessibility. Recreated pages initialize settled.
 Onboarding has a 300 ms opacity/upward entrance on fresh Activity creation,
 without replay on page changes or recreation. The wordmark fits on one line with
@@ -918,6 +920,11 @@ The permission action and explanations retain their measured slots while their
 content crossfades over 180 ms. Allow camera and Allowed use the same label
 typography. One primary footer button changes from Not now to Continue only when
 every declared permission is granted; no separate skip button is rendered.
+The footer's Not now state uses opaque `secondaryContainer`/`onSecondaryContainer`
+colors, fading to the normal primary button colors over 180 ms while the labels
+crossfade within a shared measured slot. Both enabled and disabled permission-footer
+colors use the animated container and text colors, so requesting blocks navigation
+without applying Material's disabled opacity.
 Hidden content loses semantics and its actions are disabled immediately, without changing the card's position
 or bounds after a grant, denial or return from Android Settings. Permission-card
 padding is reduced only at the top. All onboarding motion uses Compose duration

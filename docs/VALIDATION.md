@@ -101,6 +101,8 @@ Developer device validation for onboarding remains required:
   Back, rapid repeated taps, recreation on each page, and process termination before
   the final action. Restart after completion must go directly to Home. Confirm
   Home has no entrance animation behind onboarding or blank completion frame.
+  Forward steps must slide the entire page left by the full viewport width with
+  no page fade; Back must reverse the motion, including the footer.
 - Exercise already-granted, granted, denied and skipped Camera access. No prompt
   should launch automatically. After skipping/denying, enter Known Object Height,
   dismiss its tutorial and save height; use its existing permission recovery, then
@@ -112,6 +114,11 @@ Developer device validation for onboarding remains required:
   wrap readably. Setup should fade upward once, with no entrance replay after
   recreation. Permissions must show one primary button: Not now until all grants,
   then Continue, including after revocation and return from Android Settings.
+  Not now must use opaque muted palette colors with readable text, retaining the
+  same appearance when Allow camera is tapped and while Android prompts. Denial
+  must retain that appearance; grant must crossfade the label and fade the container
+  and text to normal Continue colors without
+  moving the card or footer. A pending request must still block navigation.
   Check that Allowed matches Allow camera in font, weight and size. The final
   Continue to Viewy button must retain its colors while saving and exiting, with
   no disabled-color flash. Storage-error Retry must still leave setup unfinished.

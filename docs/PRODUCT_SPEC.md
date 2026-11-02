@@ -24,9 +24,14 @@ future validated features; they have no selectable methods.
   available immediately after its entrance animation. Permissions and Completion
   use larger rounded headings. Setup enters with a short fade and subtle upward
   motion; Activity recreation shows the retained page directly.
+  Forward steps slide the whole page left across its full width without fading;
+  Back reverses the slide.
   Permissions lists Camera with an explicit Android permission action and its
   granted state, matching the request action's typography. A single navigation
   button reads **Not now** until all permissions are granted, then **Continue**.
+  Not now uses the palette's opaque, muted secondary-container colors; its colors
+  and label fade to the normal Continue appearance after all grants. A pending
+  request blocks navigation while preserving those colors.
   Skipping or denying still allows progress; no request
   launches automatically. Contextual camera recovery remains available in methods.
   Camera permission changes crossfade within stable card bounds, with one fixed

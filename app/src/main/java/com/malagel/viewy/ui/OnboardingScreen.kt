@@ -6,12 +6,11 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -29,7 +28,6 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -37,7 +35,6 @@ import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -79,8 +76,6 @@ fun OnboardingScreen(
     val blocked = entering || moving || preferences.writing || state.requesting
     // At Welcome, ordinary Activity Back/exit remains available.
     BackHandler(enabled = state.page != OnboardingPage.WELCOME || blocked) { if (!blocked) model.back(state.page) }
-    val offset = with(LocalDensity.current) { 32.dp.roundToPx() } *
-        if (LocalLayoutDirection.current == LayoutDirection.Ltr) 1 else -1
     val entranceOffset = with(LocalDensity.current) { 12.dp.toPx() }
     Surface(Modifier.fillMaxSize()) {
         pages.AnimatedContent(
@@ -90,8 +85,8 @@ fun OnboardingScreen(
             }.clipToBounds(),
             transitionSpec = {
                 val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
-                ((fadeIn(tween(220)) + slideInHorizontally(tween(220)) { direction * offset }) togetherWith
-                    (fadeOut(tween(220)) + slideOutHorizontally(tween(220)) { -direction * offset })).using(null)
+                (slideInHorizontally(tween(220)) { direction * it } togetherWith
+                    slideOutHorizontally(tween(220)) { -direction * it }).using(null)
             },
         ) { page ->
             NavigationInputGuard(blocked || page != state.page, Modifier.fillMaxSize()) {
@@ -162,20 +157,41 @@ private fun OnboardingPageContent(
             val completed = preferences.preferences?.onboardingCompleted == true
             val completing = page == OnboardingPage.COMPLETION && (preferences.writing || completed)
             val buttonColors = ButtonDefaults.buttonColors()
-            // Saving blocks input immediately, but must not gray out the outgoing button.
+            val permissionPage = page == OnboardingPage.PERMISSIONS
+            val skippingPermissions = permissionPage && !state.allPermissionsGranted
+            val containerColor by animateColorAsState(
+                if (skippingPermissions) MaterialTheme.colorScheme.secondaryContainer
+                else buttonColors.containerColor,
+                tween(180), label = "Onboarding continue color",
+            )
+            val contentColor by animateColorAsState(
+                if (skippingPermissions) MaterialTheme.colorScheme.onSecondaryContainer
+                else buttonColors.contentColor,
+                tween(180), label = "Onboarding continue text color",
+            )
+            // Temporary request/saving locks block input without changing the button's appearance.
             Button(onClick = onContinue,
                 enabled = state.canContinue && (page != OnboardingPage.COMPLETION || (preferences.canEdit && !completed)),
-                colors = if (completing) ButtonDefaults.buttonColors(
-                    disabledContainerColor = buttonColors.containerColor,
-                    disabledContentColor = buttonColors.contentColor,
-                ) else buttonColors,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = containerColor,
+                    contentColor = contentColor,
+                    disabledContainerColor = if (permissionPage || completing) containerColor else buttonColors.disabledContainerColor,
+                    disabledContentColor = if (permissionPage || completing) contentColor else buttonColors.disabledContentColor,
+                ),
                 modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
-                Text(stringResource(when {
-                    page == OnboardingPage.COMPLETION -> R.string.onboarding_enter
-                    page == OnboardingPage.PERMISSIONS && !state.allPermissionsGranted -> R.string.onboarding_not_now
-                    else -> R.string.onboarding_continue
-                }),
-                    textAlign = TextAlign.Center)
+                if (permissionPage) {
+                    Box(contentAlignment = Alignment.Center) {
+                        PermissionStateContent(!state.allPermissionsGranted) {
+                            Text(stringResource(R.string.onboarding_not_now), textAlign = TextAlign.Center)
+                        }
+                        PermissionStateContent(state.allPermissionsGranted) {
+                            Text(stringResource(R.string.onboarding_continue), textAlign = TextAlign.Center)
+                        }
+                    }
+                } else {
+                    Text(stringResource(if (page == OnboardingPage.COMPLETION) R.string.onboarding_enter
+                        else R.string.onboarding_continue), textAlign = TextAlign.Center)
+                }
             }
         }
     }
