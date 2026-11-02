@@ -8,6 +8,9 @@ class RegionalMeasurementUnitsTest {
     @Test fun icuDeterminesUnitsAndMapsMixedSystemsToMetric() {
         for ((tag, system, expected) in listOf(
             Triple("es-CL", RegionalMeasurementSystem.METRIC, MeasurementUnits.METRIC),
+            Triple("en-CL", RegionalMeasurementSystem.METRIC, MeasurementUnits.METRIC),
+            Triple("es-ES", RegionalMeasurementSystem.METRIC, MeasurementUnits.METRIC),
+            Triple("en-US", RegionalMeasurementSystem.US, MeasurementUnits.IMPERIAL),
             Triple("es-US", RegionalMeasurementSystem.US, MeasurementUnits.IMPERIAL),
             Triple("en-LR", RegionalMeasurementSystem.US, MeasurementUnits.IMPERIAL),
             Triple("en-MM", RegionalMeasurementSystem.METRIC, MeasurementUnits.METRIC),
@@ -45,12 +48,34 @@ class RegionalMeasurementUnitsTest {
             assertEquals(MeasurementUnits.METRIC, regionalMeasurementUnits(Locale.forLanguageTag("$language-CL")) { RegionalMeasurementSystem.METRIC })
         }
         assertEquals(MeasurementUnits.IMPERIAL, regionalMeasurementUnits(Locale.forLanguageTag("es-CL-u-rg-uszzzz")) {
-            assertEquals("uszzzz", it.getUnicodeLocaleType("rg"))
+            assertEquals("US", it.country)
+            assertNull(it.getUnicodeLocaleType("rg"))
             RegionalMeasurementSystem.US
         })
         assertEquals(MeasurementUnits.METRIC, regionalMeasurementUnits(Locale.forLanguageTag("en-US-u-ms-metric")) { throw AssertionError("Explicit override") })
         assertEquals(MeasurementUnits.IMPERIAL, regionalMeasurementUnits(Locale.forLanguageTag("es-CL-u-ms-ussystem")) { throw AssertionError("Explicit override") })
         assertEquals(MeasurementUnits.METRIC, regionalMeasurementUnits(Locale.forLanguageTag("en-US-u-ms-uksystem")) { throw AssertionError("Explicit override") })
+    }
+
+    @Test fun icuReceivesTheValidatedRegionEvenForUnsupportedNumericOverrides() {
+        for ((tag, region) in listOf(
+            "en-US-u-rg-419zzzz" to "US",
+            "en-US-u-rg-invalid" to "US",
+            "es-CL-u-rg-uszzzz" to "US",
+            "en-US-u-rg-clzzzz" to "CL",
+            "en-u-rg-uszzzz" to "US",
+        )) {
+            val expected = if (region == "US") MeasurementUnits.IMPERIAL else MeasurementUnits.METRIC
+            assertEquals(expected, regionalMeasurementUnits(Locale.forLanguageTag(tag)) {
+                assertEquals(region, it.country)
+                assertNull(it.getUnicodeLocaleType("rg"))
+                if (it.country == "US") RegionalMeasurementSystem.US else RegionalMeasurementSystem.METRIC
+            })
+        }
+        assertEquals(MeasurementUnits.METRIC,
+            regionalMeasurementUnits(Locale.forLanguageTag("es-CL-u-ms-metric")) {
+                throw AssertionError("Explicit override")
+            })
     }
 
     @Test fun invalidRegionalOverridesUseCountryAndMissingRegionsRemainSafe() {

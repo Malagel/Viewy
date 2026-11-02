@@ -8,8 +8,12 @@ lifecycle = "2.9.4"
 camerax = "1.6.2"
 appcompat = "1.7.1"
 datastore = "1.2.1"
+core = "1.18.0"
+test-runner = "1.7.0"
 
 [libraries]
+androidx-core = { module = "androidx.core:core", version.ref = "core" }
+androidx-test-runner = { module = "androidx.test:runner", version.ref = "test-runner" }
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
 androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }

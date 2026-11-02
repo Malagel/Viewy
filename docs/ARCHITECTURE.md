@@ -953,13 +953,18 @@ missing key; legacy choices and serialized Settings edits win. Initialization
 failures follow the existing loading/error/Retry path without publishing default
 units. No separate settings store or changes to canonical meter values exist.
 
-The regional initializer reads system resources, bypassing application-language
-overrides. A known region is required; Unicode regional/measurement overrides are
-recognized. Android's
+The regional initializer uses `LocaleManagerCompat.getSystemLocales` with the
+application context and selects the primary system locale, bypassing
+application-language overrides. An empty list defaults to Metric. A known region
+is required; Unicode regional/measurement overrides are recognized. ICU receives the validated effective region without a second
+interpretation of the `rg` extension. Android's
 [`LocaleData.getMeasurementSystem`](https://developer.android.com/reference/android/icu/util/LocaleData#getMeasurementSystem(android.icu.util.ULocale))
 maps US to Imperial and SI/UK to Metric. The UK region defaults to Metric.
 Missing, unknown or failed information defaults to Metric.
 The saved result is not recalculated on later launches or language changes.
+Debug-only `RegionalUnits` logcat entries distinguish detection (including system
+locales, regional overrides and ICU outcome) from a previously persisted selection;
+release builds emit no regional diagnostics.
 
 `SettingsViewModel` exposes immutable preference snapshots and explicit initial
 loading, write and storage-error states. Measurement UI waits for the first saved

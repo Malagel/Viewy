@@ -1,6 +1,8 @@
 package com.malagel.viewy.settings
 
 import android.content.Context
+import android.util.Log
+import com.malagel.viewy.BuildConfig
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -37,12 +39,26 @@ class AppPreferencesRepository(
     private val store: DataStore<Preferences>,
     private val initialUnits: () -> MeasurementUnits = { MeasurementUnits.METRIC },
 ) {
-    constructor(context: Context) : this(context.applicationContext.settingsDataStore, ::deviceMeasurementUnits)
+    private var reportSavedUnits: (String) -> Unit = {}
+
+    constructor(context: Context) : this(
+        context.applicationContext.settingsDataStore,
+        { deviceMeasurementUnits(context.applicationContext) },
+    ) {
+        reportSavedUnits = { saved ->
+            if (BuildConfig.DEBUG) Log.d("RegionalUnits",
+                "initialization: persisted=$saved; saved preference takes precedence, detection skipped")
+        }
+    }
 
     // Initialize atomically before publishing anything. Existing keys (including legacy
     // saved choices) always win, even if a concurrent Settings edit arrives first.
     val preferences: Flow<AppPreferences> = flow {
-        store.edit { values -> if (values[UNITS] == null) values[UNITS] = initialUnits().name }
+        store.edit { values ->
+            val saved = values[UNITS]
+            if (saved == null) values[UNITS] = initialUnits().name
+            else reportSavedUnits(saved)
+        }
         emitAll(store.data.map { values ->
             AppPreferences(
                 units = MeasurementUnits.entries.firstOrNull { it.name == values[UNITS] } ?: MeasurementUnits.METRIC,

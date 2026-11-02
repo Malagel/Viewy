@@ -65,6 +65,36 @@ Android builds are unnecessary. Follow [AGENTS.md](../AGENTS.md) for resource an
 device restrictions. Run only checks relevant to the change; recorded results below do not imply
 that these commands have been rerun on every revision.
 
+Regional units can be checked without a device using the existing JVM suite:
+
+```sh
+./gradlew --no-daemon --max-workers=1 --no-watch-fs :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest
+```
+
+The Android test APK adds real OS ICU coverage and checks that localized contexts
+cannot replace the primary system locale. Building it does not execute those tests.
+On an explicitly authorized emulator/device, run `:app:connectedDebugAndroidTest`
+with the same bounded Gradle options; cover API 31–32 and API 33+ locale retrieval.
+These Android-backed tests have not yet been executed.
+
+For manual regional verification, use separately approved fresh app data for each
+system locale: Spanish/Chile and English/Chile should initialize Metric;
+English/US should initialize Imperial. Repeat Chile with an English app override
+already set through Android's per-app language settings where supported. Debug
+logcat tag `RegionalUnits` reports the system locale list, primary locale, country,
+regional/measurement overrides, ICU outcome and detected units, or reports the
+persisted preference and skipped detection. A skipped ICU query is labeled explicitly.
+Confirm the Settings units and height-entry units agree. Never silently erase
+existing app data to obtain a fresh initialization.
+
+For an upgrade test, save each unit selection, install the updated APK with the
+same application ID/signature while preserving data, and confirm the saved units
+survive launch, language changes and restart. Test manual switching in both
+directions. Manual APK installation has no input to the resolver; fresh-data and
+upgrade behavior must still be checked separately on the affected phones.
+The reported Imperial default on Chilean devices has not been reproduced here;
+the former locale source and an already persisted default remain possible causes.
+
 Onboarding JVM coverage exercises three-page forward/Back state, stale callback
 suppression, retained temporary navigation versus fresh-process state, permission
 grant/denial/skip/resume refresh, inactive acquisition and later contextual grant.
