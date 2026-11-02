@@ -20,7 +20,7 @@ class LocalizedResourcesTest {
     @Test fun spanishCoversAllProseAndPreservesFormatArguments() {
         val english = strings("values/strings.xml")
         val spanish = strings("values-es/strings.xml")
-        val sharedNames = setOf("language_english", "language_spanish", "documentation_wip")
+        val sharedNames = setOf("language_english", "language_spanish")
         assertEquals(english.keys - sharedNames, spanish.keys)
         val placeholders = Regex("%[0-9]+\\\$[a-z]")
         spanish.forEach { (key, text) ->

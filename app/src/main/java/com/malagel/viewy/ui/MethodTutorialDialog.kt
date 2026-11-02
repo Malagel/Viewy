@@ -1,6 +1,9 @@
 package com.malagel.viewy.ui
 
+import android.view.WindowManager
 import androidx.activity.compose.PredictiveBackHandler
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -10,6 +13,7 @@ import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.stopScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
@@ -21,6 +25,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.foundation.focusGroup
 import androidx.compose.ui.input.pointer.pointerInput
@@ -38,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.view.WindowCompat
 import com.malagel.viewy.R
 import com.malagel.viewy.tutorial.TutorialCard
 import com.malagel.viewy.tutorial.TutorialPage
@@ -92,6 +98,22 @@ internal fun MethodTutorialDialog(
         derivedStateOf { !pager.isScrollInProgress && pager.settledPage == card.page.ordinal }
     }
     val cardInteractive by remember(visibility, closing) { derivedStateOf { visibility.value == 1f && !closing } }
+    // Initializing from retained navigation makes a recreated dialog appear settled.
+    val documentationTransition = updateTransition(card.documentationOpen, label = "documentation")
+    val documentationProgress = documentationTransition.animateFloat(
+        transitionSpec = { tween(260, easing = FastOutSlowInEasing) }, label = "documentation progress",
+    ) { if (it) 1f else 0f }
+    val documentationCoverage by remember {
+        derivedStateOf {
+            documentationCoversTutorial(documentationTransition.currentState,
+                documentationTransition.targetState, documentationTransition.isRunning)
+        }
+    }
+    val documentationMoving by remember {
+        derivedStateOf {
+            documentationTransition.currentState != documentationTransition.targetState || documentationTransition.isRunning
+        }
+    }
     val pageScope = rememberCoroutineScope()
     val moveToPage: (TutorialPage) -> Unit = { page ->
         pageScope.launch {
@@ -113,21 +135,42 @@ internal fun MethodTutorialDialog(
         }
     }
     Dialog(
-        onDismissRequest = { if (!card.documentationOpen) closing = true },
+        onDismissRequest = { if (!documentationCoverage && !systemBackInProgress) closing = true },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false, dismissOnBackPress = false),
     ) {
         // This transient window owns all entrance/exit motion; platform window motion must not stack with it.
         val window = (LocalView.current.parent as? DialogWindowProvider)?.window
         val normalDimAmount = remember(window) { window?.attributes?.dimAmount ?: 0f }
+        @Suppress("DEPRECATION") // Dialog/older-Android compatibility; Compose paints behind transparent bars.
         SideEffect {
+            window?.apply {
+                // DialogProperties handles edge-to-edge layout, but this separate window
+                // also needs transparent system bars. Compose supplies their background.
+                addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+                statusBarColor = android.graphics.Color.TRANSPARENT
+                navigationBarColor = android.graphics.Color.TRANSPARENT
+                isStatusBarContrastEnforced = false
+                isNavigationBarContrastEnforced = false
+                WindowCompat.getInsetsController(this, decorView).apply {
+                    isAppearanceLightStatusBars = false
+                    isAppearanceLightNavigationBars = false
+                }
+            }
             window?.setWindowAnimations(0)
             // Compose owns the scrim so removing the native window cannot cut off its fade.
             window?.setDimAmount(0f)
         }
         PredictiveBackHandler { progress ->
-            if (card.documentationOpen) {
-                progress.collect { }
-                if (!closing) onBack(card.id)
+            if (documentationCoverage) {
+                // Consume Back throughout exit; a repeated request must not page/dismiss help.
+                // Predictive cancellation never changes the retained destination.
+                systemBackInProgress = true
+                try {
+                    progress.collect { }
+                    if (documentationOpen && !closing) onBack(card.id)
+                } finally {
+                    systemBackInProgress = false
+                }
                 return@PredictiveBackHandler
             }
             val sourcePage = TutorialPage.entries[pager.settledPage]
@@ -166,7 +209,7 @@ internal fun MethodTutorialDialog(
                 systemBackInProgress = false
             }
         }
-        Box(Modifier.fillMaxSize().reserveSystemBackGestures(!card.documentationOpen && !closing)) {
+        Box(Modifier.fillMaxSize().clipToBounds().reserveSystemBackGestures(!closing)) {
             Box(Modifier.fillMaxSize().graphicsLayer { alpha = dimVisibility.value }
                 .background(Color.Black.copy(alpha = normalDimAmount)))
             BoxWithConstraints(
@@ -174,8 +217,8 @@ internal fun MethodTutorialDialog(
                 contentAlignment = Alignment.Center,
             ) {
                 val cardHeight = (maxHeight - 32.dp).coerceAtLeast(0.dp).coerceAtMost(640.dp)
-                Box(Modifier.matchParentSize().pointerInput(card.id) { detectTapGestures { closing = true } })
-                NavigationInputGuard(card.documentationOpen || !cardInteractive, Modifier.fillMaxSize()) {
+                Box(Modifier.matchParentSize().pointerInput(card.id) { detectTapGestures { if (!documentationCoverage && !systemBackInProgress) closing = true } })
+                NavigationInputGuard(documentationCoverage || !cardInteractive || systemBackInProgress, Modifier.fillMaxSize()) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Surface(
                             modifier = Modifier.padding(16.dp).widthIn(max = 560.dp).fillMaxWidth()
@@ -183,6 +226,7 @@ internal fun MethodTutorialDialog(
                                 .graphicsLayer {
                                     alpha = visibility.value
                                     translationY = (1f - visibility.value) * travel
+                                    translationX = -documentationProgress.value * travel
                                 }
                                 .semantics { paneTitle = title }
                                 .pointerInput(Unit) { detectTapGestures { /* Consume empty card taps. */ } },
@@ -194,20 +238,21 @@ internal fun MethodTutorialDialog(
                                 // Both small pages are ready before a button starts the slide.
                                 beyondViewportPageCount = 1,
                                 modifier = Modifier.fillMaxSize(),
-                                userScrollEnabled = !card.documentationOpen && cardInteractive && !systemBackInProgress,
+                                userScrollEnabled = !documentationCoverage && cardInteractive && !systemBackInProgress,
                                 flingBehavior = PagerDefaults.flingBehavior(pager, snapPositionalThreshold = 0.1f),
                                 overscrollEffect = null,
                                 key = { TutorialPage.entries[it] },
                             ) { index ->
                                 val page = TutorialPage.entries[index]
-                                val interactive = settled && page == card.page && !card.documentationOpen && cardInteractive && !systemBackInProgress
+                                val interactive = settled && page == card.page && !documentationCoverage && cardInteractive && !systemBackInProgress
                                 // Do not add a touch-consuming overlay during a drag: the pager owns it.
                                 Box(Modifier.fillMaxSize().focusProperties {
                                     canFocus = interactive
                                     onEnter = { if (!interactive) cancelFocusChange() }
                                 }.focusGroup().then(if (interactive) Modifier else Modifier.clearAndSetSemantics {})) {
                                     TutorialPageContent(content, page,
-                                        animateIllustration = pager.isScrollInProgress || pager.settledPage == index,
+                                        covered = documentationCoverage,
+                                        animateIllustration = !documentationCoverage && (pager.isScrollInProgress || pager.settledPage == index),
                                         onNext = { if (interactive) page.next?.let(moveToPage) },
                                         onBack = { if (interactive) page.previous?.let(moveToPage) },
                                         onDismiss = { if (interactive) closing = true },
@@ -218,35 +263,47 @@ internal fun MethodTutorialDialog(
                         }
                     }
                 }
-                if (card.documentationOpen) DocumentationPlaceholder { onBack(card.id) }
+            }
+            if (documentationCoverage) {
+                NavigationInputGuard(documentationMoving || systemBackInProgress, Modifier.fillMaxSize()
+                    .graphicsLayer {
+                        translationX = (1f - documentationProgress.value) * size.width
+                        alpha = documentationProgress.value
+                    }) {
+                    MethodDocumentationScreen(card.method, onBack = {
+                        if (documentationOpen && !documentationMoving && !systemBackInProgress) onBack(card.id)
+                    })
+                }
             }
         }
     }
 }
 
-@Composable
-private fun DocumentationPlaceholder(onBack: () -> Unit) {
-    Surface(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures {} }) {
-        Column(Modifier.fillMaxSize()) {
-            ScreenHeader(onBack = onBack)
-            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Text(stringResource(R.string.documentation_wip), style = MaterialTheme.typography.headlineMedium)
-            }
-        }
-    }
-}
+/** Includes a reversed entrance whose current and target states are both closed. */
+internal fun documentationCoversTutorial(current: Boolean, target: Boolean, running: Boolean): Boolean =
+    current || target || running
 
 @Composable
 private fun TutorialPageContent(
-    content: MethodTutorialContent, page: TutorialPage, animateIllustration: Boolean,
+    content: MethodTutorialContent, page: TutorialPage, covered: Boolean, animateIllustration: Boolean,
     onNext: () -> Unit, onBack: () -> Unit, onDismiss: () -> Unit, onDocumentation: () -> Unit,
 ) {
+    val scroll = rememberScrollState()
+    // A footer tap can open documentation while prose is still flinging. Freeze the
+    // position seen at coverage, rather than letting a hidden fling change it later.
+    val coveredOffset = if (covered) scroll.value else null
+    LaunchedEffect(covered) {
+        if (coveredOffset != null) {
+            scroll.stopScroll(MutatePriority.PreventUserInput)
+            scroll.scrollTo(coveredOffset)
+        }
+    }
     Column(Modifier.fillMaxSize()) {
         Text(stringResource(page.titleResource()),
             Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp).semantics { heading() },
             style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
         Column(
-            Modifier.weight(1f).verticalScroll(rememberScrollState())
+            Modifier.weight(1f).verticalScroll(scroll, enabled = !covered)
                 .padding(vertical = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {

@@ -253,4 +253,10 @@
     <string name="onboarding_complete">Todo listo!</string>
     <string name="onboarding_enter">Continuar a Viewy</string>
     <string name="onboarding_accuracy_disclaimer">La precisión depende del dispositivo y de las condiciones de medición.</string>
+    <string name="documentation_about">Acerca de este método</string>
+    <string name="documentation_known_height_intro">Esta página es la referencia de Altura conocida del objeto. Para consultar cómo realizar una medición, vuelve al tutorial.</string>
+    <string name="documentation_details">Detalles del método</string>
+    <string name="documentation_known_height_details">Aquí se añadirán la explicación matemática, las ecuaciones como imágenes y las descripciones de sus variables. Aún no están disponibles.</string>
+    <string name="documentation_limits">Supuestos y limitaciones</string>
+    <string name="documentation_known_height_limits">Los supuestos y las limitaciones detallados se añadirán junto con los cálculos. Las mediciones siguen siendo aproximadas; esta página no demuestra una exactitud calibrada.</string>
 </resources>

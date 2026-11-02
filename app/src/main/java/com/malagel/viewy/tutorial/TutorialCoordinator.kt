@@ -78,7 +78,7 @@ class TutorialCoordinator(
     }
 
     fun openDocumentation(cardId: Long) {
-        val card = state.card?.takeIf { it.id == cardId && it.page == TutorialPage.IMPORTANT } ?: return
+        val card = state.card?.takeIf { it.id == cardId && it.page == TutorialPage.IMPORTANT && !it.documentationOpen } ?: return
         state = state.copy(card = card.copy(documentationOpen = true))
     }
 

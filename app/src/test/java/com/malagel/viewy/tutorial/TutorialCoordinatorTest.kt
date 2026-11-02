@@ -124,6 +124,9 @@ class TutorialCoordinatorTest {
         val important = coordinator.state.card!!
         coordinator.openDocumentation(card.id)
         assertEquals(important.copy(documentationOpen = true), coordinator.state.card)
+        val open = coordinator.state.card
+        repeat(3) { coordinator.openDocumentation(card.id) }
+        assertSame(open, coordinator.state.card)
         coordinator.changePage(card.id, TutorialPage.INSTRUCTIONS) // Covered page cannot change.
         assertEquals(important.copy(documentationOpen = true), coordinator.state.card)
         assertTrue(seen.ids.isEmpty())
@@ -141,6 +144,24 @@ class TutorialCoordinatorTest {
         coordinator.back(card.id)
         coordinator.openDocumentation(card.id)
         assertEquals(reopened, coordinator.state.card)
+    }
+
+    @Test fun leavingWhileDocumentationIsOpenInvalidatesAllOldCallbacksWithoutCompletion() {
+        activate()
+        hidden()
+        val id = coordinator.state.card!!.id
+        coordinator.changePage(id, TutorialPage.IMPORTANT)
+        coordinator.openDocumentation(id)
+        navigate(selection.openModes())
+        activate()
+        hidden()
+        val current = coordinator.state.card
+        coordinator.back(id)
+        coordinator.openDocumentation(id)
+        coordinator.changePage(id, TutorialPage.IMPORTANT)
+        coordinator.dismiss(id)
+        assertSame(current, coordinator.state.card)
+        assertTrue(seen.ids.isEmpty())
     }
 
     @Test fun rapidNavigationCancelsPendingHelpAndRejectsObsoleteEntranceCallbacks() {

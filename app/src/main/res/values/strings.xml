@@ -242,7 +242,6 @@
         <item quantity="one">Maximum %1$d digit</item>
         <item quantity="other">Maximum %1$d digits</item>
     </plurals>
-    <string name="documentation_wip" translatable="false">WIP</string>
 
     <string name="onboarding_welcome">Welcome to Viewy</string>
     <string name="onboarding_description">Viewy uses your phone’s sensors and camera to take real-world measurements. No additional equipment needed.</string>
@@ -255,4 +254,10 @@
     <string name="onboarding_complete">You\'re all set!</string>
     <string name="onboarding_enter">Continue to Viewy</string>
     <string name="onboarding_accuracy_disclaimer">Accuracy depends on your device and measurement conditions.</string>
+    <string name="documentation_about">About this method</string>
+    <string name="documentation_known_height_intro">This page is the reference for Known Object Height. For instructions on taking a measurement, return to the tutorial.</string>
+    <string name="documentation_details">Method details</string>
+    <string name="documentation_known_height_details">The mathematical explanation, pre-rendered equations and descriptions of their variables will be added here. They are not available yet.</string>
+    <string name="documentation_limits">Assumptions and limitations</string>
+    <string name="documentation_known_height_limits">Detailed assumptions and limitations will be added alongside the calculations. Measurements remain approximate; this page does not establish calibrated accuracy.</string>
 </resources>
