@@ -8,7 +8,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.malagel.viewy.R
 import com.malagel.viewy.domain.MeasurementMethod
@@ -21,7 +20,7 @@ internal fun HomeScreen(
     onMode: (MeasurementMode) -> Unit, onSelect: (MeasurementMethod) -> Unit, interactive: Boolean,
 ) {
     BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-        val compact = maxHeight < 500.dp || maxWidth < 320.dp || LocalDensity.current.fontScale > 1.5f
+        val compact = rememberMainLayout(maxWidth, maxHeight) != MainLayout.STANDARD
         Column(Modifier.widthIn(max = 600.dp).fillMaxSize().padding(horizontal = if (compact) 12.dp else 20.dp, vertical = 8.dp)) {
             ViewyHeader(compact, false, false, {}, {}, onSettings)
             Box(Modifier.weight(1f).fillMaxWidth().padding(bottom = 16.dp), contentAlignment = Alignment.Center) {

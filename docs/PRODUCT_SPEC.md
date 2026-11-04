@@ -246,10 +246,11 @@ future validated features; they have no selectable methods.
   Backspace, Enter and Escape are supported. Smaller rounded rectangular number
   keys keep the same colors when disabled. Invalid input, including empty or zero,
   disables **Enter** immediately and dims it through a short 150 ms fade; valid
-  input fades it back to full emphasis. The complete keypad adapts proportionally
-  to the rounded workspace and remains static, without scrolling or overscroll
-  stretching. Numbers fit a clipped slot with reserved shake travel, separate from
-  the stationary unit label, so rejection feedback cannot pass beneath that label.
+  input fades it back to full emphasis. The keypad retains its ordinary arrangement
+  and full-sized controls; constrained workspaces allow scrolling and reflow the
+  unit selector when needed. Numbers fit a clipped slot with reserved shake travel,
+  with a readable minimum and horizontal scrolling for exceptional lengths, separate
+  from the stationary unit label, so rejection feedback cannot pass beneath it.
   Exceptionally small converted values show <0.0001 rather than a misleading zero.
   Camera controls immediately lose input and accessibility on editor opening.
   Camera and editor share a restrained 225 ms opacity transition over an opaque

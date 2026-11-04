@@ -28,12 +28,15 @@ supplies all Compose color roles;
 platform launch colors and system-bar icon styles match it. The Activity uses
 `adjustNothing` and measurement content excludes IME padding. `EmbeddedHeightEditor`
 occupies the existing rounded workspace without a new window, text field or input
-connection. `HeightEditorViewport` measures the compact rectangular keypad at a
-bounded reference width, then centers and proportionally scales the whole layout
-to fit the actual workspace. It has no scroll or overscroll owner. Reference keys
-are 56 dp high; bounds and font scale determine the final proportional size.
-The exceptional workspace's parent also stops scrolling while the editor owns its
-remaining height. Disabled number/unit controls retain their colors; Enter instead
+connection. `HeightEditorViewport` centers the keypad at its available width, bounded
+at 400 dp, and scrolls vertically when its natural height exceeds the workspace.
+Below 208 dp it exposes horizontal scrolling rather than compressing key columns.
+Controls are never scaled: keys retain their 56 dp minimum height and unit/cancel
+controls retain 48 dp targets. The title and unit selector use separate rows when
+the measured title cannot share their width. The numeric display fits down to 24 sp,
+then scrolls horizontally inside its clipped slot while its unit remains fixed.
+The exceptional workspace's parent stops scrolling while the editor or result owns
+its remaining height, and omits the empty reserved instruction in those cases. Disabled number/unit controls retain their colors; Enter instead
 animates to 40% opacity over 150 ms for an invalid draft, with logical eligibility
 changing immediately. All controls retain correct disabled semantics. The value
 uses fitted tabular text in a clipped numeric slot with 8 dp internal margins for
@@ -121,8 +124,28 @@ and recreated covers appear settled. The reserved stage caption retains its
 150 ms top/bottom/empty crossfade and is empty during editing; outgoing captions
 lose semantics immediately.
 
-Home and measurement use the same compact predicate, maximum width, outer top/side
-padding and header geometry. `ViewyHeader` reserves the same help slot and noncompact
+Home and measurement share `MainLayoutPolicy` and measured header/instruction geometry.
+The existing width < 320 dp, height < 500 dp or font scale > 1.5 compact signal
+is retained. Standard chrome that leaves less than 240 dp of viewfinder space
+also selects compact; compact chrome that cannot leave that space, or width below
+280 dp, selects the constrained workspace. Geometry includes actual localized text
+measurement, existing padding, gaps and full-sized actions; font scale is not a
+linear text-size multiplier. These decisions use inset-adjusted Compose constraints,
+with content bounded at 600 dp. The header moves actions to a separate row only
+when the measured wordmark and controls cannot share the available width.
+
+The constrained camera workspace uses a 320 dp preview inside its scrolling content
+with fixed capture/navigation. Oversized recovery/guidance uses the status dialog.
+Resizing into constrained space with a saved height opens the workspace; an opened
+dialog stays mounted through subsequent resizing until explicitly collapsed. The
+covered Activity renders the collapsed placeholder even after expansion, keeping
+the actual workspace and native preview in just one window.
+A real window transfer can reattach the preview; it does not change the draft,
+saved height, result or navigation state. Existing acquisition-interruption rules
+still apply to unfinished captures. The Scaffold and edge-to-edge dialog each own
+one system-bar/cutout inset application in their respective windows.
+
+Home and measurement retain the same maximum width, outer top/side padding and header geometry. `ViewyHeader` reserves the same help slot and noncompact
 subtitle line on Home while hiding them from drawing/accessibility. This keeps the
 wordmark and Settings anchored identically when a method becomes active.
 
@@ -231,7 +254,13 @@ dialog window outside the tutorial card's inset container, coloring the status a
 navigation areas with its theme background through entrance and exit. The dialog
 uses transparent system bars with light icons and disables platform contrast scrims;
 transparent bar-color setters also cover older Android and dialog-window behavior.
-Text uses Material typography and Android font scaling. Documentation
+Text uses Material typography and Android font scaling. `AdaptivePageColumn`
+measures header/footer independently: they remain pinned when at least 96 dp is
+left for the body; otherwise the whole page shares one vertical scroll owner.
+This also protects Settings, onboarding and tutorial actions when large text would
+consume their body. Tutorial documentation actions take a separate footer row
+only when their measured label cannot share the navigation row. Covered tutorial
+scrolling stops for both presentations. Documentation
 scroll state is independent of tutorial paging and saveable across Activity recreation.
 The initial English/Spanish entry identifies pending reference material without
 inventing mathematics or implying calibrated accuracy.
@@ -917,7 +946,8 @@ initial mounting and lifecycle resume refresh the platform grant. Grant, denial
 and skipping never persist completion. Measurement retains its own contextual
 launcher, resume refresh and app-settings recovery, with no automatic request.
 The permission action and explanations retain their measured slots while their
-content crossfades over 180 ms. Allow camera and Allowed use the same label
+content crossfades over 180 ms. When the measured permission title and action cannot
+share a row, the action uses the card width instead of the normal 128 dp bound. Allow camera and Allowed use the same label
 typography. One primary footer button changes from Not now to Continue only when
 every declared permission is granted; no separate skip button is rendered.
 The footer's Not now state uses opaque `secondaryContainer`/`onSecondaryContainer`

@@ -3,8 +3,6 @@ package com.malagel.viewy.ui
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -30,10 +28,11 @@ internal fun MethodDocumentationScreen(method: MeasurementMethod, onBack: () -> 
     val title = stringResource(R.string.tutorial_how_it_works)
     Surface(Modifier.fillMaxSize().semantics { paneTitle = title }
         .pointerInput(Unit) { detectTapGestures { /* Consume empty surface taps. */ } }) {
-        Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout))) {
-            ScreenHeader(onBack = onBack, title = title)
+        AdaptivePageColumn(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout)),
+            header = { ScreenHeader(onBack = onBack, title = title) },
+        ) { scrollModifier ->
             // Short documents need no lazy virtualization. Scroll state is saveable across recreation.
-            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())
+            Column(scrollModifier.fillMaxWidth()
                 .padding(horizontal = 24.dp, vertical = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Column(Modifier.widthIn(max = 720.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     content.blocks.forEach { block -> DocumentationContentBlock(block) }

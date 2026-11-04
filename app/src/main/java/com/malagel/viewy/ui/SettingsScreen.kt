@@ -16,10 +16,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -101,16 +99,17 @@ fun SettingsScreen(state: SettingsUiState, model: SettingsViewModel, backdropOnl
 private fun SettingsPage(state: SettingsUiState, model: SettingsViewModel, page: SettingsDestination, interactive: Boolean) {
     // Observing configuration refreshes both the summary and radio choice in place.
     val configuredTags = LocalConfiguration.current.locales.toLanguageTags()
-    Column(Modifier.fillMaxSize()) {
+    val scroll = remember(page) { ScrollState(0) }
+    AdaptivePageColumn(Modifier.fillMaxSize(), bodyScroll = scroll, header = {
         ScreenHeader(onBack = { if (interactive) model.back() }, enabled = !state.resetLocked,
             title = stringResource(when (page) {
                 SettingsDestination.DEVELOPER -> R.string.developer_options
                 SettingsDestination.LANGUAGE -> R.string.language
                 else -> R.string.settings
             }))
-        val scroll = remember(page) { ScrollState(0) }
-        Column(Modifier.widthIn(max = 600.dp).fillMaxWidth().align(Alignment.CenterHorizontally)
-            .weight(1f).verticalScroll(scroll)
+    }) { scrollModifier ->
+        Column(Modifier.widthIn(max = 600.dp).fillMaxWidth()
+            .then(scrollModifier)
             .then(if (page == SettingsDestination.LANGUAGE) Modifier.selectableGroup() else Modifier)) {
             when (page) {
                 SettingsDestination.MAIN -> {

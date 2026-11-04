@@ -154,14 +154,15 @@ private fun MeasurementResultPanel(
 
 /** Measure the destination once: fixed number/unit positions and tabular digits throughout counting. */
 @Composable
-private fun ResultDistance(number: String, layoutNumber: String, unit: String) {
+internal fun ResultDistance(number: String, layoutNumber: String, unit: String) {
     val density = LocalDensity.current
     val measurer = rememberTextMeasurer()
     val base = MaterialTheme.typography.displayLarge.copy(fontWeight = FontWeight.Bold, fontFeatureSettings = "tnum")
     BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         val available = constraints.maxWidth
         val style = remember(base, layoutNumber, unit, available, density) {
-            (96 downTo 28 step 2).map { base.copy(fontSize = it.sp, lineHeight = (it * 1.15f).sp) }.firstOrNull { candidate ->
+            val size = readableTextSize(96, 28, 2) {
+                val candidate = base.copy(fontSize = it.sp, lineHeight = (it * 1.15f).sp)
                 val approximation = candidate.copy(fontSize = candidate.fontSize * 0.6f, lineHeight = candidate.lineHeight * 0.6f)
                 val unitStyle = candidate.copy(fontSize = candidate.fontSize * 0.5f, lineHeight = candidate.lineHeight * 0.5f)
                 val width = measurer.measure(layoutNumber, candidate, softWrap = false).size.width +
@@ -169,9 +170,12 @@ private fun ResultDistance(number: String, layoutNumber: String, unit: String) {
                     measurer.measure(unit, unitStyle, softWrap = false).size.width
                 // Measure the actual three text styles, their two gaps and a small glyph-edge allowance.
                 width + with(density) { 18.dp.roundToPx() } <= available
-            } ?: base.copy(fontSize = 28.sp, lineHeight = (28 * 1.15f).sp)
+            }
+            base.copy(fontSize = size.sp, lineHeight = (size * 1.15f).sp)
         }
-        val numberWidth = with(density) { measurer.measure(layoutNumber, style, softWrap = false).size.width.toDp() }
+        val numberWidth = remember(layoutNumber, style, density, measurer) {
+            with(density) { measurer.measure(layoutNumber, style, softWrap = false).size.width.toDp() }
+        }
         // Exceptional magnitudes remain fully readable by scrolling, without shrinking below 28 sp.
         Row(Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)) {

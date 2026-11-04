@@ -19,7 +19,6 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -284,27 +283,34 @@ internal fun documentationCoversTutorial(current: Boolean, target: Boolean, runn
     current || target || running
 
 @Composable
-private fun TutorialPageContent(
+internal fun TutorialPageContent(
     content: MethodTutorialContent, page: TutorialPage, covered: Boolean, animateIllustration: Boolean,
     onNext: () -> Unit, onBack: () -> Unit, onDismiss: () -> Unit, onDocumentation: () -> Unit,
 ) {
     val scroll = rememberScrollState()
+    val pageScroll = rememberScrollState()
     // A footer tap can open documentation while prose is still flinging. Freeze the
     // position seen at coverage, rather than letting a hidden fling change it later.
-    val coveredOffset = if (covered) scroll.value else null
     LaunchedEffect(covered) {
-        if (coveredOffset != null) {
-            scroll.stopScroll(MutatePriority.PreventUserInput)
-            scroll.scrollTo(coveredOffset)
+        if (covered) {
+            val coveredOffsets = listOf(scroll.value, pageScroll.value)
+            listOf(scroll, pageScroll).zip(coveredOffsets).forEach { (state, offset) ->
+                state.stopScroll(MutatePriority.PreventUserInput)
+                state.scrollTo(offset)
+            }
         }
     }
-    Column(Modifier.fillMaxSize()) {
-        Text(stringResource(page.titleResource()),
-            Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp).semantics { heading() },
-            style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+    AdaptivePageColumn(Modifier.fillMaxSize(),
+        header = {
+            Text(stringResource(page.titleResource()),
+                Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp).semantics { heading() },
+                style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        },
+        footer = { TutorialPageActions(page, onNext, onBack, onDismiss, onDocumentation) },
+        bodyScroll = scroll, pageScroll = pageScroll, scrollEnabled = !covered,
+    ) { scrollModifier ->
         Column(
-            Modifier.weight(1f).verticalScroll(scroll, enabled = !covered)
-                .padding(vertical = 24.dp),
+            scrollModifier.fillMaxWidth().padding(vertical = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             content.pages.getValue(page).forEach { section ->
@@ -337,7 +343,6 @@ private fun TutorialPageContent(
                 }
             }
         }
-        TutorialPageActions(page, onNext, onBack, onDismiss, onDocumentation)
     }
 }
 
@@ -346,30 +351,43 @@ private fun TutorialPageContent(
 private fun TutorialPageActions(
     page: TutorialPage, onNext: () -> Unit, onBack: () -> Unit, onDismiss: () -> Unit, onDocumentation: () -> Unit,
 ) {
-    Row(
-        Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (page == TutorialPage.IMPORTANT) {
-            Box(Modifier.weight(1f).align(Alignment.Bottom).heightIn(min = 48.dp)
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val label = stringResource(R.string.tutorial_how_it_works)
+        val style = MaterialTheme.typography.labelLarge
+        val measurer = androidx.compose.ui.text.rememberTextMeasurer()
+        val density = LocalDensity.current
+        val stacked = page == TutorialPage.IMPORTANT && remember(label, style, constraints.maxWidth, density) {
+            measurer.measure(label, style, softWrap = false).size.width +
+                with(density) { 172.dp.roundToPx() } > constraints.maxWidth
+        }
+        val link: @Composable (Modifier) -> Unit = { modifier ->
+            Box(modifier.heightIn(min = 48.dp)
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null,
                     role = Role.Button, onClick = onDocumentation), contentAlignment = Alignment.BottomStart) {
-                Text(stringResource(R.string.tutorial_how_it_works), Modifier.fillMaxWidth().padding(start = 12.dp, bottom = 10.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Start)
+                Text(label, Modifier.fillMaxWidth().padding(start = 12.dp, bottom = 10.dp),
+                    color = MaterialTheme.colorScheme.primary, style = style, textAlign = TextAlign.Start)
             }
-        } else Spacer(Modifier.weight(1f))
-        if (page == TutorialPage.INSTRUCTIONS) {
-            MeasurementActionButton(label = nextDescription(TutorialPage.IMPORTANT), onClick = onNext) {
-                Icon(painterResource(R.drawable.ic_chevron_right), contentDescription = null, modifier = Modifier.size(28.dp))
-            }
-        } else {
-            MeasurementActionButton(label = stringResource(R.string.tutorial_go_back), onClick = onBack) {
-                Icon(painterResource(R.drawable.ic_chevron_left), contentDescription = null, modifier = Modifier.size(28.dp))
-            }
-            MeasurementActionButton(label = stringResource(R.string.close), onClick = onDismiss) {
-                Icon(painterResource(R.drawable.ic_close), contentDescription = null, modifier = Modifier.size(28.dp))
+        }
+        Column(Modifier.fillMaxWidth()) {
+            if (stacked) link(Modifier.fillMaxWidth().padding(horizontal = 12.dp))
+            Row(
+                Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (page == TutorialPage.IMPORTANT && !stacked) link(Modifier.weight(1f).align(Alignment.Bottom))
+                else Spacer(Modifier.weight(1f))
+                if (page == TutorialPage.INSTRUCTIONS) {
+                    MeasurementActionButton(label = nextDescription(TutorialPage.IMPORTANT), onClick = onNext) {
+                        Icon(painterResource(R.drawable.ic_chevron_right), contentDescription = null, modifier = Modifier.size(28.dp))
+                    }
+                } else {
+                    MeasurementActionButton(label = stringResource(R.string.tutorial_go_back), onClick = onBack) {
+                        Icon(painterResource(R.drawable.ic_chevron_left), contentDescription = null, modifier = Modifier.size(28.dp))
+                    }
+                    MeasurementActionButton(label = stringResource(R.string.close), onClick = onDismiss) {
+                        Icon(painterResource(R.drawable.ic_close), contentDescription = null, modifier = Modifier.size(28.dp))
+                    }
+                }
             }
         }
     }

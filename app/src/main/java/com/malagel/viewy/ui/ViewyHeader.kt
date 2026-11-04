@@ -3,6 +3,8 @@ package com.malagel.viewy.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.indication
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -29,75 +31,91 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.malagel.viewy.R
 
 internal val ViewyWordmarkFont = FontFamily(Font(R.font.nunito_bold, weight = FontWeight.Bold))
 
 @Composable
 internal fun ViewyHeader(compact: Boolean, overflow: Boolean, active: Boolean, onHelp: () -> Unit, onCloseWorkspace: () -> Unit, onSettings: () -> Unit, diagnosticsEnabled: Boolean = false, onDiagnostics: () -> Unit = {}) {
-    Row(
-        Modifier.fillMaxWidth().padding(top = if (compact) 4.dp else 12.dp, bottom = if (compact) 12.dp else 28.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineLarge.copy(
-                fontFamily = ViewyWordmarkFont, fontWeight = FontWeight.Bold,
-                fontSize = if (compact) 30.sp else 38.sp,
-                lineHeight = if (compact) 38.sp else 46.sp,
-            ))
-            if (!compact) Text(stringResource(R.string.measurement_method_subtitle),
-                modifier = if (active) Modifier else Modifier.graphicsLayer { alpha = 0f }.clearAndSetSemantics {},
-                style = MaterialTheme.typography.bodySmall)
+    BoxWithConstraints(Modifier.fillMaxWidth().padding(top = if (compact) 4.dp else 12.dp,
+        bottom = if (compact) 12.dp else 28.dp)) {
+        val geometry = headerGeometry(maxWidth, compact, overflow)
+        val wordmark: @Composable (Modifier) -> Unit = { modifier ->
+            Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(stringResource(R.string.app_name), style = wordmarkStyle(compact))
+                if (!compact) Text(stringResource(R.string.measurement_method_subtitle),
+                    modifier = if (active) Modifier else Modifier.graphicsLayer { alpha = 0f }.clearAndSetSemantics {},
+                    style = MaterialTheme.typography.bodySmall)
+            }
         }
-        if (overflow) LabeledIconButton(R.string.close, "×", onCloseWorkspace)
-        if (active) {
-            val helpLabel = stringResource(R.string.how_to_use)
-            val diagnosticsLabel = stringResource(R.string.diag_open)
-            val haptic = LocalHapticFeedback.current
-            val helpInteractions = remember { MutableInteractionSource() }
-            // One gesture owner for the full 48 dp target. Consume disabled holds too,
-            // so releasing a long press never falls through to the tutorial click.
-            val longPress = {
-                if (diagnosticsEnabled) {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onDiagnostics()
+        if (geometry.separateActions) {
+            Column(Modifier.fillMaxWidth()) {
+                wordmark(Modifier.fillMaxWidth())
+                Row(Modifier.align(Alignment.End).horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
+                    HeaderActions(overflow, active, onHelp, onCloseWorkspace, onSettings, diagnosticsEnabled, onDiagnostics)
                 }
             }
-            Box(Modifier.size(48.dp).clearAndSetSemantics {
-                contentDescription = helpLabel
-                role = Role.Button
-                onClick(label = helpLabel) { onHelp(); true }
-                if (diagnosticsEnabled) onLongClick(label = diagnosticsLabel) { longPress(); true }
-            }.combinedClickable(
-                interactionSource = helpInteractions, indication = null,
-                role = Role.Button, onClickLabel = helpLabel, onClick = onHelp,
-                onLongClickLabel = if (diagnosticsEnabled) diagnosticsLabel else null,
-                hapticFeedbackEnabled = false, onLongClick = longPress,
-            ), contentAlignment = Alignment.Center) {
-                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    // Keep the 48 dp gesture target, but draw all interaction feedback
-                    // only inside the visible 40 dp circle.
-                    modifier = Modifier.size(40.dp).clip(CircleShape).indication(helpInteractions, ripple())) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text("?", fontSize = with(LocalDensity.current) { 20.dp.toSp() }, modifier = Modifier.clearAndSetSemantics {})
-                    }
-                }
+        } else {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                wordmark(Modifier.weight(1f))
+                HeaderActions(overflow, active, onHelp, onCloseWorkspace, onSettings, diagnosticsEnabled, onDiagnostics)
             }
-            Spacer(Modifier.width(8.dp))
-        } else Spacer(Modifier.width(56.dp))
-        val settingsLabel = stringResource(R.string.settings)
-        FilledTonalIconButton(
-            onClick = onSettings, shape = CircleShape,
-            // A slightly richer purple than the shared tonal actions, using theme roles.
-            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                containerColor = lerp(MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.primaryContainer, 0.25f),
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            ),
-            modifier = Modifier.size(52.dp).semantics { contentDescription = settingsLabel },
-        ) {
-            Icon(painterResource(R.drawable.ic_settings), contentDescription = null, modifier = Modifier.size(28.dp))
         }
     }
+}
+
+@Composable
+private fun HeaderActions(overflow: Boolean, active: Boolean, onHelp: () -> Unit,
+    onCloseWorkspace: () -> Unit, onSettings: () -> Unit, diagnosticsEnabled: Boolean, onDiagnostics: () -> Unit,
+) {
+    if (overflow) LabeledIconButton(R.string.close, "×", onCloseWorkspace)
+    if (active) {
+        val helpLabel = stringResource(R.string.how_to_use)
+        val diagnosticsLabel = stringResource(R.string.diag_open)
+        val haptic = LocalHapticFeedback.current
+        val helpInteractions = remember { MutableInteractionSource() }
+        // One gesture owner for the full 48 dp target. Consume disabled holds too,
+        // so releasing a long press never falls through to the tutorial click.
+        val longPress = {
+            if (diagnosticsEnabled) {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onDiagnostics()
+            }
+        }
+        Box(Modifier.size(48.dp).clearAndSetSemantics {
+            contentDescription = helpLabel
+            role = Role.Button
+            onClick(label = helpLabel) { onHelp(); true }
+            if (diagnosticsEnabled) onLongClick(label = diagnosticsLabel) { longPress(); true }
+        }.combinedClickable(
+            interactionSource = helpInteractions, indication = null,
+            role = Role.Button, onClickLabel = helpLabel, onClick = onHelp,
+            onLongClickLabel = if (diagnosticsEnabled) diagnosticsLabel else null,
+            hapticFeedbackEnabled = false, onLongClick = longPress,
+        ), contentAlignment = Alignment.Center) {
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                // Keep the 48 dp gesture target, but draw all interaction feedback
+                // only inside the visible 40 dp circle.
+                modifier = Modifier.size(40.dp).clip(CircleShape).indication(helpInteractions, ripple())) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text("?", fontSize = with(LocalDensity.current) { 20.dp.toSp() }, modifier = Modifier.clearAndSetSemantics {})
+                }
+            }
+        }
+        Spacer(Modifier.width(8.dp))
+    } else Spacer(Modifier.width(56.dp))
+    val settingsLabel = stringResource(R.string.settings)
+    FilledTonalIconButton(
+        onClick = onSettings, shape = CircleShape,
+        // A slightly richer purple than the shared tonal actions, using theme roles.
+        colors = IconButtonDefaults.filledTonalIconButtonColors(
+            containerColor = lerp(MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.primaryContainer, 0.25f),
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        ),
+        modifier = Modifier.size(52.dp).semantics { contentDescription = settingsLabel },
+    ) {
+        Icon(painterResource(R.drawable.ic_settings), contentDescription = null, modifier = Modifier.size(28.dp))
+    }
+
 }

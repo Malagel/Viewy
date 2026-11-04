@@ -6,6 +6,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.selection.selectable
@@ -19,9 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.*
@@ -33,9 +34,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.malagel.viewy.R
@@ -90,15 +89,30 @@ internal fun EmbeddedHeightEditor(
                 Column(Modifier.fillMaxWidth().padding(12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = onCancel, enabled = interactive,
-                            colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.onSurface,
-                                disabledContentColor = MaterialTheme.colorScheme.onSurface)) {
-                            Icon(painterResource(R.drawable.ic_arrow_back), stringResource(R.string.cancel))
+                    BoxWithConstraints(Modifier.fillMaxWidth()) {
+                        val title = stringResource(R.string.object_height)
+                        val style = MaterialTheme.typography.titleMedium
+                        val measurer = rememberTextMeasurer()
+                        val density = LocalDensity.current
+                        val stacked = remember(title, style, constraints.maxWidth, density) {
+                            measurer.measure(title, style, softWrap = false).size.width +
+                                with(density) { 160.dp.roundToPx() } > constraints.maxWidth
                         }
-                        Text(stringResource(R.string.object_height), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium,
-                            maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        HeightUnits(draft, interactive, onSwitchUnit)
+                        Column {
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(onClick = onCancel, enabled = interactive,
+                                    modifier = Modifier.size(48.dp),
+                                    colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.onSurface,
+                                        disabledContentColor = MaterialTheme.colorScheme.onSurface)) {
+                                    Icon(painterResource(R.drawable.ic_arrow_back), stringResource(R.string.cancel))
+                                }
+                                Text(title, Modifier.weight(1f), style = style)
+                                if (!stacked) HeightUnits(draft, interactive, onSwitchUnit)
+                            }
+                            if (stacked) Box(Modifier.align(Alignment.End)) {
+                                HeightUnits(draft, interactive, onSwitchUnit)
+                            }
+                        }
                     }
                     HeightNumberDisplay(draft, display, displayDescription, limitDescription)
                     if (draft.correctionFailed) Text(stringResource(R.string.height_correction_failed),
@@ -134,21 +148,18 @@ internal fun EmbeddedHeightEditor(
     }
 }
 
-/** Measure once at a readable reference width, then fit the whole editor without a scroll owner. */
+/** Keep full-size controls; the viewport scrolls only when the natural editor cannot fit. */
 @Composable
 private fun HeightEditorViewport(modifier: Modifier, content: @Composable () -> Unit) {
-    Layout(content = content, modifier = modifier.clipToBounds()) { measurables, constraints ->
-        val referenceWidth = constraints.maxWidth.coerceIn(320.dp.roundToPx(), 400.dp.roundToPx())
-        val child = measurables.single().measure(Constraints(
-            minWidth = referenceWidth, maxWidth = referenceWidth,
-        ))
-        val scale = minOf(1f, constraints.maxWidth.toFloat() / child.width,
-            constraints.maxHeight.toFloat() / child.height)
-        layout(constraints.maxWidth, constraints.maxHeight) {
-            child.placeWithLayer((constraints.maxWidth - child.width) / 2, (constraints.maxHeight - child.height) / 2) {
-                scaleX = scale
-                scaleY = scale
-                transformOrigin = TransformOrigin.Center
+    BoxWithConstraints(modifier.clipToBounds(), contentAlignment = Alignment.Center) {
+        val viewportHeight = maxHeight
+        // Below 208 dp, reveal full-sized columns horizontally instead of compressing keys.
+        val editorWidth = maxWidth.coerceIn(208.dp, 400.dp)
+        Box(Modifier.widthIn(max = 400.dp).fillMaxWidth().horizontalScroll(rememberScrollState()),
+            contentAlignment = Alignment.Center) {
+            Box(Modifier.width(editorWidth).verticalScroll(rememberScrollState())
+                .heightIn(min = viewportHeight), contentAlignment = Alignment.Center) {
+                content()
             }
         }
     }
@@ -188,13 +199,18 @@ private fun HeightNumberDisplay(draft: HeightDraft, display: String, description
         // Reserve the full shake travel inside the number slot, before the fixed unit gap.
         BoxWithConstraints(Modifier.weight(1f).clipToBounds().padding(horizontal = 8.dp), contentAlignment = Alignment.CenterEnd) {
             val style = remember(base, text, constraints.maxWidth, density) {
-                (base.fontSize.value.toInt() downTo 1).map { base.copy(fontSize = it.sp) }.firstOrNull {
-                    measurer.measure(text, it, softWrap = false).size.width <= constraints.maxWidth
-                } ?: base.copy(fontSize = 1.sp)
+                val size = readableTextSize(base.fontSize.value.toInt(), minimumHeightNumberSp) {
+                    measurer.measure(text, base.copy(fontSize = it.sp), softWrap = false).size.width <= constraints.maxWidth
+                }
+                base.copy(fontSize = size.sp)
             }
-            Text(text, Modifier.fillMaxWidth().offset { IntOffset(shake.value.dp.roundToPx(), 0) },
-                style = style, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.End,
-                color = if (display.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
+            val scroll = rememberScrollState()
+            LaunchedEffect(text, scroll.maxValue) { scroll.scrollTo(scroll.maxValue) }
+            Box(Modifier.fillMaxWidth().offset { IntOffset(shake.value.dp.roundToPx(), 0) }, contentAlignment = Alignment.CenterEnd) {
+                Text(text, Modifier.horizontalScroll(scroll), style = style, maxLines = 1, softWrap = false,
+                    textAlign = TextAlign.End,
+                    color = if (display.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
+            }
         }
         Text(draft.unit.label, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -224,11 +240,8 @@ private fun HeightUnits(draft: HeightDraft, interactive: Boolean, onSwitchUnit: 
                     interactionSource = interactions, indication = null,
                     onClick = { if (unit != draft.unit) onSwitchUnit() },
                 ).semantics { contentDescription = label }, contentAlignment = Alignment.Center) {
-                    Box(Modifier.size(width = 44.dp, height = 40.dp),
-                        contentAlignment = Alignment.Center) {
-                        Text(unit.label, Modifier.clearAndSetSemantics {}, style = MaterialTheme.typography.labelLarge,
-                            color = if (unit == draft.unit) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                    Text(unit.label, Modifier.clearAndSetSemantics {}, style = MaterialTheme.typography.labelLarge,
+                        color = if (unit == draft.unit) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

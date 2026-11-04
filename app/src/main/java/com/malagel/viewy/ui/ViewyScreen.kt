@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.provider.Settings
+import android.view.WindowManager
 import androidx.annotation.StringRes
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
@@ -24,6 +25,7 @@ import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -47,6 +49,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.*
@@ -59,9 +62,11 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.content.ContextCompat
 import androidx.core.app.ActivityCompat
 import androidx.core.net.toUri
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -199,20 +204,29 @@ fun ViewyScreen(
     LaunchedEffect(measurementDestination, navigating) {
         if (!measurementDestination && !navigating) showWorkspace = false
     }
-    Scaffold { insets ->
-        BoxWithConstraints(Modifier.fillMaxSize().padding(insets), contentAlignment = Alignment.TopCenter) {
-            val compact = maxHeight < 500.dp || LocalDensity.current.fontScale > 1.5f || maxWidth < 320.dp
+    Scaffold(contentWindowInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout)) { insets ->
+        BoxWithConstraints(Modifier.fillMaxSize().padding(insets).consumeWindowInsets(insets), contentAlignment = Alignment.TopCenter) {
+            val layout = rememberMainLayout(maxWidth, maxHeight)
+            val compact = layout != MainLayout.STANDARD
+            val exceptional = layout == MainLayout.CONSTRAINED
+            var wasConstrained by rememberSaveable { mutableStateOf(exceptional) }
+            val workspaceRequested = keepWorkspaceOpen(showWorkspace, wasConstrained, exceptional, heightConfigured)
+            SideEffect {
+                wasConstrained = exceptional
+                if (workspaceRequested) showWorkspace = true
+            }
             val workspace: @Composable (Boolean) -> Unit = { overflow ->
                 key(state.methodActivationId) {
                     MeasurementVisibilityEffect(model, permission, overlay.blocksMeasurement || showStatus || navigating, editorBlocks)
 
+                    val scrollWorkspace = overflow && !editorBlocks && !measurement.completed
                     Column(
                         Modifier.widthIn(max = 600.dp).fillMaxSize().padding(start = if (compact) 12.dp else 20.dp, end = if (compact) 12.dp else 20.dp, top = 8.dp, bottom = if (compact) 16.dp else 32.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Column(
-                            Modifier.weight(1f).then(if (overflow && !editorBlocks) Modifier.verticalScroll(rememberScrollState()) else Modifier),
+                            Modifier.weight(1f).then(if (scrollWorkspace) Modifier.verticalScroll(rememberScrollState()) else Modifier),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             ViewyHeader(compact, overflow, true, { openHelp(false) }, {
@@ -221,7 +235,7 @@ fun ViewyScreen(
                             }, openAppSettings, diagnosticsEnabled, { openHelp(true) })
                             key(Unit) {
                                 BoxWithConstraints(
-                                    Modifier.fillMaxWidth().then(if (overflow && !editorBlocks) Modifier.height(320.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)) else Modifier.weight(1f)).clip(RoundedCornerShape(28.dp))
+                                    Modifier.fillMaxWidth().then(if (scrollWorkspace) Modifier.height(320.dp) else Modifier.weight(1f)).clip(RoundedCornerShape(28.dp))
                                         .background(MaterialTheme.colorScheme.surfaceContainer),
                                     contentAlignment = Alignment.Center,
                                 ) {
@@ -239,7 +253,7 @@ fun ViewyScreen(
                                                 } ?: 0
                                             }
                                             val recoveryNeeded = state.recoveryVisible
-                                            val useStatusDialog = !overflow && ((compact && recoveryNeeded) || hintHeight > with(density) { (maxHeight / 2 - 54.dp).toPx() })
+                                            val useStatusDialog = (compact && recoveryNeeded) || hintHeight > with(density) { (maxHeight / 2 - 54.dp).toPx() }
                                             if (displayedCameraHeight != null) {
                                                 LivePreview(model, state, MaterialTheme.colorScheme.surfaceContainer, workspaceMotion,
                                                     resultCovered = measurement.result != null && coveredResult === measurement.result)
@@ -260,7 +274,7 @@ fun ViewyScreen(
                                                 if (measurement.completed) {
                                                     // The result overlay owns all completed-measurement content.
                                                 } else if (useStatusDialog) {
-                                                    FilledTonalIconButton(onClick = { statusSnapshot = state; showStatus = true }, modifier = Modifier.align(Alignment.BottomStart).padding(4.dp)
+                                                    FilledTonalIconButton(onClick = { statusSnapshot = state; showStatus = true }, modifier = Modifier.align(Alignment.BottomStart).padding(4.dp).sizeIn(minWidth = 48.dp, minHeight = 48.dp)
                                                         .semantics { contentDescription = previewStatusLabel }) {
                                                         Text(if (recoveryNeeded || hint != null) "!" else "i")
                                                     }
@@ -313,7 +327,7 @@ fun ViewyScreen(
                                     }
                                 }
                             }
-                            MeasurementStageArea(
+                            if (!overflow || (!editorBlocks && !measurement.completed)) MeasurementStageArea(
                                 stageInstruction(measurement, editorBlocks), textMeasurer,
                                 if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
                             )
@@ -329,9 +343,8 @@ fun ViewyScreen(
             }
             // An exceptional window gets a readable, scrollable workspace dialog. Its
             // capture/navigation row stays fixed; the regular portrait screen never scrolls.
-            val exceptional = maxHeight < 360.dp || maxWidth < 280.dp || LocalDensity.current.fontScale > 2f
             if (exceptional && editHeight && !showWorkspace) SideEffect { showWorkspace = true }
-            val workspaceDialogOpen = exceptional && (showWorkspace || editorBlocks) && (measurementDestination || navigating)
+            val workspaceDialogOpen = (workspaceRequested || (exceptional && editorBlocks)) && (measurementDestination || navigating)
             val home: @Composable (Boolean) -> Unit = { interactive ->
                 NavigationInputGuard(homeEntering, Modifier.fillMaxSize().graphicsLayer { alpha = homeEntryAlpha.value }) {
                     HomeScreen(homePresentationDestination(state.selection.destination),
@@ -350,9 +363,9 @@ fun ViewyScreen(
                     if (!measuring) {
                         SideEffect { model.visibilityChanged(MeasurementVisibility()) }
                         home(!navigating && !measurementDestination && !overlay.blocksMeasurement && !workspaceDialogOpen)
-                    } else if (exceptional) {
-                        if (!showWorkspace) SideEffect { model.visibilityChanged(MeasurementVisibility()) }
-                        Column(Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    } else if (exceptional || workspaceDialogOpen) {
+                        if (!workspaceRequested) SideEffect { model.visibilityChanged(MeasurementVisibility()) }
+                        Column(Modifier.widthIn(max = 600.dp).fillMaxSize().padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                             ViewyHeader(compact, false, true, { openHelp(false) }, {}, openAppSettings, diagnosticsEnabled, { openHelp(true) })
                             TextButton(onClick = { showWorkspace = true }, modifier = Modifier.weight(1f)) {
                                 Text(stringResource(R.string.open_viewfinder))
@@ -368,21 +381,38 @@ fun ViewyScreen(
                     if (editHeight) model.cancelHeightEditor()
                     else if (!editorBlocks && !overlay.blocksMeasurement && !navigating) showWorkspace = false
                 },
-                properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = false),
+                properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false, dismissOnBackPress = false),
             ) {
+                val window = (LocalView.current.parent as? DialogWindowProvider)?.window
+                @Suppress("DEPRECATION") // Match the Activity's edge-to-edge bars on older Android too.
+                SideEffect {
+                    window?.apply {
+                        addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+                        statusBarColor = android.graphics.Color.TRANSPARENT
+                        navigationBarColor = android.graphics.Color.TRANSPARENT
+                        isStatusBarContrastEnforced = false
+                        isNavigationBarContrastEnforced = false
+                        WindowCompat.getInsetsController(this, decorView).apply {
+                            isAppearanceLightStatusBars = false
+                            isAppearanceLightNavigationBars = false
+                        }
+                    }
+                }
                 BackHandler(enabled = !overlay.blocksMeasurement && !editorBlocks && !showStatus && state.tutorial.card == null) {
                     if (!navigating && !workspaceMotion.moving) model.systemBack()
                 }
-                Surface(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout))) {
-                    ScreenOverlayHost(overlayTransition, overlay, backdropOnly = false, overlay = { destination, interactive ->
-                        when (destination) {
-                            ScreenOverlay.SETTINGS -> settingsContent(false, interactive)
-                            ScreenOverlay.DIAGNOSTICS -> DiagnosticsScreen(state, unit, permission, model::dismissDiagnostics, interactive = interactive)
-                            ScreenOverlay.NONE -> Unit
-                        }
-                    }) {
-                        MeasurementDestinationHost(destinationTransition, blocked = overlay.blocksMeasurement) { measuring ->
-                            if (measuring) workspace(true) else home(false)
+                Surface(Modifier.fillMaxSize()) {
+                    Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout))) {
+                        ScreenOverlayHost(overlayTransition, overlay, backdropOnly = false, overlay = { destination, interactive ->
+                            when (destination) {
+                                ScreenOverlay.SETTINGS -> settingsContent(false, interactive)
+                                ScreenOverlay.DIAGNOSTICS -> DiagnosticsScreen(state, unit, permission, model::dismissDiagnostics, interactive = interactive)
+                                ScreenOverlay.NONE -> Unit
+                            }
+                        }) {
+                            MeasurementDestinationHost(destinationTransition, blocked = overlay.blocksMeasurement) { measuring ->
+                                if (measuring) workspace(true) else home(false)
+                            }
                         }
                     }
                 }
@@ -630,7 +660,7 @@ private fun stageText(state: MeasurementState): String = stringResource(when {
 
 @Composable
 internal fun LabeledIconButton(@StringRes label: Int, symbol: String, onClick: () -> Unit, modifier: Modifier = Modifier, description: String = stringResource(label)) {
-    FilledTonalIconButton(onClick = onClick, modifier = modifier.semantics { contentDescription = description }) {
+    FilledTonalIconButton(onClick = onClick, modifier = modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp).semantics { contentDescription = description }) {
         Text(symbol, fontSize = with(LocalDensity.current) { 24.dp.toSp() }, modifier = Modifier.clearAndSetSemantics {})
     }
 }
@@ -640,35 +670,39 @@ private fun MeasurementControls(
     captureTop: Boolean, canCapture: Boolean, compact: Boolean,
     onRestart: () -> Unit, onCapture: () -> Unit, captureRestriction: String? = null, homeControl: @Composable () -> Unit,
 ) {
-    Row(Modifier.widthIn(max = 320.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-            MeasurementActionButton(label = stringResource(R.string.restart_measurement), onClick = onRestart) {
-                Icon(painterResource(R.drawable.ic_restart), contentDescription = null)
+    BoxWithConstraints(Modifier.widthIn(max = 320.dp).fillMaxWidth()) {
+        val rowModifier = if (maxWidth < 208.dp) Modifier.horizontalScroll(rememberScrollState()).width(208.dp)
+            else Modifier.fillMaxWidth()
+        Row(rowModifier, verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                MeasurementActionButton(label = stringResource(R.string.restart_measurement), onClick = onRestart) {
+                    Icon(painterResource(R.drawable.ic_restart), contentDescription = null)
+                }
             }
+            val captureLabel = stringResource(if (captureTop) R.string.capture_top else R.string.capture_bottom)
+            val captureColor by animateColorAsState(
+                if (canCapture) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                tween(150), label = "Capture availability")
+            Button(
+                onClick = onCapture, enabled = canCapture,
+                modifier = Modifier.size(if (compact) 72.dp else 88.dp).semantics {
+                    contentDescription = captureLabel
+                    captureRestriction?.let { stateDescription = it }
+                },
+                shape = CircleShape, contentPadding = PaddingValues(0.dp),
+                border = BorderStroke(2.dp, captureColor),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    contentColor = captureColor,
+                    disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    disabledContentColor = captureColor,
+                ),
+            ) {
+                val color = LocalContentColor.current
+                Canvas(Modifier.fillMaxSize().padding(6.dp)) { drawCircle(color) }
+            }
+            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { homeControl() }
         }
-        val captureLabel = stringResource(if (captureTop) R.string.capture_top else R.string.capture_bottom)
-        val captureColor by animateColorAsState(
-            if (canCapture) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-            tween(150), label = "Capture availability")
-        Button(
-            onClick = onCapture, enabled = canCapture,
-            modifier = Modifier.size(if (compact) 72.dp else 88.dp).semantics {
-                contentDescription = captureLabel
-                captureRestriction?.let { stateDescription = it }
-            },
-            shape = CircleShape, contentPadding = PaddingValues(0.dp),
-            border = BorderStroke(2.dp, captureColor),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                contentColor = captureColor,
-                disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                disabledContentColor = captureColor,
-            ),
-        ) {
-            val color = LocalContentColor.current
-            Canvas(Modifier.fillMaxSize().padding(6.dp)) { drawCircle(color) }
-        }
-        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { homeControl() }
     }
 }
 

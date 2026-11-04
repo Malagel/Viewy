@@ -241,6 +241,60 @@ in the method-help row below.
 Source and tests define the individual cases. Mocked deployment tests verify script decisions using
 fictional devices/configuration, not real wireless reliability.
 
+## Responsive layout compatibility
+
+The shared policy has JVM coverage for portrait defaults, measured chrome budgets,
+constrained fallbacks, readable fitting floors, header reflow and workspace retention
+on resize. Compose component tests in `ResponsiveLayoutTest` cover all configurations
+below in English and Spanish using `DeviceConfigurationOverride`: measured policy,
+keypad touch targets/draft retention through resizing, permission/footer actions,
+tutorial documentation/Back/Close, long result/unit overflow, and the Back target.
+They use the existing Compose BOM with only `ui-test-junit4` and the debug test
+Activity manifest added; no screenshot plugin or release dependency is needed.
+
+Compile these tests without connecting a device by adding
+`:app:compileDebugAndroidTestKotlin` to the bounded Gradle command above. Compilation
+passes alongside the JVM suite, debug assembly and lint (no errors). The component
+tests have not been executed: rendered UI assertions require a separately authorized
+Android test run. No screenshot baseline or rendered visual equivalence is established.
+
+For developer-controlled screenshot comparison, use the same locale, font size,
+display density, system navigation and animation settings before/after the change.
+Capture Home, Methods, height prompt/editor, live capture, both tutorial pages,
+result, Settings/Language/Developer Options, Diagnostics and documentation.
+Compare the ordinary S22 portrait layout first: header/wordmark, card bounds,
+viewfinder corners/reticle, keypad arrangement, spacing, action sizes, typography,
+colors and motion must retain the established presentation.
+
+| Available content (dp) | Font scale | Focus |
+| --- | --- | --- |
+| 393 × 852; 360 × 800 | 100% | Standard structure and source-defined dimensions |
+| 320 × 568 | 150% | Compact spacing, wrapped captions and editor scrolling |
+| 280 × 360 | 200% | Constrained workspace; all actions reachable |
+| 412 × 915 | 200% | Readable large text, permission/tutorial footer reflow |
+| 800 × 1280; 1280 × 800 | 100%, then 200% | Centered bounded content and landscape tolerance |
+| 600 × 500 | 100%, then 200% | Resizing and measured chrome fallback |
+
+These are available content constraints, not physical-device specifications. Also
+vary display density, gesture/three-button navigation and cutouts; content must
+clear each system inset once, with the existing dark system-bar appearance.
+Repeat in English and Spanish with TalkBack and hardware-key input. Scroll to
+all keypad keys/unit controls, Enter and Cancel; verify 48 dp targets and a fixed
+unit next to long values. Converted numbers overflow horizontally at 24 sp rather
+than disappearing into tiny text. Check result values/units (m, ft, km, mi) with
+long English/Spanish decimals, small preview bounds and the retained count-up.
+
+Resize while editing, reading either tutorial page/documentation, capturing and
+showing a result; then expand again. Height, unit draft, tutorial destination and
+completed result must survive, without replaying entrance/count animations.
+The opened workspace dialog remains open until explicitly collapsed; normal Back,
+Restart, Home and overlay input/accessibility guards must keep their contracts.
+Activity recreation retains ViewModels, but pause/window transfer can interrupt
+unfinished capture pairs under the existing acquisition policy. Verify resource
+release/rebinding and retained result behavior separately. Camera FILL_CENTER
+framing, cutouts, display rotation mapping, actual nonlinear font rendering,
+physical cleanup and pixel-level S22 equivalence remain real-device checks.
+
 ## Animation responsiveness and rendering
 
 The animation and rendering changes passed the bounded JVM tests, debug assembly
@@ -405,9 +459,9 @@ keypad and completed result to distinguish live-preview teardown from button fee
    Background or open Help/Settings during the fade, then return; check that no
    cover or snapshot remains stuck. These rendered frame checks require a device.
 7. Repeat in small/split windows, landscape, large text, cutouts/system insets and
-   the exceptional workspace. The keypad must adapt proportionally, remain fully
-   visible and never move or stretch under finger swipes. All keys and Enter must
-   remain reachable without overlap or scrolling. Type and convert
+   the exceptional workspace. The keypad must retain full-sized controls, scrolling
+   vertically when it cannot fit. All keys, units, Cancel and Enter must remain
+   reachable without overlap or stretching. Type and convert
    long values rapidly: the unit label must stay fixed and never receive overflowing
    numeric pixels. With TalkBack verify value, units, decimal, distinct backspace and
    cancel actions; underlying camera/result/Capture targets must be absent or disabled,
